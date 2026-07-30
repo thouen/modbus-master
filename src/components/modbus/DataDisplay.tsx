@@ -105,10 +105,10 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
             </span>
           </div>
 
-          {/* Data grid - multi column layout */}
+          {/* Data grid - 8 rows x 8 columns, address left + value right */}
           <div className="border border-border rounded-sm overflow-hidden">
             <div className="overflow-auto max-h-[400px] scanline p-2">
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1">
+              <div className="grid grid-cols-8 gap-1">
                 {latestResult.values.map((val, idx) => {
                   const addr = latestResult.address + idx;
                   const isBool = typeof val === 'boolean';
@@ -116,10 +116,10 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
                   return (
                     <div
                       key={idx}
-                      className="group bg-secondary/30 border border-border rounded-sm p-2 hover:border-primary/50 hover:bg-secondary/60 transition-all data-cell-highlight"
+                      className="group bg-secondary/30 border border-border rounded-sm px-2 py-1.5 hover:border-primary/50 hover:bg-secondary/60 transition-all data-cell-highlight flex items-center justify-between gap-1"
                     >
-                      <div className="text-xs font-mono text-muted-foreground mb-1">
-                        {addr.toString().padStart(5, '0')}
+                      <div className="text-xs font-mono text-muted-foreground shrink-0">
+                        {addr.toString().padStart(3, '0')}
                       </div>
                       <div className="text-sm font-mono font-medium text-primary truncate">
                         {formatValue(val, isBool)}

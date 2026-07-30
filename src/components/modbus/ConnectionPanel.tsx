@@ -68,54 +68,50 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
           </select>
         </div>
 
-        {/* Host & Port - 2/3 + 1/3 */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2">
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">HOST / IP</label>
+        {/* Host : Port - shared label */}
+        <div>
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">HOST : PORT</label>
+          <div className="flex items-center gap-2">
             <Input
               value={host}
               onChange={(e) => setHost(e.target.value)}
               placeholder="192.168.1.100"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base"
+              className="font-mono bg-secondary/50 border-border text-base flex-1"
             />
-          </div>
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PORT</label>
+            <span className="text-sm font-mono text-foreground/50">:</span>
             <Input
               value={port}
               onChange={(e) => setPort(e.target.value)}
               placeholder="502"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base"
+              className="font-mono bg-secondary/50 border-border text-base w-24"
               type="number"
             />
           </div>
         </div>
 
-        {/* Unit ID & Timeout - 1/2 + 1/2 */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">UNIT ID</label>
+        {/* Unit ID : Timeout - shared label */}
+        <div>
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">UNIT ID : TIMEOUT (ms)</label>
+          <div className="flex items-center gap-2">
             <Input
               value={unitId}
               onChange={(e) => setUnitId(e.target.value)}
               placeholder="1"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base"
+              className="font-mono bg-secondary/50 border-border text-base flex-1"
               type="number"
               min="1"
               max="247"
             />
-          </div>
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">TIMEOUT (ms)</label>
+            <span className="text-sm font-mono text-foreground/50">:</span>
             <Input
               value={timeout}
               onChange={(e) => setTimeout(e.target.value)}
               placeholder="5000"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base"
+              className="font-mono bg-secondary/50 border-border text-base w-32"
               type="number"
             />
           </div>
