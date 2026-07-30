@@ -51,43 +51,21 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
       </div>
 
       <div className="space-y-3">
-        {/* Protocol Selector - Radio Buttons */}
+        {/* Protocol Selector - Select Dropdown */}
         <div>
           <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PROTOCOL</label>
-          <div className="grid grid-cols-3 gap-2">
+          <select
+            value={protocol}
+            onChange={(e) => !connected && setProtocol(e.target.value as ModbusProtocol)}
+            disabled={connected}
+            className="w-full font-mono text-base bg-secondary/50 border border-border rounded px-3 py-2 text-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+          >
             {PROTOCOL_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={`
-                  flex items-center gap-2 px-3 py-1.5 rounded-sm border cursor-pointer transition-all
-                  ${protocol === opt.value
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border bg-secondary/20 hover:border-primary/40'
-                  }
-                  ${connected ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                <input
-                  type="radio"
-                  name="protocol"
-                  value={opt.value}
-                  checked={protocol === opt.value}
-                  onChange={() => !connected && setProtocol(opt.value)}
-                  disabled={connected}
-                  className="sr-only"
-                />
-                <div className={`
-                  w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center
-                  ${protocol === opt.value ? 'border-primary' : 'border-border'}
-                `}>
-                  {protocol === opt.value && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  )}
-                </div>
-                <span className="text-sm font-mono font-medium text-foreground/90">{opt.label}</span>
-              </label>
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         <div>

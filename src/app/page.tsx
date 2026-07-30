@@ -251,8 +251,9 @@ export default function ModbusMasterPage() {
 
       {/* Main Content */}
       <main className="max-w-[1920px] mx-auto p-4">
-        {/* Top Row - Connection & Data */}
+        {/* Two Column Layout */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          {/* Left Column - Connection, Read, Write */}
           <div className="xl:col-span-4 space-y-4">
             <ConnectionPanel
               connected={connectionStatus.connected}
@@ -260,13 +261,6 @@ export default function ModbusMasterPage() {
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
             />
-          </div>
-          <div className="xl:col-span-8">
-            <DataDisplay results={readResults} isPolling={isPolling} pollConfig={pollConfig} />
-        </div>
-
-        {/* Bottom Row - Operations & Logs */}
-          <div className="xl:col-span-3">
             <ReadPanel
               connected={connectionStatus.connected}
               isPolling={isPolling}
@@ -275,14 +269,15 @@ export default function ModbusMasterPage() {
               onStopPolling={handleStopPolling}
               pollConfig={pollConfig}
             />
-          </div>
-          <div className="xl:col-span-3">
             <WritePanel
               connected={connectionStatus.connected}
               onWrite={handleWrite}
             />
           </div>
-          <div className="xl:col-span-6">
+
+          {/* Right Column - Data Display, Log */}
+          <div className="xl:col-span-8 space-y-4">
+            <DataDisplay results={readResults} isPolling={isPolling} pollConfig={pollConfig} />
             <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>
         </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { ReadResult, PollConfig } from '@/types/modbus';
 
 interface DataDisplayProps {
@@ -8,6 +9,8 @@ interface DataDisplayProps {
   pollConfig: PollConfig | null;
 }
 
+type DisplayFormat = 'hex' | 'dec' | 'bin';
+
 const FC_LABELS: Record<number, string> = {
   1: 'Coils',
   2: 'Discrete Inputs',
@@ -15,8 +18,25 @@ const FC_LABELS: Record<number, string> = {
   4: 'Input Registers',
 };
 
+const FORMAT_OPTIONS: { value: DisplayFormat; label: string }[] = [
+  { value: 'hex', label: 'HEX' },
+  { value: 'dec', label: 'DEC' },
+  { value: 'bin', label: 'BIN' },
+];
+
 export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps) {
+  const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
   const latestResult = results[0];
+
+  const formatValue = (val: number | boolean, isBool: boolean): string => {
+    const numVal = isBool ? (val ? 1 : 0) : (val as number);
+    if (displayFormat === 'hex') {
+      return numVal.toString(16).toUpperCase().padStart(isBool ? 1 : 4, '0');
+    } else if (displayFormat === 'bin') {
+      return isBool ? (val ? '1' : '0') : numVal.toString(2).padStart(16, '0');
+    }
+    return String(numVal);
+  };
 
   return (
     <div className="industrial-panel p-4">
@@ -28,12 +48,32 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
           </svg>
           <h2 className="industrial-header">Register Data</h2>
         </div>
-        {isPolling && pollConfig && (
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-sm font-mono font-medium text-amber-400">POLLING</span>
+        <div className="flex items-center gap-3">
+          {isPolling && pollConfig && (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs font-mono font-medium text-amber-400">POLLING</span>
+            </div>
+          )}
+          {/* Format selector */}
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-sm p-0.5">
+            {FORMAT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDisplayFormat(opt.value)}
+                className={`
+                  px-2.5 py-1 text-xs font-mono font-medium rounded-sm transition-all
+                  ${displayFormat === opt.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }
+                `}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
       </div>
 
       {!latestResult ? (
@@ -48,7 +88,7 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
       ) : (
         <div>
           {/* Result header */}
-          <div className="flex items-center justify-between mb-3 px-2">
+          <div className="flex items-center justify-between mb-3 px-1">
             <div className="flex items-center gap-3 text-sm font-mono">
               <span className="text-foreground/70">
                 FC{latestResult.functionCode.toString().padStart(2, '0')} - {FC_LABELS[latestResult.functionCode] || 'Unknown'}
@@ -60,67 +100,34 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
                 QTY: <span className="text-foreground font-medium">{latestResult.quantity}</span>
               </span>
             </div>
-            <span className="text-sm font-mono text-foreground/60">
+            <span className="text-xs font-mono text-foreground/60">
               {new Date(latestResult.timestamp).toLocaleTimeString()}
             </span>
           </div>
 
-          {/* Data table */}
+          {/* Data grid - multi column layout */}
           <div className="border border-border rounded-sm overflow-hidden">
-            <div className="overflow-auto max-h-[400px] scanline">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-secondary/80 backdrop-blur-sm">
-                  <tr>
-                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
-                      OFFSET
-                    </th>
-                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
-                      ADDR
-                    </th>
-                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
-                      HEX
-                    </th>
-                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
-                      DEC
-                    </th>
-                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
-                      BIN
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {latestResult.values.map((val, idx) => {
-                    const addr = latestResult.address + idx;
-                    const isBool = typeof val === 'boolean';
-                    const numVal = isBool ? (val ? 1 : 0) : (val as number);
+            <div className="overflow-auto max-h-[400px] scanline p-2">
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1">
+                {latestResult.values.map((val, idx) => {
+                  const addr = latestResult.address + idx;
+                  const isBool = typeof val === 'boolean';
 
-                    return (
-                      <tr
-                        key={idx}
-                        className="hover:bg-secondary/30 transition-colors data-cell-highlight"
-                      >
-                        <td className="data-cell text-muted-foreground">
-                          +{idx.toString().padStart(4, '0')}
-                        </td>
-                        <td className="data-cell text-foreground font-medium">
-                          {addr.toString().padStart(5, '0')}
-                        </td>
-                        <td className="data-cell text-primary">
-                          {numVal.toString(16).toUpperCase().padStart(isBool ? 1 : 4, '0')}
-                        </td>
-                        <td className="data-cell text-foreground">
-                          {numVal}
-                        </td>
-                        <td className="data-cell text-muted-foreground text-xs">
-                          {isBool
-                            ? (val ? '1' : '0').padStart(1, '0')
-                            : numVal.toString(2).padStart(16, '0')}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                  return (
+                    <div
+                      key={idx}
+                      className="group bg-secondary/30 border border-border rounded-sm p-2 hover:border-primary/50 hover:bg-secondary/60 transition-all data-cell-highlight"
+                    >
+                      <div className="text-xs font-mono text-muted-foreground mb-1">
+                        {addr.toString().padStart(5, '0')}
+                      </div>
+                      <div className="text-sm font-mono font-medium text-primary truncate">
+                        {formatValue(val, isBool)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -134,6 +141,9 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
                 Non-zero: <span className="text-primary">{latestResult.values.filter((v) => v !== 0 && v !== false).length}</span>
               </span>
             )}
+            <span className="ml-auto">
+              Format: <span className="text-foreground font-medium">{displayFormat.toUpperCase()}</span>
+            </span>
           </div>
         </div>
       )}
