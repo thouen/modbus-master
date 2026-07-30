@@ -68,18 +68,18 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
           </select>
         </div>
 
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">HOST / IP</label>
-          <Input
-            value={host}
-            onChange={(e) => setHost(e.target.value)}
-            placeholder="192.168.1.100"
-            disabled={connected}
-            className="font-mono bg-secondary/50 border-border text-base"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
+        {/* Host & Port - 2/3 + 1/3 */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">HOST / IP</label>
+            <Input
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              placeholder="192.168.1.100"
+              disabled={connected}
+              className="font-mono bg-secondary/50 border-border text-base"
+            />
+          </div>
           <div>
             <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PORT</label>
             <Input
@@ -91,6 +91,10 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
               type="number"
             />
           </div>
+        </div>
+
+        {/* Unit ID & Timeout - 1/2 + 1/2 */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">UNIT ID</label>
             <Input
@@ -104,18 +108,17 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
               max="247"
             />
           </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">TIMEOUT (ms)</label>
-          <Input
-            value={timeout}
-            onChange={(e) => setTimeout(e.target.value)}
-            placeholder="5000"
-            disabled={connected}
-            className="font-mono bg-secondary/50 border-border text-base"
-            type="number"
-          />
+          <div>
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">TIMEOUT (ms)</label>
+            <Input
+              value={timeout}
+              onChange={(e) => setTimeout(e.target.value)}
+              placeholder="5000"
+              disabled={connected}
+              className="font-mono bg-secondary/50 border-border text-base"
+              type="number"
+            />
+          </div>
         </div>
 
         <div className="pt-2">
