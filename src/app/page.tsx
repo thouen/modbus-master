@@ -239,9 +239,11 @@ export default function ModbusMasterPage() {
               </svg>
               <h1 className="text-lg font-semibold tracking-tight">MODBUS MASTER</h1>
             </div>
-            <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded-sm">
-              TCP
-            </span>
+            {connectionStatus.config?.protocol && (
+              <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded-sm uppercase">
+                {connectionStatus.config.protocol.replace('_', ' ')}
+              </span>
+            )}
           </div>
           <StatusBar connected={connectionStatus.connected} config={connectionStatus.config} />
         </div>
@@ -249,15 +251,22 @@ export default function ModbusMasterPage() {
 
       {/* Main Content */}
       <main className="max-w-[1920px] mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Left Panel - Connection & Operations */}
-          <div className="lg:col-span-4 space-y-4">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          {/* Top Row - Connection & Data */}
+          <div className="xl:col-span-4 space-y-4">
             <ConnectionPanel
               connected={connectionStatus.connected}
               config={connectionStatus.config}
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
             />
+          </div>
+          <div className="xl:col-span-8">
+            <DataDisplay results={readResults} isPolling={isPolling} pollConfig={pollConfig} />
+          </div>
+
+          {/* Bottom Row - Operations & Logs */}
+          <div className="xl:col-span-3">
             <ReadPanel
               connected={connectionStatus.connected}
               isPolling={isPolling}
@@ -266,15 +275,14 @@ export default function ModbusMasterPage() {
               onStopPolling={handleStopPolling}
               pollConfig={pollConfig}
             />
+          </div>
+          <div className="xl:col-span-3">
             <WritePanel
               connected={connectionStatus.connected}
               onWrite={handleWrite}
             />
           </div>
-
-          {/* Right Panel - Data & Logs */}
-          <div className="lg:col-span-8 space-y-4">
-            <DataDisplay results={readResults} isPolling={isPolling} pollConfig={pollConfig} />
+          <div className="xl:col-span-6">
             <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>
         </div>

@@ -116,7 +116,7 @@ class ModbusClientManager {
       this.config = null;
       this.client = null;
 
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       return this.addLog({
         type: 'error',
         message: `Connection failed: ${errMsg}`,
@@ -162,6 +162,18 @@ class ModbusClientManager {
     });
   }
 
+  private extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    if (error && typeof error === 'object') {
+      const e = error as Record<string, unknown>;
+      if (typeof e.message === 'string') return e.message;
+      if (typeof e.errno === 'string') return e.errno;
+      if (typeof e.code === 'string') return e.code;
+    }
+    return 'Unknown error';
+  }
+
   private ensureConnected(): void {
     if (!this.connected || !this.client) {
       throw new Error('Not connected to any Modbus device');
@@ -186,7 +198,7 @@ class ModbusClientManager {
         }),
       };
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 1,
@@ -216,7 +228,7 @@ class ModbusClientManager {
         }),
       };
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 2,
@@ -246,7 +258,7 @@ class ModbusClientManager {
         }),
       };
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 3,
@@ -276,7 +288,7 @@ class ModbusClientManager {
         }),
       };
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 4,
@@ -302,7 +314,7 @@ class ModbusClientManager {
         success: true,
       });
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 5,
@@ -329,7 +341,7 @@ class ModbusClientManager {
         success: true,
       });
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 6,
@@ -356,7 +368,7 @@ class ModbusClientManager {
         success: true,
       });
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 15,
@@ -396,7 +408,7 @@ class ModbusClientManager {
         success: true,
       });
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errMsg = this.extractErrorMessage(error);
       throw this.addLog({
         type: 'error',
         functionCode: 16,
