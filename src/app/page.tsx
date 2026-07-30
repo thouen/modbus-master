@@ -252,8 +252,8 @@ export default function ModbusMasterPage() {
       {/* Main Content */}
       <main className="max-w-[1920px] mx-auto p-4">
         {/* Top Row - Connection & Data */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-4">
-          <div className="xl:col-span-4">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          <div className="xl:col-span-4 space-y-4">
             <ConnectionPanel
               connected={connectionStatus.connected}
               config={connectionStatus.config}
@@ -263,11 +263,9 @@ export default function ModbusMasterPage() {
           </div>
           <div className="xl:col-span-8">
             <DataDisplay results={readResults} isPolling={isPolling} pollConfig={pollConfig} />
-          </div>
         </div>
 
         {/* Bottom Row - Operations & Logs */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
           <div className="xl:col-span-3">
             <ReadPanel
               connected={connectionStatus.connected}

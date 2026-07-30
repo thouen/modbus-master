@@ -15,7 +15,7 @@ interface ConnectionPanelProps {
 const PROTOCOL_OPTIONS: { value: ModbusProtocol; label: string }[] = [
   { value: 'tcp', label: 'Modbus TCP' },
   { value: 'udp', label: 'Modbus UDP' },
-  { value: 'rtu_tcp', label: 'RTU over TCP' },
+  { value: 'rtu_tcp', label: 'Modbus RTU over TCP' },
 ];
 
 export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: ConnectionPanelProps) {
@@ -54,7 +54,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         {/* Protocol Selector - Radio Buttons */}
         <div>
           <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PROTOCOL</label>
-          <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {PROTOCOL_OPTIONS.map((opt) => (
               <label
                 key={opt.value}
