@@ -24,44 +24,52 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Filter out NaN/Infinity values that could cause buffer length mismatch
+    const cleanValues = values.filter((v: number | boolean) => typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)));
+    if (cleanValues.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'All values are invalid (NaN or Infinity)' },
+        { status: 400 }
+      );
+    }
 
     let log: ModbusLogEntry;
     switch (functionCode) {
       case 5:
-        if (typeof values[0] !== 'boolean') {
+        if (typeof cleanValues[0] !== 'boolean') {
           return NextResponse.json(
             { success: false, error: 'Coil value must be boolean' },
             { status: 400 }
           );
         }
-        log = await modbusManager.writeSingleCoil(address, values[0]);
+        log = await modbusManager.writeSingleCoil(address, cleanValues[0]);
         break;
       case 6:
-        if (typeof values[0] !== 'number' || values[0] < 0 || values[0] > 65535) {
+        if (typeof cleanValues[0] !== 'number' || cleanValues[0] < 0 || cleanValues[0] > 65535) {
           return NextResponse.json(
             { success: false, error: 'Register value must be 0-65535' },
             { status: 400 }
           );
         }
-        log = await modbusManager.writeSingleRegister(address, values[0]);
+        log = await modbusManager.writeSingleRegister(address, cleanValues[0]);
         break;
       case 15:
-        if (!values.every((v: unknown) => typeof v === 'boolean')) {
+        if (!cleanValues.every((v: unknown) => typeof v === 'boolean')) {
           return NextResponse.json(
             { success: false, error: 'All coil values must be boolean' },
             { status: 400 }
           );
         }
-        log = await modbusManager.writeMultipleCoils(address, values);
+        log = await modbusManager.writeMultipleCoils(address, cleanValues as boolean[]);
         break;
       case 16:
-        if (!values.every((v: unknown) => typeof v === 'number' && v >= 0 && v <= 65535)) {
+        if (!cleanValues.every((v: unknown) => typeof v === 'number' && v >= 0 && v <= 65535)) {
           return NextResponse.json(
             { success: false, error: 'All register values must be 0-65535' },
             { status: 400 }
           );
         }
-        log = await modbusManager.writeMultipleRegisters(address, values);
+        log = await modbusManager.writeMultipleRegisters(address, cleanValues as number[]);
         break;
       default:
         return NextResponse.json({ success: false, error: 'Unsupported function code' }, { status: 400 });

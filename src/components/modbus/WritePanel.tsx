@@ -38,7 +38,11 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
         if (isCoil) {
           values = multiValues.split(',').map((v) => v.trim().toLowerCase() === 'true' || v.trim() === '1');
         } else {
-          values = multiValues.split(',').map((v) => parseInt(v.trim(), 10));
+          values = multiValues.split(',')
+            .map((v) => v.trim())
+            .filter((v) => v !== '')
+            .map((v) => parseInt(v, 10))
+            .filter((v) => !isNaN(v));
         }
       } else {
         if (isCoil) {

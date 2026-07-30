@@ -292,15 +292,17 @@ class ModbusClientManager {
 
   async writeSingleRegister(address: number, value: number): Promise<ModbusLogEntry> {
     this.ensureConnected();
+    // Sanitize: clamp to uint16 range
+    const sanitized = Math.max(0, Math.min(65535, Math.round(value)));
     try {
-      await this.client!.writeRegister(address, value);
+      await this.client!.writeRegister(address, sanitized);
       return this.addLog({
         type: 'write',
         functionCode: 6,
         address,
         quantity: 1,
-        values: [value],
-        message: `Write Single Register (FC06): Address ${address}, Value ${value}`,
+        values: [sanitized],
+        message: `Write Single Register (FC06): Address ${address}, Value ${sanitized}`,
         success: true,
       });
     } catch (error) {
@@ -317,15 +319,17 @@ class ModbusClientManager {
 
   async writeMultipleCoils(address: number, values: boolean[]): Promise<ModbusLogEntry> {
     this.ensureConnected();
+    // Sanitize: ensure all values are proper booleans
+    const sanitized = values.map((v) => Boolean(v));
     try {
-      await this.client!.writeCoils(address, values);
+      await this.client!.writeCoils(address, sanitized);
       return this.addLog({
         type: 'write',
         functionCode: 15,
         address,
-        quantity: values.length,
-        values,
-        message: `Write Multiple Coils (FC15): Address ${address}, Count ${values.length}`,
+        quantity: sanitized.length,
+        values: sanitized,
+        message: `Write Multiple Coils (FC15): Address ${address}, Count ${sanitized.length}`,
         success: true,
       });
     } catch (error) {
@@ -342,15 +346,30 @@ class ModbusClientManager {
 
   async writeMultipleRegisters(address: number, values: number[]): Promise<ModbusLogEntry> {
     this.ensureConnected();
-    try {
-      await this.client!.writeRegisters(address, values);
-      return this.addLog({
-        type: 'write',
+    // Sanitize: filter NaN/Infinity, clamp to uint16 range to prevent buffer length mismatch
+    const sanitized = values
+      .filter((v) => Number.isFinite(v))
+      .map((v) => Math.max(0, Math.min(65535, Math.round(v))));
+    if (sanitized.length === 0) {
+      throw this.addLog({
+        type: 'error',
         functionCode: 16,
         address,
         quantity: values.length,
         values,
-        message: `Write Multiple Registers (FC16): Address ${address}, Count ${values.length}`,
+        message: 'Write Multiple Registers failed: No valid values provided',
+        success: false,
+      });
+    }
+    try {
+      await this.client!.writeRegisters(address, sanitized);
+      return this.addLog({
+        type: 'write',
+        functionCode: 16,
+        address,
+        quantity: sanitized.length,
+        values: sanitized,
+        message: `Write Multiple Registers (FC16): Address ${address}, Count ${sanitized.length}`,
         success: true,
       });
     } catch (error) {
@@ -359,6 +378,8 @@ class ModbusClientManager {
         type: 'error',
         functionCode: 16,
         address,
+        quantity: sanitized.length,
+        values: sanitized,
         message: `Write Multiple Registers failed: ${errMsg}`,
         success: false,
       });
