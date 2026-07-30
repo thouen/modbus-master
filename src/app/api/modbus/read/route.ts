@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { modbusManager } from '@/lib/modbus-client';
+import { modbusManager, type ModbusLogEntry } from '@/lib/modbus-client';
+
+interface ReadResult {
+  data: number[] | boolean[];
+  log: ModbusLogEntry;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let result: { data: number[] | boolean[]; log: import('@/lib/modbus-client').ModbusLogEntry } | undefined;
+    let result: ReadResult | null = null;
     switch (functionCode) {
       case 1:
         result = await modbusManager.readCoils(address, quantity);

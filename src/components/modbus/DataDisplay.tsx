@@ -15,14 +15,6 @@ const FC_LABELS: Record<number, string> = {
   4: 'Input Registers',
 };
 
-function formatValue(val: number | boolean, isBool: boolean): string {
-  if (isBool) return val ? '1 (ON)' : '0 (OFF)';
-  const num = val as number;
-  const hex = '0x' + num.toString(16).toUpperCase().padStart(4, '0');
-  const bin = '0b' + num.toString(2).padStart(16, '0');
-  return `${num}  |  ${hex}  |  ${bin}`;
-}
-
 export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps) {
   const latestResult = results[0];
 

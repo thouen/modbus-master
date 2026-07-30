@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { modbusManager } from '@/lib/modbus-client';
+import { modbusManager, type ModbusLogEntry } from '@/lib/modbus-client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let log;
+    let log: ModbusLogEntry;
     switch (functionCode) {
       case 5:
         if (typeof values[0] !== 'boolean') {
@@ -63,6 +63,8 @@ export async function POST(request: NextRequest) {
         }
         log = await modbusManager.writeMultipleRegisters(address, values);
         break;
+      default:
+        return NextResponse.json({ success: false, error: 'Unsupported function code' }, { status: 400 });
     }
 
     return NextResponse.json({ success: true, data: log });

@@ -62,16 +62,18 @@ class ModbusClientManager {
   }
 
   async connect(config: ModbusConnectionConfig): Promise<ModbusLogEntry> {
+    // Clean up previous connection before establishing a new one
     if (this.connected && this.client) {
       await this.disconnect();
     }
 
-    this.client = new ModbusRTU();
-    this.client.setID(config.unitId);
-    this.client.setTimeout(config.timeout || 5000);
+    const newClient = new ModbusRTU();
+    newClient.setID(config.unitId);
+    newClient.setTimeout(config.timeout || 5000);
 
     try {
-      await this.client.connectTCP(config.host, { port: config.port });
+      await newClient.connectTCP(config.host, { port: config.port });
+      this.client = newClient;
       this.connected = true;
       this.config = { ...config };
 
@@ -81,6 +83,12 @@ class ModbusClientManager {
         success: true,
       });
     } catch (error) {
+      // Clean up the failed client to avoid socket leaks
+      try {
+        newClient.close(() => {});
+      } catch {
+        // ignore close errors on failed client
+      }
       this.connected = false;
       this.config = null;
       this.client = null;
@@ -96,15 +104,30 @@ class ModbusClientManager {
 
   async disconnect(): Promise<ModbusLogEntry> {
     if (this.client) {
-      try {
-        this.client.close(() => {
-          // closed
-        });
-      } catch {
-        // ignore close errors
-      }
+      const clientToClose = this.client;
       this.client = null;
+      this.connected = false;
+      const prevConfig = this.config;
+      this.config = null;
+
+      // Wrap callback-based close() in a Promise for proper async handling
+      await new Promise<void>((resolve) => {
+        try {
+          clientToClose.close(() => {
+            resolve();
+          });
+        } catch {
+          resolve();
+        }
+      });
+
+      return this.addLog({
+        type: 'disconnect',
+        message: `Disconnected from ${prevConfig?.host || 'unknown'}:${prevConfig?.port || 'unknown'}`,
+        success: true,
+      });
     }
+
     this.connected = false;
     const prevConfig = this.config;
     this.config = null;

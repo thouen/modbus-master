@@ -17,7 +17,10 @@ export async function POST(request: NextRequest) {
     }
 
     const log = await modbusManager.connect({ host, port, unitId, timeout });
-    return NextResponse.json({ success: log.success, data: log });
+    if (!log.success) {
+      return NextResponse.json({ success: false, error: log.message, data: log }, { status: 502 });
+    }
+    return NextResponse.json({ success: true, data: log });
   } catch {
     return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
   }

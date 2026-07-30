@@ -9,6 +9,12 @@ import { LogPanel } from '@/components/modbus/LogPanel';
 import { StatusBar } from '@/components/modbus/StatusBar';
 import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult } from '@/types/modbus';
 
+let resultIdCounter = 0;
+function nextResultId(): string {
+  resultIdCounter += 1;
+  return `${Date.now()}-${resultIdCounter}`;
+}
+
 export default function ModbusMasterPage() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
     connected: false,
@@ -51,6 +57,16 @@ export default function ModbusMasterPage() {
       });
   }, []);
 
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
   const addLog = useCallback((log: LogEntry) => {
     setLogs((prev) => [log, ...prev].slice(0, 500));
   }, []);
@@ -68,7 +84,7 @@ export default function ModbusMasterPage() {
           setConnectionStatus({ connected: true, config });
           addLog(data.data);
         } else {
-          addLog(data.data || { type: 'error', message: data.error, success: false, timestamp: Date.now(), id: Date.now().toString() });
+          addLog(data.data || { type: 'error', message: data.error, success: false, timestamp: Date.now(), id: nextResultId() });
         }
         return data.success;
       } catch (err) {
@@ -78,7 +94,7 @@ export default function ModbusMasterPage() {
           message: errMsg,
           success: false,
           timestamp: Date.now(),
-          id: Date.now().toString(),
+          id: nextResultId(),
         });
         return false;
       }
@@ -118,7 +134,7 @@ export default function ModbusMasterPage() {
         const data = await res.json();
         if (data.success) {
           const result: ReadResult = {
-            id: Date.now().toString(),
+            id: nextResultId(),
             timestamp: Date.now(),
             functionCode,
             address,
@@ -139,7 +155,7 @@ export default function ModbusMasterPage() {
           message: errMsg,
           success: false,
           timestamp: Date.now(),
-          id: Date.now().toString(),
+          id: nextResultId(),
         });
         return null;
       }
@@ -169,7 +185,7 @@ export default function ModbusMasterPage() {
           message: errMsg,
           success: false,
           timestamp: Date.now(),
-          id: Date.now().toString(),
+          id: nextResultId(),
         });
         return false;
       }
