@@ -1,32 +1,265 @@
-import type { Metadata } from 'next';
-import Image from 'next/image';
+'use client';
 
-export const metadata: Metadata = {
-  title: '扣子编程 - AI 开发伙伴',
-  description: '扣子编程，你的 AI 开发伙伴已就位',
-};
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { ConnectionPanel } from '@/components/modbus/ConnectionPanel';
+import { ReadPanel } from '@/components/modbus/ReadPanel';
+import { WritePanel } from '@/components/modbus/WritePanel';
+import { DataDisplay } from '@/components/modbus/DataDisplay';
+import { LogPanel } from '@/components/modbus/LogPanel';
+import { StatusBar } from '@/components/modbus/StatusBar';
+import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult } from '@/types/modbus';
 
-export default function Home() {
+export default function ModbusMasterPage() {
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
+    connected: false,
+    config: null,
+  });
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [readResults, setReadResults] = useState<ReadResult[]>([]);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pollConfig, setPollConfig] = useState<{
+    functionCode: number;
+    address: number;
+    quantity: number;
+    interval: number;
+  } | null>(null);
+
+  // Check initial connection status
+  useEffect(() => {
+    fetch('/api/modbus/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setConnectionStatus(data.data);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    // Load initial logs
+    fetch('/api/modbus/logs?limit=50')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setLogs(data.data.logs);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+  }, []);
+
+  const addLog = useCallback((log: LogEntry) => {
+    setLogs((prev) => [log, ...prev].slice(0, 500));
+  }, []);
+
+  const handleConnect = useCallback(
+    async (config: ConnectionConfig): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/modbus/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setConnectionStatus({ connected: true, config });
+          addLog(data.data);
+        } else {
+          addLog(data.data || { type: 'error', message: data.error, success: false, timestamp: Date.now(), id: Date.now().toString() });
+        }
+        return data.success;
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Connection failed';
+        addLog({
+          type: 'error',
+          message: errMsg,
+          success: false,
+          timestamp: Date.now(),
+          id: Date.now().toString(),
+        });
+        return false;
+      }
+    },
+    [addLog]
+  );
+
+  const handleDisconnect = useCallback(async () => {
+    // Stop polling first
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+      setIsPolling(false);
+      setPollConfig(null);
+    }
+
+    try {
+      const res = await fetch('/api/modbus/disconnect', { method: 'POST' });
+      const data = await res.json();
+      setConnectionStatus({ connected: false, config: null });
+      if (data.success) {
+        addLog(data.data);
+      }
+    } catch {
+      setConnectionStatus({ connected: false, config: null });
+    }
+  }, [addLog]);
+
+  const handleRead = useCallback(
+    async (functionCode: number, address: number, quantity: number) => {
+      try {
+        const res = await fetch('/api/modbus/read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ functionCode, address, quantity }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          const result: ReadResult = {
+            id: Date.now().toString(),
+            timestamp: Date.now(),
+            functionCode,
+            address,
+            quantity,
+            values: data.data.values,
+          };
+          setReadResults((prev) => [result, ...prev].slice(0, 50));
+          addLog(data.data.log);
+          return result;
+        } else {
+          if (data.log) addLog(data.log);
+        }
+        return null;
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Read failed';
+        addLog({
+          type: 'error',
+          message: errMsg,
+          success: false,
+          timestamp: Date.now(),
+          id: Date.now().toString(),
+        });
+        return null;
+      }
+    },
+    [addLog]
+  );
+
+  const handleWrite = useCallback(
+    async (functionCode: number, address: number, values: number[] | boolean[]) => {
+      try {
+        const res = await fetch('/api/modbus/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ functionCode, address, values }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          addLog(data.data);
+        } else {
+          if (data.log) addLog(data.log);
+        }
+        return data.success;
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Write failed';
+        addLog({
+          type: 'error',
+          message: errMsg,
+          success: false,
+          timestamp: Date.now(),
+          id: Date.now().toString(),
+        });
+        return false;
+      }
+    },
+    [addLog]
+  );
+
+  const handleStartPolling = useCallback(
+    (functionCode: number, address: number, quantity: number, interval: number) => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+      setPollConfig({ functionCode, address, quantity, interval });
+      setIsPolling(true);
+
+      // Immediate first read
+      handleRead(functionCode, address, quantity);
+
+      pollingRef.current = setInterval(() => {
+        handleRead(functionCode, address, quantity);
+      }, interval);
+    },
+    [handleRead]
+  );
+
+  const handleStopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    setIsPolling(false);
+    setPollConfig(null);
+  }, []);
+
+  const handleClearLogs = useCallback(async () => {
+    await fetch('/api/modbus/logs', { method: 'DELETE' });
+    setLogs([]);
+  }, []);
+
   return (
-    <div className="flex h-full items-center justify-center bg-background text-foreground transition-colors duration-300 dark:bg-background dark:text-foreground overflow-hidden min-h-screen">
-      {/* 主容器 */}
-      <main className="flex w-full h-full max-w-3xl flex-col items-center justify-center px-16 py-32 sm:items-center">
-        <div className="flex flex-col items-center justify-between gap-4">
-           <Image
-            src="https://lf-coze-web-cdn.coze.cn/obj/eden-cn/lm-lgvj/ljhwZthlaukjlkulzlp/coze-coding/icon/coze-coding.gif"
-            alt="扣子编程 Logo"
-            width={156}
-            height={130}
-          />
-          <div>
-            <div className="flex flex-col items-center gap-2 text-center sm:items-center sm:text-center">
-              <h1 className="max-w-xl text-base font-semibold leading-tight tracking-tight text-foreground dark:text-foreground">
-                应用开发中
-              </h1>
-              <p className="max-w-2xl text-sm leading-8 text-muted-foreground dark:text-muted-foreground">
-                请稍后，页面即将呈现
-              </p>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm">
+        <div className="max-w-[1920px] mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-6 h-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="3" width="20" height="18" rx="2" />
+                <path d="M8 7h8M8 11h8M8 15h4" />
+                <circle cx="18" cy="15" r="1.5" fill="currentColor" />
+              </svg>
+              <h1 className="text-lg font-semibold tracking-tight">MODBUS MASTER</h1>
             </div>
+            <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded-sm">
+              TCP
+            </span>
+          </div>
+          <StatusBar connected={connectionStatus.connected} config={connectionStatus.config} />
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-[1920px] mx-auto p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Left Panel - Connection & Operations */}
+          <div className="lg:col-span-4 space-y-4">
+            <ConnectionPanel
+              connected={connectionStatus.connected}
+              config={connectionStatus.config}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+            />
+            <ReadPanel
+              connected={connectionStatus.connected}
+              isPolling={isPolling}
+              onRead={handleRead}
+              onStartPolling={handleStartPolling}
+              onStopPolling={handleStopPolling}
+              pollConfig={pollConfig}
+            />
+            <WritePanel
+              connected={connectionStatus.connected}
+              onWrite={handleWrite}
+            />
+          </div>
+
+          {/* Right Panel - Data & Logs */}
+          <div className="lg:col-span-8 space-y-4">
+            <DataDisplay results={readResults} isPolling={isPolling} pollConfig={pollConfig} />
+            <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>
         </div>
       </main>
