@@ -12,10 +12,10 @@ interface ConnectionPanelProps {
   onDisconnect: () => void;
 }
 
-const PROTOCOL_OPTIONS: { value: ModbusProtocol; label: string; desc: string }[] = [
-  { value: 'tcp', label: 'Modbus TCP', desc: 'MBAP + TCP' },
-  { value: 'udp', label: 'Modbus UDP', desc: 'MBAP + UDP' },
-  { value: 'rtu_tcp', label: 'RTU over TCP', desc: 'CRC + TCP' },
+const PROTOCOL_OPTIONS: { value: ModbusProtocol; label: string }[] = [
+  { value: 'tcp', label: 'Modbus TCP' },
+  { value: 'udp', label: 'Modbus UDP' },
+  { value: 'rtu_tcp', label: 'RTU over TCP' },
 ];
 
 export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: ConnectionPanelProps) {
@@ -50,28 +50,42 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         <h2 className="industrial-header">Connection</h2>
       </div>
 
-      <div className="space-y-4">
-        {/* Protocol Selector */}
+      <div className="space-y-3">
+        {/* Protocol Selector - Radio Buttons */}
         <div>
-          <label className="text-xs font-mono font-medium text-foreground/70 mb-1.5 block">PROTOCOL</label>
-          <div className="flex gap-1.5">
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PROTOCOL</label>
+          <div className="flex flex-col gap-1.5">
             {PROTOCOL_OPTIONS.map((opt) => (
-              <button
+              <label
                 key={opt.value}
-                type="button"
-                disabled={connected}
-                onClick={() => setProtocol(opt.value)}
                 className={`
-                  flex-1 px-2 py-1.5 text-xs font-mono font-medium rounded-sm border transition-all
+                  flex items-center gap-2 px-3 py-1.5 rounded-sm border cursor-pointer transition-all
                   ${protocol === opt.value
-                    ? 'border-primary bg-primary/15 text-primary'
-                    : 'border-border bg-secondary/30 text-foreground/60 hover:border-primary/40 hover:text-foreground'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-secondary/20 hover:border-primary/40'
                   }
-                  disabled:opacity-50 disabled:cursor-not-allowed
+                  ${connected ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
               >
-                {opt.label}
-              </button>
+                <input
+                  type="radio"
+                  name="protocol"
+                  value={opt.value}
+                  checked={protocol === opt.value}
+                  onChange={() => !connected && setProtocol(opt.value)}
+                  disabled={connected}
+                  className="sr-only"
+                />
+                <div className={`
+                  w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center
+                  ${protocol === opt.value ? 'border-primary' : 'border-border'}
+                `}>
+                  {protocol === opt.value && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  )}
+                </div>
+                <span className="text-sm font-mono font-medium text-foreground/90">{opt.label}</span>
+              </label>
             ))}
           </div>
         </div>
