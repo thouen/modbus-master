@@ -54,13 +54,13 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
           </svg>
           <h2 className="industrial-header">Operation Log</h2>
-          <span className="text-xs font-mono text-muted-foreground">({logs.length})</span>
+          <span className="text-sm font-mono text-foreground/60">({logs.length})</span>
         </div>
         <Button
           onClick={onClear}
           variant="ghost"
           size="sm"
-          className="text-xs font-mono text-muted-foreground hover:text-foreground h-7"
+          className="text-sm font-mono text-foreground/60 hover:text-foreground h-7"
         >
           Clear
         </Button>
@@ -71,30 +71,30 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
         className="overflow-auto max-h-[300px] border border-border rounded-sm bg-background/50"
       >
         {logs.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <p className="text-xs font-mono">No operations logged</p>
+          <div className="flex items-center justify-center py-8 text-foreground/50">
+            <p className="text-sm font-mono">No operations logged</p>
           </div>
         ) : (
-          <div className="font-mono text-xs">
+          <div className="font-mono text-sm">
             {logs.map((log) => (
               <div
                 key={log.id}
-                className={`flex items-start gap-2 px-3 py-1.5 border-b border-border/30 hover:bg-secondary/20 transition-colors ${
+                className={`flex items-start gap-2 px-3 py-2 border-b border-border/30 hover:bg-secondary/20 transition-colors ${
                   !log.success ? 'bg-red-950/20' : ''
                 }`}
               >
-                <span className="text-muted-foreground shrink-0 w-[72px]">
+                <span className="text-foreground/60 shrink-0 w-[72px]">
                   {new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false })}
                 </span>
-                <span className={`shrink-0 w-4 text-center font-bold ${TYPE_COLORS[log.type] || 'text-muted-foreground'}`}>
+                <span className={`shrink-0 w-4 text-center font-bold ${TYPE_COLORS[log.type] || 'text-foreground/50'}`}>
                   {TYPE_ICONS[log.type] || '-'}
                 </span>
                 {log.functionCode && (
-                  <span className="shrink-0 text-primary/70 w-[120px]">
+                  <span className="shrink-0 text-primary/80 w-[120px]">
                     {FC_NAMES[log.functionCode] || `FC${log.functionCode}`}
                   </span>
                 )}
-                <span className={`${log.success ? 'text-foreground/80' : 'text-red-400'} flex-1`}>
+                <span className={`${log.success ? 'text-foreground/90' : 'text-red-400'} flex-1`}>
                   {log.message}
                 </span>
               </div>

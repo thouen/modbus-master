@@ -68,16 +68,16 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
         <h2 className="industrial-header">Write Registers</h2>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
-          <label className="text-xs font-mono text-muted-foreground mb-1 block">FUNCTION CODE</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">FUNCTION CODE</label>
           <Select value={functionCode} onValueChange={setFunctionCode} disabled={!connected}>
-            <SelectTrigger className="font-mono text-xs bg-secondary/50 border-border">
+            <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {WRITE_FUNCTION_CODES.map((fc) => (
-                <SelectItem key={fc.value} value={fc.value} className="font-mono text-xs">
+                <SelectItem key={fc.value} value={fc.value} className="font-mono text-sm">
                   {fc.label}
                 </SelectItem>
               ))}
@@ -86,13 +86,13 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
         </div>
 
         <div>
-          <label className="text-xs font-mono text-muted-foreground mb-1 block">ADDRESS</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">ADDRESS</label>
           <Input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="0"
             disabled={!connected}
-            className="font-mono bg-secondary/50 border-border text-sm"
+            className="font-mono bg-secondary/50 border-border text-base"
             type="number"
             min="0"
             max="65535"
@@ -101,7 +101,7 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
 
         {isMultiple ? (
           <div>
-            <label className="text-xs font-mono text-muted-foreground mb-1 block">
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">
               VALUES ({isCoil ? 'comma-separated: true,false,1,0' : 'comma-separated: 0-65535'})
             </label>
             <Input
@@ -109,12 +109,12 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
               onChange={(e) => setMultiValues(e.target.value)}
               placeholder={isCoil ? '1,0,1,1,0' : '100,200,300'}
               disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-sm"
+              className="font-mono bg-secondary/50 border-border text-base"
             />
           </div>
         ) : isCoil ? (
           <div>
-            <label className="text-xs font-mono text-muted-foreground mb-1 block">VALUE (TRUE/FALSE)</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">VALUE (TRUE/FALSE)</label>
             <Select value={value} onValueChange={setValue} disabled={!connected}>
               <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border">
                 <SelectValue />
@@ -127,13 +127,13 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
           </div>
         ) : (
           <div>
-            <label className="text-xs font-mono text-muted-foreground mb-1 block">VALUE (0-65535)</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">VALUE (0-65535)</label>
             <Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="0"
               disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-sm"
+              className="font-mono bg-secondary/50 border-border text-base"
               type="number"
               min="0"
               max="65535"
@@ -144,7 +144,7 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
         <Button
           onClick={handleWrite}
           disabled={!connected || writing}
-          className="w-full font-mono text-xs uppercase tracking-wider bg-amber-600 hover:bg-amber-700 text-white"
+          className="w-full font-mono text-sm font-medium uppercase tracking-wider bg-amber-600 hover:bg-amber-700 text-white"
         >
           {writing ? (
             <svg className="w-4 h-4 mr-2 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

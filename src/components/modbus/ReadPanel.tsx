@@ -61,16 +61,16 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
         <h2 className="industrial-header">Read Registers</h2>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
-          <label className="text-xs font-mono text-muted-foreground mb-1 block">FUNCTION CODE</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">FUNCTION CODE</label>
           <Select value={functionCode} onValueChange={setFunctionCode} disabled={!connected}>
-            <SelectTrigger className="font-mono text-xs bg-secondary/50 border-border">
+            <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {FUNCTION_CODES.map((fc) => (
-                <SelectItem key={fc.value} value={fc.value} className="font-mono text-xs">
+                <SelectItem key={fc.value} value={fc.value} className="font-mono text-sm">
                   {fc.label}
                 </SelectItem>
               ))}
@@ -80,26 +80,26 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-mono text-muted-foreground mb-1 block">START ADDR</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">START ADDR</label>
             <Input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="0"
               disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-sm"
+              className="font-mono bg-secondary/50 border-border text-base"
               type="number"
               min="0"
               max="65535"
             />
           </div>
           <div>
-            <label className="text-xs font-mono text-muted-foreground mb-1 block">QUANTITY</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">QUANTITY</label>
             <Input
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="10"
               disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-sm"
+              className="font-mono bg-secondary/50 border-border text-base"
               type="number"
               min="1"
               max="125"
@@ -111,7 +111,7 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
           <Button
             onClick={handleRead}
             disabled={!connected || reading}
-            className="flex-1 font-mono text-xs uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white"
+            className="flex-1 font-mono text-sm font-medium uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white"
           >
             {reading ? (
               <svg className="w-4 h-4 mr-2 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -134,17 +134,17 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
               <circle cx="12" cy="12" r="10" />
               <path d="M12 6v6l4 2" />
             </svg>
-            <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Auto Polling</span>
+            <span className="text-sm font-mono font-medium text-foreground/70 uppercase tracking-wider">Auto Polling</span>
           </div>
           <div className="flex gap-2 items-end">
             <div className="flex-1">
-              <label className="text-xs font-mono text-muted-foreground mb-1 block">INTERVAL (ms)</label>
+              <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">INTERVAL (ms)</label>
               <Input
                 value={interval}
                 onChange={(e) => setInterval(e.target.value)}
                 placeholder="1000"
                 disabled={!connected || isPolling}
-                className="font-mono bg-secondary/50 border-border text-sm"
+                className="font-mono bg-secondary/50 border-border text-base"
                 type="number"
                 min="100"
               />
@@ -153,7 +153,7 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
               onClick={handleTogglePolling}
               disabled={!connected}
               variant={isPolling ? 'destructive' : 'secondary'}
-              className={`font-mono text-xs uppercase tracking-wider ${
+              className={`font-mono text-sm font-medium uppercase tracking-wider ${
                 isPolling ? '' : 'bg-amber-600 hover:bg-amber-700 text-white'
               }`}
             >

@@ -31,36 +31,36 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
         {isPolling && pollConfig && (
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-xs font-mono text-amber-400">POLLING</span>
+            <span className="text-sm font-mono font-medium text-amber-400">POLLING</span>
           </div>
         )}
       </div>
 
       {!latestResult ? (
-        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center py-16 text-foreground/50">
           <svg className="w-12 h-12 mb-3 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
           </svg>
-          <p className="text-sm font-mono">No data yet</p>
-          <p className="text-xs font-mono mt-1">Connect and read registers to see data</p>
+          <p className="text-base font-mono">No data yet</p>
+          <p className="text-sm font-mono mt-1 text-foreground/40">Connect and read registers to see data</p>
         </div>
       ) : (
         <div>
           {/* Result header */}
           <div className="flex items-center justify-between mb-3 px-2">
-            <div className="flex items-center gap-3 text-xs font-mono">
-              <span className="text-muted-foreground">
+            <div className="flex items-center gap-3 text-sm font-mono">
+              <span className="text-foreground/70">
                 FC{latestResult.functionCode.toString().padStart(2, '0')} - {FC_LABELS[latestResult.functionCode] || 'Unknown'}
               </span>
-              <span className="text-muted-foreground">
-                ADDR: <span className="text-foreground">{latestResult.address}</span>
+              <span className="text-foreground/60">
+                ADDR: <span className="text-foreground font-medium">{latestResult.address}</span>
               </span>
-              <span className="text-muted-foreground">
-                QTY: <span className="text-foreground">{latestResult.quantity}</span>
+              <span className="text-foreground/60">
+                QTY: <span className="text-foreground font-medium">{latestResult.quantity}</span>
               </span>
             </div>
-            <span className="text-xs font-mono text-muted-foreground">
+            <span className="text-sm font-mono text-foreground/60">
               {new Date(latestResult.timestamp).toLocaleTimeString()}
             </span>
           </div>
@@ -71,19 +71,19 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
               <table className="w-full">
                 <thead className="sticky top-0 bg-secondary/80 backdrop-blur-sm">
                   <tr>
-                    <th className="text-left text-xs font-mono text-muted-foreground px-3 py-2 border-b border-border">
+                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
                       OFFSET
                     </th>
-                    <th className="text-left text-xs font-mono text-muted-foreground px-3 py-2 border-b border-border">
+                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
                       ADDR
                     </th>
-                    <th className="text-left text-xs font-mono text-muted-foreground px-3 py-2 border-b border-border">
+                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
                       HEX
                     </th>
-                    <th className="text-left text-xs font-mono text-muted-foreground px-3 py-2 border-b border-border">
+                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
                       DEC
                     </th>
-                    <th className="text-left text-xs font-mono text-muted-foreground px-3 py-2 border-b border-border">
+                    <th className="text-left text-sm font-mono font-medium text-foreground/70 px-3 py-2 border-b border-border">
                       BIN
                     </th>
                   </tr>

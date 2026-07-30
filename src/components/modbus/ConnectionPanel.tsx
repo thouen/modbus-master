@@ -50,11 +50,11 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         <h2 className="industrial-header">Connection</h2>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {/* Protocol Selector */}
         <div>
-          <label className="text-xs font-mono text-muted-foreground mb-1.5 block">PROTOCOL</label>
-          <div className="grid grid-cols-2 gap-1.5">
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PROTOCOL</label>
+          <div className="grid grid-cols-2 gap-2">
             {PROTOCOL_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -62,52 +62,52 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
                 disabled={connected}
                 onClick={() => setProtocol(opt.value)}
                 className={`
-                  px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded-sm border transition-all
+                  px-3 py-2.5 text-xs font-mono uppercase tracking-wider rounded-sm border transition-all
                   ${protocol === opt.value
                     ? 'border-primary bg-primary/15 text-primary'
-                    : 'border-border bg-secondary/30 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                    : 'border-border bg-secondary/30 text-foreground/60 hover:border-primary/40 hover:text-foreground'
                   }
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
                 <div className="font-semibold">{opt.label}</div>
-                <div className="text-[9px] opacity-60 mt-0.5">{opt.desc}</div>
+                <div className="text-[10px] opacity-60 mt-0.5">{opt.desc}</div>
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <label className="text-xs font-mono text-muted-foreground mb-1 block">HOST / IP</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">HOST / IP</label>
           <Input
             value={host}
             onChange={(e) => setHost(e.target.value)}
             placeholder="192.168.1.100"
             disabled={connected}
-            className="font-mono bg-secondary/50 border-border text-sm"
+            className="font-mono bg-secondary/50 border-border text-base"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-mono text-muted-foreground mb-1 block">PORT</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PORT</label>
             <Input
               value={port}
               onChange={(e) => setPort(e.target.value)}
               placeholder="502"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-sm"
+              className="font-mono bg-secondary/50 border-border text-base"
               type="number"
             />
           </div>
           <div>
-            <label className="text-xs font-mono text-muted-foreground mb-1 block">UNIT ID</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">UNIT ID</label>
             <Input
               value={unitId}
               onChange={(e) => setUnitId(e.target.value)}
               placeholder="1"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-sm"
+              className="font-mono bg-secondary/50 border-border text-base"
               type="number"
               min="1"
               max="247"
@@ -116,13 +116,13 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         </div>
 
         <div>
-          <label className="text-xs font-mono text-muted-foreground mb-1 block">TIMEOUT (ms)</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">TIMEOUT (ms)</label>
           <Input
             value={timeout}
             onChange={(e) => setTimeout(e.target.value)}
             placeholder="5000"
             disabled={connected}
-            className="font-mono bg-secondary/50 border-border text-sm"
+            className="font-mono bg-secondary/50 border-border text-base"
             type="number"
           />
         </div>
@@ -132,7 +132,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
             <Button
               onClick={onDisconnect}
               variant="destructive"
-              className="w-full font-mono text-xs uppercase tracking-wider"
+              className="w-full font-mono text-sm font-medium uppercase tracking-wider"
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -144,7 +144,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
             <Button
               onClick={handleConnect}
               disabled={connecting || !host || !port}
-              className="w-full font-mono text-xs uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90"
+              className="w-full font-mono text-sm font-medium uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M5 12h14M12 5l7 7-7 7" />

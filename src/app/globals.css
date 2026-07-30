@@ -92,22 +92,22 @@
 
 .dark {
   --background: oklch(0.13 0.005 250);
-  --foreground: oklch(0.92 0.005 200);
+  --foreground: oklch(0.95 0.005 200);
   --card: oklch(0.17 0.008 250);
-  --card-foreground: oklch(0.92 0.005 200);
+  --card-foreground: oklch(0.95 0.005 200);
   --popover: oklch(0.17 0.008 250);
-  --popover-foreground: oklch(0.92 0.005 200);
+  --popover-foreground: oklch(0.95 0.005 200);
   --primary: oklch(0.78 0.15 165);
   --primary-foreground: oklch(0.13 0.005 250);
   --secondary: oklch(0.22 0.01 250);
-  --secondary-foreground: oklch(0.92 0.005 200);
+  --secondary-foreground: oklch(0.95 0.005 200);
   --muted: oklch(0.22 0.01 250);
-  --muted-foreground: oklch(0.6 0.01 200);
+  --muted-foreground: oklch(0.72 0.01 200);
   --accent: oklch(0.22 0.01 250);
-  --accent-foreground: oklch(0.92 0.005 200);
+  --accent-foreground: oklch(0.95 0.005 200);
   --destructive: oklch(0.65 0.2 25);
-  --border: oklch(0.28 0.012 250);
-  --input: oklch(0.22 0.01 250);
+  --border: oklch(0.32 0.012 250);
+  --input: oklch(0.25 0.01 250);
   --ring: oklch(0.78 0.15 165);
   --chart-1: oklch(0.78 0.15 165);
   --chart-2: oklch(0.75 0.16 75);
@@ -115,12 +115,12 @@
   --chart-4: oklch(0.65 0.2 260);
   --chart-5: oklch(0.6 0.15 310);
   --sidebar: oklch(0.15 0.008 250);
-  --sidebar-foreground: oklch(0.92 0.005 200);
+  --sidebar-foreground: oklch(0.95 0.005 200);
   --sidebar-primary: oklch(0.78 0.15 165);
   --sidebar-primary-foreground: oklch(0.13 0.005 250);
   --sidebar-accent: oklch(0.22 0.01 250);
-  --sidebar-accent-foreground: oklch(0.92 0.005 200);
-  --sidebar-border: oklch(0.28 0.012 250);
+  --sidebar-accent-foreground: oklch(0.95 0.005 200);
+  --sidebar-border: oklch(0.32 0.012 250);
   --sidebar-ring: oklch(0.78 0.15 165);
 }
 
@@ -129,10 +129,11 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground text-[15px] leading-relaxed;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    font-weight: 400;
   }
 }
 
@@ -154,8 +155,8 @@ body {
   }
 
   .industrial-header {
-    @apply text-xs font-mono uppercase tracking-widest text-muted-foreground;
-    letter-spacing: 0.15em;
+    @apply text-sm font-mono font-semibold uppercase tracking-wider text-foreground/80;
+    letter-spacing: 0.12em;
   }
 
   .status-dot {
@@ -168,7 +169,7 @@ body {
   }
 
   .status-dot-disconnected {
-    @apply bg-zinc-600;
+    @apply bg-zinc-500;
   }
 
   .status-dot-error {
@@ -177,9 +178,9 @@ body {
   }
 
   .data-cell {
-    @apply font-mono text-xs px-3 py-1.5 border-b border-border/50;
+    @apply font-mono text-sm font-medium px-3 py-2 border-b border-border/50;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
   }
 
   .data-cell-highlight {
