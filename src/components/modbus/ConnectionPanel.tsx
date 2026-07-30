@@ -52,13 +52,14 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
 
       <div className="space-y-3">
         {/* Protocol Selector - Select Dropdown */}
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PROTOCOL</label>
+        {/* Protocol */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">PROTOCOL</label>
           <select
             value={protocol}
             onChange={(e) => !connected && setProtocol(e.target.value as ModbusProtocol)}
             disabled={connected}
-            className="w-full font-mono text-base bg-secondary/50 border border-border rounded px-3 py-2 text-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            className="flex-1 font-mono text-sm bg-secondary/50 border border-border rounded px-2 py-1.5 text-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
           >
             {PROTOCOL_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -68,16 +69,16 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
           </select>
         </div>
 
-        {/* Host : Port - shared label */}
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">HOST : PORT</label>
-          <div className="flex items-center gap-2">
+        {/* IP: Host : Port */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">IP</label>
+          <div className="flex items-center gap-2 flex-1">
             <Input
               value={host}
               onChange={(e) => setHost(e.target.value)}
               placeholder="192.168.1.100"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base flex-1"
+              className="font-mono bg-secondary/50 border-border text-sm flex-1 py-1.5"
             />
             <span className="text-sm font-mono text-foreground/50">:</span>
             <Input
@@ -85,36 +86,34 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
               onChange={(e) => setPort(e.target.value)}
               placeholder="502"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base w-24"
+              className="font-mono bg-secondary/50 border-border text-sm w-20 py-1.5"
               type="number"
             />
           </div>
         </div>
 
-        {/* Unit ID : Timeout - shared label */}
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">UNIT ID : TIMEOUT (ms)</label>
-          <div className="flex items-center gap-2">
-            <Input
-              value={unitId}
-              onChange={(e) => setUnitId(e.target.value)}
-              placeholder="1"
-              disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base flex-1"
-              type="number"
-              min="1"
-              max="247"
-            />
-            <span className="text-sm font-mono text-foreground/50">:</span>
-            <Input
-              value={timeout}
-              onChange={(e) => setTimeout(e.target.value)}
-              placeholder="5000"
-              disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-base w-32"
-              type="number"
-            />
-          </div>
+        {/* Unit ID : Timeout */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">UNIT ID</label>
+          <Input
+            value={unitId}
+            onChange={(e) => setUnitId(e.target.value)}
+            placeholder="1"
+            disabled={connected}
+            className="font-mono bg-secondary/50 border-border text-sm w-24 py-1.5"
+            type="number"
+            min="1"
+            max="247"
+          />
+          <label className="text-sm font-mono font-medium text-foreground/70 w-24 shrink-0">TIMEOUT (ms)</label>
+          <Input
+            value={timeout}
+            onChange={(e) => setTimeout(e.target.value)}
+            placeholder="5000"
+            disabled={connected}
+            className="font-mono bg-secondary/50 border-border text-sm w-28 py-1.5"
+            type="number"
+          />
         </div>
 
         <div className="pt-2">
