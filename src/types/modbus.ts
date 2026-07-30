@@ -1,8 +1,11 @@
+export type ModbusProtocol = 'tcp' | 'udp' | 'rtu_tcp';
+
 export interface ConnectionConfig {
   host: string;
   port: number;
   unitId: number;
   timeout?: number;
+  protocol?: ModbusProtocol;
 }
 
 export interface ConnectionStatus {

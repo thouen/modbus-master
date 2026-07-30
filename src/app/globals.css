@@ -130,11 +130,20 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 }
 
 body {
   @apply font-sans;
+}
+
+/* Tabular numbers for aligned data display */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 /* Industrial SCADA Theme */
@@ -169,6 +178,8 @@ body {
 
   .data-cell {
     @apply font-mono text-xs px-3 py-1.5 border-b border-border/50;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
   }
 
   .data-cell-highlight {

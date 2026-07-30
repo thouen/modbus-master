@@ -1,10 +1,13 @@
 import ModbusRTU from 'modbus-serial';
 
+export type ModbusProtocol = 'tcp' | 'udp' | 'rtu_tcp';
+
 export interface ModbusConnectionConfig {
   host: string;
   port: number;
   unitId: number;
   timeout?: number;
+  protocol?: ModbusProtocol;
 }
 
 export interface ModbusLogEntry {
@@ -67,19 +70,39 @@ class ModbusClientManager {
       await this.disconnect();
     }
 
+    const protocol = config.protocol || 'tcp';
     const newClient = new ModbusRTU();
     newClient.setID(config.unitId);
     newClient.setTimeout(config.timeout || 5000);
 
     try {
-      await newClient.connectTCP(config.host, { port: config.port });
+      switch (protocol) {
+        case 'tcp':
+          await newClient.connectTCP(config.host, { port: config.port });
+          break;
+        case 'udp':
+          await newClient.connectUDP(config.host, { port: config.port });
+          break;
+        case 'rtu_tcp':
+          await newClient.connectTcpRTUBuffered(config.host, { port: config.port });
+          break;
+        default:
+          throw new Error(`Unsupported protocol: ${protocol}`);
+      }
+
       this.client = newClient;
       this.connected = true;
       this.config = { ...config };
 
+      const protocolLabels: Record<ModbusProtocol, string> = {
+        tcp: 'Modbus TCP',
+        udp: 'Modbus UDP',
+        rtu_tcp: 'RTU over TCP',
+      };
+
       return this.addLog({
         type: 'connect',
-        message: `Connected to ${config.host}:${config.port} (Unit ID: ${config.unitId})`,
+        message: `Connected to ${config.host}:${config.port} via ${protocolLabels[protocol]} (Unit ID: ${config.unitId})`,
         success: true,
       });
     } catch (error) {

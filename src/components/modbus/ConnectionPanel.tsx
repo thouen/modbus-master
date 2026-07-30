@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { ConnectionConfig } from '@/types/modbus';
+import type { ConnectionConfig, ModbusProtocol } from '@/types/modbus';
 
 interface ConnectionPanelProps {
   connected: boolean;
@@ -12,11 +12,18 @@ interface ConnectionPanelProps {
   onDisconnect: () => void;
 }
 
+const PROTOCOL_OPTIONS: { value: ModbusProtocol; label: string; desc: string }[] = [
+  { value: 'tcp', label: 'Modbus TCP', desc: 'MBAP + TCP' },
+  { value: 'udp', label: 'Modbus UDP', desc: 'MBAP + UDP' },
+  { value: 'rtu_tcp', label: 'RTU over TCP', desc: 'CRC + TCP' },
+];
+
 export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: ConnectionPanelProps) {
   const [host, setHost] = useState(config?.host || '127.0.0.1');
   const [port, setPort] = useState(String(config?.port || 502));
   const [unitId, setUnitId] = useState(String(config?.unitId || 1));
   const [timeout, setTimeout] = useState('5000');
+  const [protocol, setProtocol] = useState<ModbusProtocol>(config?.protocol || 'tcp');
   const [connecting, setConnecting] = useState(false);
 
   const handleConnect = async () => {
@@ -27,6 +34,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         port: parseInt(port, 10),
         unitId: parseInt(unitId, 10),
         timeout: parseInt(timeout, 10),
+        protocol,
       });
     } finally {
       setConnecting(false);
@@ -43,6 +51,32 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
       </div>
 
       <div className="space-y-3">
+        {/* Protocol Selector */}
+        <div>
+          <label className="text-xs font-mono text-muted-foreground mb-1.5 block">PROTOCOL</label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {PROTOCOL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={connected}
+                onClick={() => setProtocol(opt.value)}
+                className={`
+                  px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded-sm border transition-all
+                  ${protocol === opt.value
+                    ? 'border-primary bg-primary/15 text-primary'
+                    : 'border-border bg-secondary/30 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                `}
+              >
+                <div className="font-semibold">{opt.label}</div>
+                <div className="text-[9px] opacity-60 mt-0.5">{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div>
           <label className="text-xs font-mono text-muted-foreground mb-1 block">HOST / IP</label>
           <Input
