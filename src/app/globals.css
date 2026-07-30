@@ -1,3 +1,4 @@
+@import "https://fonts.googleapis.cn/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap";
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -47,8 +48,8 @@
     system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
   --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
   --font-serif:
     'Noto Serif SC', 'Songti SC', 'SimSun', ui-serif, Georgia, Cambria,
     'Times New Roman', Times, serif;
@@ -167,7 +168,7 @@ body {
   }
 
   .data-cell {
-    @apply font-mono text-sm px-2 py-1.5 border-b border-border/50;
+    @apply font-mono text-xs px-3 py-1.5 border-b border-border/50;
   }
 
   .data-cell-highlight {
