@@ -53,8 +53,8 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
       <div className="space-y-4">
         {/* Protocol Selector */}
         <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">PROTOCOL</label>
-          <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs font-mono font-medium text-foreground/70 mb-1.5 block">PROTOCOL</label>
+          <div className="flex gap-1.5">
             {PROTOCOL_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -62,7 +62,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
                 disabled={connected}
                 onClick={() => setProtocol(opt.value)}
                 className={`
-                  px-3 py-2.5 text-xs font-mono uppercase tracking-wider rounded-sm border transition-all
+                  flex-1 px-2 py-1.5 text-xs font-mono font-medium rounded-sm border transition-all
                   ${protocol === opt.value
                     ? 'border-primary bg-primary/15 text-primary'
                     : 'border-border bg-secondary/30 text-foreground/60 hover:border-primary/40 hover:text-foreground'
@@ -70,8 +70,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
-                <div className="font-semibold">{opt.label}</div>
-                <div className="text-[10px] opacity-60 mt-0.5">{opt.desc}</div>
+                {opt.label}
               </button>
             ))}
           </div>
