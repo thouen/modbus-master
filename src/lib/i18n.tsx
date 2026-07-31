@@ -33,6 +33,7 @@ const resources = {
       },
       write: {
         title: '写入寄存器',
+        functionCode: '功能码',
         address: '地址',
         value: '值',
         write: '写入',
@@ -62,6 +63,7 @@ const resources = {
       log: {
         title: '操作日志',
         clear: '清除',
+        noLogs: '暂无操作记录',
       },
       status: {
         online: '在线',
@@ -101,6 +103,7 @@ const resources = {
       },
       write: {
         title: 'Write Registers',
+        functionCode: 'Function Code',
         address: 'Address',
         value: 'Value',
         write: 'Write',
@@ -130,6 +133,7 @@ const resources = {
       log: {
         title: 'Operation Log',
         clear: 'Clear',
+        noLogs: 'No operations logged',
       },
       status: {
         online: 'Online',

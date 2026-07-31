@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,6 +24,7 @@ const FUNCTION_CODES = [
 ];
 
 export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStopPolling, pollConfig }: ReadPanelProps) {
+  const { t } = useTranslation();
   const [functionCode, setFunctionCode] = useState('3');
   const [address, setAddress] = useState('0');
   const [quantity, setQuantity] = useState('10');
@@ -58,12 +60,12 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
           <path d="M21 12a9 9 0 11-6.219-8.56" />
           <path d="M21 3v6h-6" />
         </svg>
-        <h2 className="industrial-header">Read Registers</h2>
+        <h2 className="industrial-header">{t('read.title')}</h2>
       </div>
 
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">FUNCTION CODE</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">{t('read.functionCode')}</label>
           <Select value={functionCode} onValueChange={setFunctionCode} disabled={!connected}>
             <SelectTrigger className="font-mono text-sm bg-secondary/50 flex-1 border-border">
               <SelectValue />
@@ -80,7 +82,7 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
 
         <div className="grid grid-cols-2 gap-5">
           <div className="flex items-center gap-3">
-            <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">START ADDR</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">{t('read.startAddr')}</label>
             <Input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -93,7 +95,7 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
             />
           </div>
           <div  className="flex items-center gap-3">
-            <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">QUANTITY</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">{t('read.quantity')}</label>
             <Input
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
@@ -123,7 +125,7 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
                 <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
               </svg>
             )}
-            Read
+            {t('read.read')}
           </Button>
         </div>
 
@@ -134,11 +136,11 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
               <circle cx="12" cy="12" r="10" />
               <path d="M12 6v6l4 2" />
             </svg>
-            <span className="text-sm font-mono font-medium text-foreground/70 uppercase tracking-wider">Auto Polling</span>
+            <span className="text-sm font-mono font-medium text-foreground/70 uppercase tracking-wider">{t('read.autoPolling')}</span>
           </div>
           <div className="flex gap-2 items-end">
             <div className="flex-1 flex items-center gap-3">
-              <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">INTERVAL (ms)</label>
+              <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">{t('read.interval')}</label>
               <Input
                 value={interval}
                 onChange={(e) => setInterval(e.target.value)}
@@ -163,14 +165,14 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
                     <rect x="6" y="4" width="4" height="16" />
                     <rect x="14" y="4" width="4" height="16" />
                   </svg>
-                  Stop
+                  {t('read.stop')}
                 </>
               ) : (
                 <>
                   <svg className="w-3.5 h-3.5 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="5 3 19 12 5 21 5 3" />
                   </svg>
-                  Start
+                  {t('read.start')}
                 </>
               )}
             </Button>

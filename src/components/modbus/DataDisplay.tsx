@@ -357,7 +357,8 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
 
           <div className="flex-1 overflow-auto">
             <div className="inline-block min-w-full">
-              <div className="grid gap-px" style={{ gridTemplateColumns: `40px repeat(${cols}, minmax(60px, 1fr))` }}>
+              <div className="grid gap-px" style={{ gridTemplateColumns: `40px repeat(${cols}, minmax(80px, 1fr))` }}>
+                {/* Header row */}
                 <div className="h-6"></div>
                 {colHeaders.map((h, i) => (
                   <div key={i} className="h-6 flex items-center justify-center text-xs font-mono text-muted-foreground">
@@ -365,32 +366,42 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
                   </div>
                 ))}
 
-                {gridData.map((cell, idx) => {
-                  const row = Math.floor(idx / cols);
-                  const col = idx % cols;
-                  const isRowHeader = col === 0;
-                  const displayValue = formatCellValue(cell.value, cell.fltVal, cell.dlbVal);
-                  const showFlt = cell.hasFlt;
-                  const showDlb = cell.hasDlb && cell.addr % 2 === 0;
-
+                {/* Data rows */}
+                {Array.from({ length: rows }, (_, rowIdx) => {
+                  const rowStartIdx = rowIdx * cols;
+                  const rowData = gridData.slice(rowStartIdx, rowStartIdx + cols);
+                  
                   return (
-                    <div
-                      key={idx}
-                      className={`h-7 flex items-center text-xs font-mono border-b border-border/30 ${
-                        isRowHeader ? 'text-muted-foreground justify-center' : 'justify-center cursor-pointer hover:bg-primary/10'
-                      } ${cell.value !== null && cell.value !== 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}
-                      onMouseMove={(e) => {
-                        if (!isRowHeader && (showFlt || showDlb)) {
-                          handleMouseMove(e, cell.addr, cell.fltVal, cell.dlbVal);
-                        }
-                      }}
-                      onMouseLeave={handleMouseLeave}
-                    >
-                      {isRowHeader ? rowHeaders[row] : (
-                        <span className="truncate max-w-full px-1" title={displayValue}>
-                          {displayValue}
-                        </span>
-                      )}
+                    <div key={rowIdx} className="contents">
+                      {/* Row header */}
+                      <div className="h-7 flex items-center justify-center text-xs font-mono text-muted-foreground border-b border-border/30">
+                        {rowHeaders[rowIdx]}
+                      </div>
+                      {/* Data cells */}
+                      {rowData.map((cell, colIdx) => {
+                        const displayValue = formatCellValue(cell.value, cell.fltVal, cell.dlbVal);
+                        const showFlt = cell.hasFlt;
+                        const showDlb = cell.hasDlb && cell.addr % 2 === 0;
+
+                        return (
+                          <div
+                            key={colIdx}
+                            className={`h-7 flex items-center justify-center text-xs font-mono border-b border-border/30 cursor-pointer hover:bg-primary/10 ${
+                              cell.value !== null && cell.value !== 0 ? 'text-primary font-medium' : 'text-muted-foreground'
+                            }`}
+                            onMouseMove={(e) => {
+                              if (showFlt || showDlb) {
+                                handleMouseMove(e, cell.addr, cell.fltVal, cell.dlbVal);
+                              }
+                            }}
+                            onMouseLeave={handleMouseLeave}
+                          >
+                            <span className="truncate max-w-full px-1" title={displayValue}>
+                              {displayValue}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
