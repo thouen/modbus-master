@@ -31,6 +31,7 @@ export default function ModbusMasterPage() {
     quantity: number;
     interval: number;
   } | null>(null);
+  const [lastReadTime, setLastReadTime] = useState<number | null>(null);
 
   // Check initial connection status
   useEffect(() => {
@@ -150,6 +151,7 @@ export default function ModbusMasterPage() {
           };
           setReadResults((prev) => [result, ...prev].slice(0, 50));
           setReadTrigger(address);
+          setLastReadTime(Date.now());
           addLog(data.data.log);
           return result;
         } else {
@@ -252,9 +254,9 @@ export default function ModbusMasterPage() {
             isConnected={connectionStatus.connected}
             isConnecting={false}
             connectionConfig={connectionStatus.config}
-            isPolling={false}
-            pollInterval={0}
-            lastReadTime={null}
+            isPolling={isPolling}
+            pollInterval={pollConfig?.interval || 0}
+            lastReadTime={lastReadTime}
           />
         </div>
       </header>

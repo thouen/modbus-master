@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import type { LogEntry } from '@/types/modbus';
 
@@ -37,6 +38,7 @@ const FC_NAMES: Record<number, string> = {
 };
 
 export function LogPanel({ logs, onClear }: LogPanelProps) {
+  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
             <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
           </svg>
-          <h2 className="industrial-header">Operation Log</h2>
+          <h2 className="industrial-header">{t('log.title')}</h2>
           <span className="text-sm font-mono text-foreground/60">({logs.length})</span>
         </div>
         <Button
@@ -62,7 +64,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           size="sm"
           className="text-sm font-mono text-foreground/60 hover:text-foreground h-7"
         >
-          Clear
+          {t('log.clear')}
         </Button>
       </div>
 
@@ -72,7 +74,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       >
         {logs.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-foreground/50">
-            <p className="text-sm font-mono">No operations logged</p>
+            <p className="text-sm font-mono">{t('log.noLogs')}</p>
           </div>
         ) : (
           <div className="font-mono text-sm">
