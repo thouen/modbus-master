@@ -134,6 +134,9 @@ export default function ModbusMasterPage() {
         });
         const data = await res.json();
         if (data.success) {
+          const fcNames: Record<number, string> = {
+            1: 'READ_COILS', 2: 'READ_DISCRETE', 3: 'READ_HOLDING', 4: 'READ_INPUT',
+          };
           const result: ReadResult = {
             id: nextResultId(),
             timestamp: Date.now(),
@@ -141,6 +144,9 @@ export default function ModbusMasterPage() {
             address,
             quantity,
             values: data.data.values,
+            name: fcNames[functionCode] || `FC${functionCode}`,
+            startAddr: address,
+            data: data.data.values,
           };
           setReadResults((prev) => [result, ...prev].slice(0, 50));
           setReadTrigger(address);
@@ -242,7 +248,14 @@ export default function ModbusMasterPage() {
               <h1 className="text-lg font-semibold tracking-tight">MODBUS MASTER</h1>
             </div>
           </div>
-          <StatusBar connected={connectionStatus.connected} config={connectionStatus.config} />
+          <StatusBar
+            isConnected={connectionStatus.connected}
+            isConnecting={false}
+            connectionConfig={connectionStatus.config}
+            isPolling={false}
+            pollInterval={0}
+            lastReadTime={null}
+          />
         </div>
       </header>
 
