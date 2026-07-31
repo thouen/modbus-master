@@ -24,12 +24,24 @@ const FORMAT_OPTIONS: { value: DisplayFormat; label: string }[] = [
   { value: 'bin', label: 'BIN' },
 ];
 
-const PAGE_SIZE = 64; // 8x8 grid
-const TOTAL_PAGES = 1024; // 64 * 1024 = 65536 registers
+const HEX_CHARS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+
+// 16x16 = 256 per page for HEX/DEC, 16x4 = 64 per page for BIN
+const PAGE_SIZE_HEX = 256;
+const PAGE_SIZE_BIN = 64;
+const TOTAL_PAGES_HEX = 256;  // 256 * 256 = 65536
+const TOTAL_PAGES_BIN = 1024; // 64 * 1024 = 65536
 
 export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps) {
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
   const [currentPage, setCurrentPage] = useState(0);
+  const [hoveredCell, setHoveredCell] = useState<{ addr: number; val: number | boolean | null } | null>(null);
+
+  const isBinMode = displayFormat === 'bin';
+  const pageSize = isBinMode ? PAGE_SIZE_BIN : PAGE_SIZE_HEX;
+  const totalPages = isBinMode ? TOTAL_PAGES_BIN : TOTAL_PAGES_HEX;
+  const cols = isBinMode ? 4 : 16;
+  const rows = 16;
 
   const latestResult = results[0];
 
@@ -44,24 +56,24 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
     return map;
   }, [latestResult]);
 
-  // Generate 8x8 grid data for current page
+  // Generate grid data for current page
   const gridData = useMemo(() => {
-    const startAddr = currentPage * PAGE_SIZE;
-    const rows: { addr: number; val: number | boolean | null }[][] = [];
+    const startAddr = currentPage * pageSize;
+    const gridRows: { addr: number; val: number | boolean | null }[][] = [];
 
-    for (let row = 0; row < 8; row++) {
+    for (let row = 0; row < rows; row++) {
       const rowData: { addr: number; val: number | boolean | null }[] = [];
-      for (let col = 0; col < 8; col++) {
-        const addr = startAddr + row * 8 + col;
+      for (let col = 0; col < cols; col++) {
+        const addr = startAddr + row * cols + col;
         const val = dataMap.has(addr) ? dataMap.get(addr)! : null;
         rowData.push({ addr, val });
       }
-      rows.push(rowData);
+      gridRows.push(rowData);
     }
-    return rows;
-  }, [currentPage, dataMap]);
+    return gridRows;
+  }, [currentPage, dataMap, pageSize, cols]);
 
-  const formatValue = (val: number | boolean | null, isBool: boolean): string => {
+  const formatCellValue = (val: number | boolean | null, isBool: boolean): string => {
     if (val === null) return '0';
     const numVal = isBool ? (val ? 1 : 0) : (val as number);
     if (displayFormat === 'hex') {
@@ -73,6 +85,20 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
   };
 
   const isBoolType = latestResult?.functionCode === 1 || latestResult?.functionCode === 2;
+
+  // Format address for display
+  const formatAddr = (addr: number): string => {
+    return addr.toString(16).toUpperCase().padStart(4, '0');
+  };
+
+  // Format value for tooltip
+  const formatTooltipValue = (val: number | boolean | null, isBool: boolean) => {
+    if (val === null) return { dec: '0', hex: '0x0000', bin: '0b0000 0000 0000 0000' };
+    const numVal = isBool ? (val ? 1 : 0) : (val as number);
+    const hex = '0x' + numVal.toString(16).toUpperCase().padStart(4, '0');
+    const bin = '0b' + numVal.toString(2).padStart(16, '0').replace(/(.{4})/g, '$1 ').trim();
+    return { dec: String(numVal), hex, bin };
+  };
 
   return (
     <div className="industrial-panel p-4">
@@ -96,7 +122,10 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
             {FORMAT_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
-                onClick={() => setDisplayFormat(opt.value)}
+                onClick={() => {
+                  setDisplayFormat(opt.value);
+                  setCurrentPage(0);
+                }}
                 className={`
                   px-2.5 py-1 text-xs font-mono font-medium rounded-sm transition-all
                   ${displayFormat === opt.value
@@ -130,29 +159,74 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
         </div>
       )}
 
-      {/* 8x8 Grid */}
-      <div className="space-y-1">
-        {gridData.map((row, rowIdx) => (
-          <div key={rowIdx} className="grid grid-cols-8 gap-1">
-            {row.map((cell) => (
-              <div key={cell.addr} className="flex items-center gap-1 bg-secondary/30 rounded-sm px-1.5 py-1 transition-colors gap-3">
-                <span className="text-[10px] font-mono text-foreground/40 w-7 shrink-0 text-right">
-                  {cell.addr.toString().padStart(5, '0')}
-                </span>
-                <div
-                  className="border border-border/30 hover:border-primary/30 flex-1 items-center"
-                >
-                  <span
-                    className={`text-xs font-mono font-medium truncate ${cell.val === null ? 'text-foreground/25' : 'text-primary'
-                      }`}
-                  >
-                    {formatValue(cell.val, isBoolType)}
-                  </span>
-                </div>
+      {/* 16x16 or 16x4 Grid with headers */}
+      <div className="relative">
+        <div className="flex">
+          {/* Column headers */}
+          <div className="w-8 shrink-0" />
+          <div className={`grid gap-0.5 flex-1`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+            {Array.from({ length: cols }, (_, i) => (
+              <div key={i} className="text-center text-[10px] font-mono text-foreground/50 py-1">
+                {HEX_CHARS[i]}
               </div>
             ))}
           </div>
-        ))}
+        </div>
+
+        {/* Grid rows */}
+        <div className="space-y-0.5">
+          {gridData.map((row, rowIdx) => (
+            <div key={rowIdx} className="flex items-center">
+              {/* Row header */}
+              <div className="w-8 shrink-0 text-center text-[10px] font-mono text-foreground/50">
+                {HEX_CHARS[rowIdx]}
+              </div>
+              {/* Cells */}
+              <div className={`grid gap-0.5 flex-1`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+                {row.map((cell) => (
+                  <div
+                    key={cell.addr}
+                    className="relative bg-secondary/30 rounded-sm px-1 py-0.5 text-center cursor-pointer transition-colors hover:bg-secondary/60"
+                    onMouseEnter={() => setHoveredCell(cell)}
+                    onMouseLeave={() => setHoveredCell(null)}
+                  >
+                    <span
+                      className={`text-xs font-mono font-medium ${cell.val === null ? 'text-foreground/25' : 'text-primary'
+                        }`}
+                    >
+                      {formatCellValue(cell.val, isBoolType)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Hover Tooltip */}
+        {hoveredCell && (
+          <div className="absolute top-0 right-0 z-10 bg-background border border-border rounded-sm p-2 shadow-lg pointer-events-none">
+            <div className="text-xs font-mono space-y-1">
+              <div className="text-foreground/60">
+                ADDR: <span className="text-foreground font-medium">{hoveredCell.addr}</span>
+                <span className="text-foreground/60 ml-2">0x{formatAddr(hoveredCell.addr)}</span>
+              </div>
+              {hoveredCell.val !== null && (
+                <div className="space-y-0.5">
+                  <div className="text-foreground/60">
+                    DEC: <span className="text-primary font-medium">{formatTooltipValue(hoveredCell.val, isBoolType).dec}</span>
+                  </div>
+                  <div className="text-foreground/60">
+                    HEX: <span className="text-primary font-medium">{formatTooltipValue(hoveredCell.val, isBoolType).hex}</span>
+                  </div>
+                  <div className="text-foreground/60">
+                    BIN: <span className="text-primary font-medium">{formatTooltipValue(hoveredCell.val, isBoolType).bin}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
@@ -166,11 +240,11 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
             &lt; PREV
           </button>
           <span className="text-xs font-mono text-foreground/60">
-            PAGE <span className="text-foreground font-medium">{currentPage + 1}</span> / {TOTAL_PAGES}
+            PAGE <span className="text-foreground font-medium">{currentPage + 1}</span> / {totalPages}
           </span>
           <button
-            onClick={() => setCurrentPage((p) => Math.min(TOTAL_PAGES - 1, p + 1))}
-            disabled={currentPage === TOTAL_PAGES - 1}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={currentPage === totalPages - 1}
             className="px-2 py-1 text-xs font-mono bg-secondary/50 border border-border rounded-sm hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             NEXT &gt;
@@ -180,18 +254,18 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
           <input
             type="number"
             min="1"
-            max={TOTAL_PAGES}
+            max={totalPages}
             value={currentPage + 1}
             onChange={(e) => {
               const page = parseInt(e.target.value, 10);
-              if (!isNaN(page) && page >= 1 && page <= TOTAL_PAGES) {
+              if (!isNaN(page) && page >= 1 && page <= totalPages) {
                 setCurrentPage(page - 1);
               }
             }}
             className="w-16 px-2 py-1 text-xs font-mono bg-secondary/50 border border-border rounded-sm text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
           <span className="text-xs font-mono text-foreground/40">
-            ADDR {currentPage * PAGE_SIZE} - {currentPage * PAGE_SIZE + PAGE_SIZE - 1}
+            ADDR {currentPage * pageSize} - {currentPage * pageSize + pageSize - 1}
           </span>
         </div>
       </div>
