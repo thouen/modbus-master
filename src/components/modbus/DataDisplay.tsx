@@ -86,9 +86,26 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
 
   const isBoolType = latestResult?.functionCode === 1 || latestResult?.functionCode === 2;
 
-  // Format address for display
+  // Format address for display (hex, 4 digits)
   const formatAddr = (addr: number): string => {
     return addr.toString(16).toUpperCase().padStart(4, '0');
+  };
+
+  // Format decimal address (5 digits, 00000-65535)
+  const formatDecAddr = (addr: number): string => {
+    return addr.toString().padStart(5, '0');
+  };
+
+  // Get column headers based on mode and page
+  const getColumnHeaders = (): string[] => {
+    if (!isBinMode) {
+      // HEX/DEC mode: always 0-F
+      return HEX_CHARS;
+    }
+    // BIN mode: 4 cols, headers based on page
+    // Page 0: 0,1,2,3 | Page 1: 4,5,6,7 | Page 2: 8,9,A,B | Page 3: C,D,E,F | repeat
+    const offset = (currentPage % 4) * 4;
+    return HEX_CHARS.slice(offset, offset + 4);
   };
 
   // Format value for tooltip
@@ -165,9 +182,9 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
           {/* Column headers */}
           <div className="w-8 shrink-0" />
           <div className={`grid gap-0.5 flex-1`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-            {Array.from({ length: cols }, (_, i) => (
+            {getColumnHeaders().map((ch, i) => (
               <div key={i} className="text-center text-[10px] font-mono text-foreground/50 py-1">
-                {HEX_CHARS[i]}
+                {ch}
               </div>
             ))}
           </div>
@@ -208,7 +225,7 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
           <div className="absolute top-0 right-0 z-10 bg-background border border-border rounded-sm p-2 shadow-lg pointer-events-none">
             <div className="text-xs font-mono space-y-1">
               <div className="text-foreground/60">
-                ADDR: <span className="text-foreground font-medium">{hoveredCell.addr}</span>
+                ADDR: <span className="text-foreground font-medium">{formatDecAddr(hoveredCell.addr)}</span>
                 <span className="text-foreground/60 ml-2">0x{formatAddr(hoveredCell.addr)}</span>
               </div>
               {hoveredCell.val !== null && (
