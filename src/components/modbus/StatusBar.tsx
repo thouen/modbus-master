@@ -25,9 +25,9 @@ export function StatusBar({
   const { lang, changeLanguage } = useI18n();
 
   const protocolLabels: Record<string, string> = {
-    tcp: 'TCP',
-    udp: 'UDP',
-    rtu_tcp: 'RTU/TCP',
+    tcp: 'TCP/IP',
+    udp: 'UDP/IP',
+    rtu_tcp: 'RTU over TCP/IP',
   };
 
   return (

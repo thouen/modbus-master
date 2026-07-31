@@ -95,9 +95,9 @@ class ModbusClientManager {
       this.config = { ...config };
 
       const protocolLabels: Record<ModbusProtocol, string> = {
-        tcp: 'Modbus TCP',
-        udp: 'Modbus UDP',
-        rtu_tcp: 'RTU over TCP',
+        tcp: 'Modbus TCP/IP',
+        udp: 'Modbus UDP/IP',
+        rtu_tcp: 'Modbus RTU over TCP/IP',
       };
 
       return this.addLog({

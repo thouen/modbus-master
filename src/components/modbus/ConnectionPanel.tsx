@@ -14,9 +14,9 @@ interface ConnectionPanelProps {
 }
 
 const PROTOCOL_OPTIONS: { value: ModbusProtocol; label: string }[] = [
-  { value: 'tcp', label: 'Modbus TCP' },
-  { value: 'udp', label: 'Modbus UDP' },
-  { value: 'rtu_tcp', label: 'Modbus RTU over TCP' },
+  { value: 'tcp', label: 'Modbus TCP/IP' },
+  { value: 'udp', label: 'Modbus UDP/IP' },
+  { value: 'rtu_tcp', label: 'Modbus RTU over TCP/IP' },
 ];
 
 export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: ConnectionPanelProps) {
