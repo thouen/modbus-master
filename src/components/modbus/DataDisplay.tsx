@@ -364,7 +364,7 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
                   return (
                     <div key={rowIdx} className="contents">
                       {/* Row header */}
-                      <div className={`${isDblMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono text-muted-foreground border-b border-border/30`}>
+                      <div className={`${isDblMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono text-muted-foreground`}>
                         {rowHeaders[rowIdx]}
                       </div>
                       {/* Data cells */}
@@ -376,7 +376,7 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
                         return (
                           <div
                             key={colIdx}
-                            className={`${isDblMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono border-b border-border/30 cursor-pointer hover:bg-primary/10 ${
+                            className={`${isDblMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono border border-border/30 cursor-pointer hover:bg-primary/10 ${
                               cell.value !== null && cell.value !== 0 ? 'text-primary font-medium' : 'text-muted-foreground'
                             }`}
                             onMouseMove={(e) => {

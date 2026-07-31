@@ -72,7 +72,7 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
 
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">{t('write.functionCode') || 'Function Code'}</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">{t('write.functionCode')}</label>
           <Select value={functionCode} onValueChange={setFunctionCode} disabled={!connected}>
             <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border flex-1">
               <SelectValue />
@@ -104,7 +104,7 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
 
           {isMultiple ? (
             <div className="flex items-center gap-3">
-              <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">
+              <label className="text-sm font-mono font-medium text-foreground/70 w-18 block">
                 {t('write.value')}s
               </label>
               <Input
@@ -117,7 +117,7 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
             </div>
           ) : isCoil ? (
             <div className="flex items-center gap-3">
-              <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">{t('write.value')}</label>
+              <label className="text-sm font-mono font-medium text-foreground/70 w-18 block">{t('write.value')}</label>
               <Select value={value} onValueChange={setValue} disabled={!connected}>
                 <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border flex-1">
                   <SelectValue />
@@ -130,7 +130,7 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">{t('write.value')}</label>
+              <label className="text-sm font-mono font-medium text-foreground/70 w-18 block">{t('write.value')}</label>
               <Input
                 value={value}
                 onChange={(e) => setValue(e.target.value)}

@@ -67,7 +67,7 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
         <div className="flex items-center gap-3">
           <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">{t('read.functionCode')}</label>
           <Select value={functionCode} onValueChange={setFunctionCode} disabled={!connected}>
-            <SelectTrigger className="font-mono text-sm bg-secondary/50 flex-1 border-border">
+            <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border flex-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -95,7 +95,7 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
             />
           </div>
           <div  className="flex items-center gap-3">
-            <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">{t('read.quantity')}</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 w-18 block">{t('read.quantity')}</label>
             <Input
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
