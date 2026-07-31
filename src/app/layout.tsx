@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inspector } from 'react-dev-inspector';
+import I18nProvider from '@/lib/i18n';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export default function RootLayout({
     <html lang="zh-CN" className="dark">
       <body className={`antialiased bg-background text-foreground`}>
         {isDev && <Inspector />}
-        {children}
+        <I18nProvider>{children}</I18nProvider>
       </body>
     </html>
   );

@@ -32,27 +32,26 @@ const FC_LABELS: Record<number, string> = {
 
 const HEX_CHARS = '0123456789ABCDEF'.split('');
 
+// FLT column headers for odd/even pages
+const FLT_COL_HEADERS_ODD = ['0', '1', '2', '3', '4', '5', '6', '7'];
+const FLT_COL_HEADERS_EVEN = ['8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+
 // DLB row headers: 0,2,4,6,8,A,C,E repeated twice
 const DLB_ROW_HEADERS = ['0', '2', '4', '6', '8', 'A', 'C', 'E', '0', '2', '4', '6', '8', 'A', 'C', 'E'];
 // DLB column headers: 0/8, 1/9, 2/A, 3/B, 4/C, 5/D, 6/E, 7/F
 const DLB_COL_HEADERS = ['0/8', '1/9', '2/A', '3/B', '4/C', '5/D', '6/E', '7/F'];
 
 // Pages per mode (based on 65536 total registers)
-const PAGES_256 = 256;   // 256 regs/page (HEX/DEC/FLT)
+const PAGES_256 = 256;   // 256 regs/page (HEX/DEC)
 const PAGES_BIN = 1024;  // 64 regs/page
-const PAGES_DLB = 512;   // 128 doubles (256 regs)/page
+const PAGES_FLT = 512;   // 128 regs/page (16x8 FLT)
+const PAGES_DLB = 512;   // 128 regs/page (16x8 DLB, 2 regs per value)
 
 // Registers per page per mode
 const REGS_PER_PAGE_256 = 256;
 const REGS_PER_PAGE_BIN = 64;
-const REGS_PER_PAGE_DLB = 256; // 128 doubles * 2 regs each... wait, double is 4 regs (8 bytes)
-
-// Actually: double = 8 bytes = 4 registers (16-bit each)
-// 16 rows * 8 cols = 128 doubles per page
-// 128 doubles * 4 regs = 512 regs per page
-// 65536 / 512 = 128 pages
-const REGS_PER_PAGE_DLB_ACTUAL = 512;
-const PAGES_DLB_ACTUAL = 128;
+const REGS_PER_PAGE_FLT = 128;  // 16 rows * 8 cols = 128 floats (2 regs each)
+const REGS_PER_PAGE_DLB = 128;  // 16 rows * 8 cols = 128 doubles (2 regs each, row step 2)
 
 export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTrigger }: DataDisplayProps) {
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
@@ -72,13 +71,15 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
 
   const getRegsPerPage = (format: DisplayFormat): number => {
     if (format === 'bin') return REGS_PER_PAGE_BIN;
-    if (format === 'dlb') return REGS_PER_PAGE_DLB_ACTUAL;
+    if (format === 'flt') return REGS_PER_PAGE_FLT;
+    if (format === 'dlb') return REGS_PER_PAGE_DLB;
     return REGS_PER_PAGE_256;
   };
 
   const getPagesPerMode = (format: DisplayFormat): number => {
     if (format === 'bin') return PAGES_BIN;
-    if (format === 'dlb') return PAGES_DLB_ACTUAL;
+    if (format === 'flt') return PAGES_FLT;
+    if (format === 'dlb') return PAGES_DLB;
     return PAGES_256;
   };
 
@@ -95,10 +96,11 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
   const latestResult = readResults.length > 0 ? readResults[0] : null;
 
   // Grid dimensions based on format
+  const isFltMode = displayFormat === 'flt';
   const isDlbMode = displayFormat === 'dlb';
   const isBinMode = displayFormat === 'bin';
   const rows = 16;
-  const cols = isDlbMode ? 8 : (isBinMode ? 4 : 16);
+  const cols = (isFltMode || isDlbMode) ? 8 : isBinMode ? 4 : 16;
 
   // Total pages based on format
   const totalPages = getPagesPerMode(displayFormat);
@@ -203,25 +205,26 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
         const val = getVal(addr);
 
         if (displayFormat === 'flt') {
-          // FLT mode: 16x16 grid, each cell shows float from 2 consecutive registers
-          // addr and addr+1 (next row same col, or next col if row=15)
-          const addr2 = addr + 1;
-          const val2 = getVal(addr2);
+          // FLT mode: 16x8 grid, 512 pages
+          // Odd pages: col headers 0-7, Even pages: col headers 8-F
+          const colOffset = currentPage % 2 === 1 ? 0 : 8;
+          const reg1Addr = startAddr + (colOffset + col) * 16 + row;
+          const reg2Addr = reg1Addr + 1;
+          const val1 = getVal(reg1Addr);
+          const val2 = getVal(reg2Addr);
           let fltVal: number | undefined;
-          if (val !== null && val2 !== null && typeof val === 'number' && typeof val2 === 'number') {
-            fltVal = parseFloat32(val, val2, byteOrder);
+          if (val1 !== null && val2 !== null && typeof val1 === 'number' && typeof val2 === 'number') {
+            fltVal = parseFloat32(val1, val2, byteOrder);
           }
-          rowData.push({ addr, val, fltVal });
+          rowData.push({ addr: reg1Addr, val: val1, fltVal });
         } else if (displayFormat === 'dlb') {
-          // DLB mode: 16x8 grid
-          // Row determines base offset (0,2,4,6,8,A,C,E pattern)
-          // Col determines low register (0-7)
-          const rowBase = row < 8 ? row * 2 : (row - 8) * 2 + 1;
-          const colLow = col;
-          const reg1Addr = startAddr + colLow + rowBase * 16;
-          const reg2Addr = reg1Addr + 8;
+          // DLB mode: 16x8 grid, 512 pages
+          // Row step = 2 (each DLB occupies 2 registers)
+          // Col step = 16
+          const reg1Addr = startAddr + col * 16 + row * 2;
+          const reg2Addr = reg1Addr + 1;
           const reg3Addr = reg1Addr + 16;
-          const reg4Addr = reg1Addr + 24;
+          const reg4Addr = reg1Addr + 17;
 
           const v1 = getVal(reg1Addr);
           const v2 = getVal(reg2Addr);
@@ -243,7 +246,7 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
       data.push(rowData);
     }
     return data;
-  }, [latestResult, startAddr, rows, cols, displayFormat, byteOrder, parseFloat32, parseFloat64]);
+  }, [latestResult, startAddr, rows, cols, displayFormat, byteOrder, parseFloat32, parseFloat64, currentPage]);
 
   // Format cell value
   const formatCellValue = (val: number | boolean | null, fltVal?: number, dlbVal?: number): string => {
@@ -286,6 +289,10 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
   const getColumnHeaders = (): string[] => {
     if (isDlbMode) {
       return DLB_COL_HEADERS;
+    }
+    if (isFltMode) {
+      // FLT: odd pages (0,2,4...) show 0-7, even pages (1,3,5...) show 8-F
+      return currentPage % 2 === 0 ? FLT_COL_HEADERS_ODD : FLT_COL_HEADERS_EVEN;
     }
     if (isBinMode) {
       const offset = (currentPage % 4) * 4;
@@ -345,8 +352,8 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
               <span className="text-xs font-mono font-medium text-amber-400">POLLING</span>
             </div>
           )}
-          {/* Format selector */}
-          <div className="flex items-center gap-1 bg-secondary/50 rounded-sm p-0.5">
+          {/* Format selector - fixed position */}
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-sm p-0.5 min-w-[180px] justify-center">
             {FORMAT_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -408,9 +415,6 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
           <span className="text-foreground/60">
             QTY: <span className="text-foreground font-medium">{latestResult.quantity}</span>
           </span>
-          <span className="text-foreground/60">
-            PAGE: <span className="text-foreground font-medium">{currentPage + 1}/{totalPages}</span>
-          </span>
         </div>
       )}
 
@@ -449,8 +453,9 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
                       onMouseMove={(e) => handleMouseMove(e, cell)}
                     >
                       <span
-                        className={`text-xs font-mono font-medium ${cell.val === null ? 'text-foreground/25' : 'text-primary'
+                        className={`text-xs font-mono font-medium truncate block max-w-full ${cell.val === null ? 'text-foreground/25' : 'text-primary'
                           }`}
+                        title={formatCellValue(cell.val, cell.fltVal, cell.dlbVal)}
                       >
                         {formatCellValue(cell.val, cell.fltVal, cell.dlbVal)}
                       </span>

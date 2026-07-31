@@ -241,11 +241,6 @@ export default function ModbusMasterPage() {
               </svg>
               <h1 className="text-lg font-semibold tracking-tight">MODBUS MASTER</h1>
             </div>
-            {connectionStatus.config?.protocol && (
-              <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded-sm uppercase">
-                {connectionStatus.config.protocol.replace('_', ' ')}
-              </span>
-            )}
           </div>
           <StatusBar connected={connectionStatus.connected} config={connectionStatus.config} />
         </div>
