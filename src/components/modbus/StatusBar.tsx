@@ -68,7 +68,7 @@ export function StatusBar({
       <div className="flex items-center gap-2">
         <button
           onClick={() => changeLanguage(lang === 'zh' ? 'en' : 'zh')}
-          className="px-2 py-1 text-xs font-mono border border-border rounded-sm hover:bg-secondary hover:text-primary transition-colors"
+          className="px-2 py-1 text-xs font-mono border border-border rounded-sm hover:bg-secondary hover:text-primary transition-colors w-[52px] text-center"
         >
           {lang === 'zh' ? 'EN' : '中文'}
         </button>
