@@ -2,9 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ConnectionPanel } from '@/components/modbus/ConnectionPanel';
-import { ReadPanel } from '@/components/modbus/ReadPanel';
 import { WritePanel } from '@/components/modbus/WritePanel';
-import { DataDisplay } from '@/components/modbus/DataDisplay';
+import { DataPanel } from '@/components/modbus/DataPanel';
 import { LogPanel } from '@/components/modbus/LogPanel';
 import { StatusBar } from '@/components/modbus/StatusBar';
 import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult } from '@/types/modbus';
@@ -21,16 +20,7 @@ export default function ModbusMasterPage() {
     config: null,
   });
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [readResults, setReadResults] = useState<ReadResult[]>([]);
   const [isPolling, setIsPolling] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [readTrigger, setReadTrigger] = useState<number | null>(null);
-  const [pollConfig, setPollConfig] = useState<{
-    functionCode: number;
-    address: number;
-    quantity: number;
-    interval: number;
-  } | null>(null);
   const [lastReadTime, setLastReadTime] = useState<number | null>(null);
 
   // Check initial connection status
@@ -57,16 +47,6 @@ export default function ModbusMasterPage() {
       .catch(() => {
         // ignore
       });
-  }, []);
-
-  // Cleanup polling interval on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
   }, []);
 
   const addLog = useCallback((log: LogEntry) => {
@@ -105,14 +85,6 @@ export default function ModbusMasterPage() {
   );
 
   const handleDisconnect = useCallback(async () => {
-    // Stop polling first
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-      setIsPolling(false);
-      setPollConfig(null);
-    }
-
     try {
       const res = await fetch('/api/modbus/disconnect', { method: 'POST' });
       const data = await res.json();
@@ -135,25 +107,19 @@ export default function ModbusMasterPage() {
         });
         const data = await res.json();
         if (data.success) {
-          const fcNames: Record<number, string> = {
-            1: 'READ_COILS', 2: 'READ_DISCRETE', 3: 'READ_HOLDING', 4: 'READ_INPUT',
-          };
-          const result: ReadResult = {
+          setLastReadTime(Date.now());
+          addLog(data.data.log);
+          return {
             id: nextResultId(),
             timestamp: Date.now(),
             functionCode,
             address,
             quantity,
             values: data.data.values,
-            name: fcNames[functionCode] || `FC${functionCode}`,
+            name: `FC${functionCode}`,
             startAddr: address,
             data: data.data.values,
-          };
-          setReadResults((prev) => [result, ...prev].slice(0, 50));
-          setReadTrigger(address);
-          setLastReadTime(Date.now());
-          addLog(data.data.log);
-          return result;
+          } as ReadResult;
         } else {
           if (data.log) addLog(data.log);
         }
@@ -203,33 +169,6 @@ export default function ModbusMasterPage() {
     [addLog]
   );
 
-  const handleStartPolling = useCallback(
-    (functionCode: number, address: number, quantity: number, interval: number) => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-      setPollConfig({ functionCode, address, quantity, interval });
-      setIsPolling(true);
-
-      // Immediate first read
-      handleRead(functionCode, address, quantity);
-
-      pollingRef.current = setInterval(() => {
-        handleRead(functionCode, address, quantity);
-      }, interval);
-    },
-    [handleRead]
-  );
-
-  const handleStopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    setIsPolling(false);
-    setPollConfig(null);
-  }, []);
-
   const handleClearLogs = useCallback(async () => {
     await fetch('/api/modbus/logs', { method: 'DELETE' });
     setLogs([]);
@@ -255,7 +194,7 @@ export default function ModbusMasterPage() {
             isConnecting={false}
             connectionConfig={connectionStatus.config}
             isPolling={isPolling}
-            pollInterval={pollConfig?.interval || 0}
+            pollInterval={0}
             lastReadTime={lastReadTime}
           />
         </div>
@@ -263,37 +202,26 @@ export default function ModbusMasterPage() {
 
       {/* Main Content */}
       <main className="max-w-[1920px] mx-auto p-4">
-        {/* Two Column Layout */}
+        {/* Two Column Layout: Left (Connection + Log), Right (Data Panel) */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-          {/* Left Column - Connection, Read, Write */}
-          <div className="xl:col-span-3 space-y-4">
+          {/* Left Column - Connection, Write, Log */}
+          <div className="xl:col-span-4 space-y-4">
             <ConnectionPanel
               connected={connectionStatus.connected}
               config={connectionStatus.config}
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
             />
-            <ReadPanel
-              connected={connectionStatus.connected}
-              isPolling={isPolling}
-              onRead={handleRead}
-              onStartPolling={handleStartPolling}
-              onStopPolling={handleStopPolling}
-              pollConfig={pollConfig}
-            />
             <WritePanel
               connected={connectionStatus.connected}
               onWrite={handleWrite}
             />
-          </div>
-
-          {/* Right Column - Data Display, Log */}
-          <div className="xl:col-span-6 space-y-4">
-            <DataDisplay readResults={readResults} isPolling={isPolling} pollConfig={pollConfig} onRead={handleRead} readTrigger={readTrigger} />
-          </div>
-
-          <div className="xl:col-span-3 space-y-4">
             <LogPanel logs={logs} onClear={handleClearLogs} />
+          </div>
+
+          {/* Right Column - Data Panel with Tabs */}
+          <div className="xl:col-span-8">
+            <DataPanel onRead={handleRead} />
           </div>
         </div>
       </main>
