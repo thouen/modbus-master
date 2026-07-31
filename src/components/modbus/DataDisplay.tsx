@@ -352,24 +352,6 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
               <span className="text-xs font-mono font-medium text-amber-400">POLLING</span>
             </div>
           )}
-          {/* Format selector - fixed position */}
-          <div className="flex items-center gap-1 bg-secondary/50 rounded-sm p-0.5 min-w-[180px] justify-center">
-            {FORMAT_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => handleFormatChange(opt.value)}
-                className={`
-                  px-2.5 py-1 text-xs font-mono font-medium rounded-sm transition-all
-                  ${displayFormat === opt.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                  }
-                `}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
           {/* Int mode selector (for DEC) */}
           {displayFormat === 'dec' && (
             <div className="flex items-center gap-1 bg-secondary/50 rounded-sm p-0.5">
@@ -400,6 +382,24 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
               <option value="DCBA">DCBA</option>
             </select>
           )}
+          {/* Format selector */}
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-sm p-0.5">
+            {FORMAT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleFormatChange(opt.value)}
+                className={`
+                  px-2.5 py-1 text-xs font-mono font-medium rounded-sm transition-all
+                  ${displayFormat === opt.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }
+                `}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
