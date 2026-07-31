@@ -56,7 +56,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         {/* Protocol Selector - Select Dropdown */}
         {/* Protocol */}
         <div className="flex items-center gap-3">
-          <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">{t('connection.protocol')}</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 w-18 shrink-0">{t('connection.protocol')}</label>
           <select
             value={protocol}
             onChange={(e) => !connected && setProtocol(e.target.value as ModbusProtocol)}
@@ -73,7 +73,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
 
         {/* IP: Host : Port */}
         <div className="flex items-center gap-3">
-          <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">{t('connection.ip')}</label>
+          <label className="text-sm font-mono font-medium text-foreground/70 w-18 shrink-0">{t('connection.ip')}</label>
           <div className="flex items-center gap-2 flex-1">
             <Input
               value={host}
@@ -97,7 +97,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         {/* Unit ID : Timeout */}
         <div className="grid grid-cols-2 gap-5">
           <div className="flex items-center gap-3">
-            <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">{t('connection.unitId')}</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 w-18 shrink-0">{t('connection.unitId')}</label>
             <Input
               value={unitId}
               onChange={(e) => setUnitId(e.target.value)}
@@ -110,7 +110,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
             />
           </div>
           <div className="flex items-center gap-3">
-            <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">{t('connection.timeout')}</label>
+            <label className="text-sm font-mono font-medium text-foreground/70 w-26 shrink-0">{t('connection.timeout')}</label>
             <Input
               value={timeout}
               onChange={(e) => setTimeout(e.target.value)}

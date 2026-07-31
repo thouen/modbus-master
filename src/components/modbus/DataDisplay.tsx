@@ -283,7 +283,23 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
           <span className="text-primary">▦</span>
           {t('data.title')}
         </h2>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Format buttons */}
+          <div className="flex items-center gap-1">
+            {(['hex', 'dec', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
+              <button
+                key={fmt}
+                onClick={() => setDisplayFormat(fmt)}
+                className={`px-2 py-1 text-xs font-mono uppercase rounded-sm transition-colors ${
+                  displayFormat === fmt
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground border border-border'
+                }`}
+              >
+                {fmt}
+              </button>
+            ))}
+          </div>
           {/* S/U toggle */}
           <div className="flex items-center gap-1">
             <button
@@ -312,22 +328,6 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
             <option value="LE">ABCD (LE)</option>
             <option value="BE">DCBA (BE)</option>
           </select>
-          {/* Format buttons */}
-          <div className="flex items-center gap-1">
-            {(['hex', 'dec', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
-              <button
-                key={fmt}
-                onClick={() => setDisplayFormat(fmt)}
-                className={`px-2 py-1 text-xs font-mono uppercase rounded-sm transition-colors ${
-                  displayFormat === fmt
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground border border-border'
-                }`}
-              >
-                {fmt}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 

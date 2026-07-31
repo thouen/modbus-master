@@ -266,7 +266,7 @@ export default function ModbusMasterPage() {
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
           {/* Left Column - Connection, Read, Write */}
-          <div className="xl:col-span-4 space-y-4">
+          <div className="xl:col-span-3 space-y-4">
             <ConnectionPanel
               connected={connectionStatus.connected}
               config={connectionStatus.config}
@@ -288,8 +288,11 @@ export default function ModbusMasterPage() {
           </div>
 
           {/* Right Column - Data Display, Log */}
-          <div className="xl:col-span-8 space-y-4">
+          <div className="xl:col-span-6 space-y-4">
             <DataDisplay readResults={readResults} isPolling={isPolling} pollConfig={pollConfig} onRead={handleRead} readTrigger={readTrigger} />
+          </div>
+
+          <div className="xl:col-span-3 space-y-4">
             <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>
         </div>
