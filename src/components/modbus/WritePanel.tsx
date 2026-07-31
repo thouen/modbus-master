@@ -69,10 +69,10 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
       </div>
 
       <div className="space-y-4">
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">FUNCTION CODE</label>
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">FUNCTION CODE</label>
           <Select value={functionCode} onValueChange={setFunctionCode} disabled={!connected}>
-            <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border">
+            <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border flex-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -85,61 +85,63 @@ export function WritePanel({ connected, onWrite }: WritePanelProps) {
           </Select>
         </div>
 
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">ADDRESS</label>
-          <Input
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="0"
-            disabled={!connected}
-            className="font-mono bg-secondary/50 border-border text-base"
-            type="number"
-            min="0"
-            max="65535"
-          />
-        </div>
-
-        {isMultiple ? (
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">
-              VALUES ({isCoil ? 'comma-separated: true,false,1,0' : 'comma-separated: 0-65535'})
-            </label>
+        <div className="grid grid-cols-2 gap-5">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">ADDRESS</label>
             <Input
-              value={multiValues}
-              onChange={(e) => setMultiValues(e.target.value)}
-              placeholder={isCoil ? '1,0,1,1,0' : '100,200,300'}
-              disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-base"
-            />
-          </div>
-        ) : isCoil ? (
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">VALUE (TRUE/FALSE)</label>
-            <Select value={value} onValueChange={setValue} disabled={!connected}>
-              <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">TRUE (ON)</SelectItem>
-                <SelectItem value="false">FALSE (OFF)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">VALUE (0-65535)</label>
-            <Input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
               placeholder="0"
               disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-base"
+              className="font-mono bg-secondary/50 border-border text-base flex-1"
               type="number"
               min="0"
               max="65535"
             />
           </div>
-        )}
+
+          {isMultiple ? (
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">
+                VALUES
+              </label>
+              <Input
+                value={multiValues}
+                onChange={(e) => setMultiValues(e.target.value)}
+                placeholder={isCoil ? 'comma-separated: true,false,1,0' : 'comma-separated: 0-65535'}
+                disabled={!connected}
+                className="font-mono bg-secondary/50 border-border text-base flex-1"
+              />
+            </div>
+          ) : isCoil ? (
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">VALUE</label>
+              <Select value={value} onValueChange={setValue} disabled={!connected}>
+                <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">TRUE (ON)</SelectItem>
+                  <SelectItem value="false">FALSE (OFF)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">VALUE</label>
+              <Input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0-65535"
+                disabled={!connected}
+                className="font-mono bg-secondary/50 border-border text-base flex-1"
+                type="number"
+                min="0"
+                max="65535"
+              />
+            </div>
+          )}
+        </div>
 
         <Button
           onClick={handleWrite}

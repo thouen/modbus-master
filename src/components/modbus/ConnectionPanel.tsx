@@ -93,27 +93,31 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
         </div>
 
         {/* Unit ID : Timeout */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">UNIT ID</label>
-          <Input
-            value={unitId}
-            onChange={(e) => setUnitId(e.target.value)}
-            placeholder="1"
-            disabled={connected}
-            className="font-mono bg-secondary/50 border-border text-sm w-24 py-1.5"
-            type="number"
-            min="1"
-            max="247"
-          />
-          <label className="text-sm font-mono font-medium text-foreground/70 w-24 shrink-0">TIMEOUT (ms)</label>
-          <Input
-            value={timeout}
-            onChange={(e) => setTimeout(e.target.value)}
-            placeholder="5000"
-            disabled={connected}
-            className="font-mono bg-secondary/50 border-border text-sm w-28 py-1.5"
-            type="number"
-          />
+        <div className="grid grid-cols-2 gap-5">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-mono font-medium text-foreground/70 w-20 shrink-0">UNIT ID</label>
+            <Input
+              value={unitId}
+              onChange={(e) => setUnitId(e.target.value)}
+              placeholder="1"
+              disabled={connected}
+              className="font-mono bg-secondary/50 border-border text-sm flex-1 py-1.5"
+              type="number"
+              min="1"
+              max="247"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-mono font-medium text-foreground/70 w-26 shrink-0">TIMEOUT (ms)</label>
+            <Input
+              value={timeout}
+              onChange={(e) => setTimeout(e.target.value)}
+              placeholder="5000"
+              disabled={connected}
+              className="font-mono bg-secondary/50 border-border text-sm flex-1 py-1.5"
+              type="number"
+            />
+          </div>
         </div>
 
         <div className="pt-2">

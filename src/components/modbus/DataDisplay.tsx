@@ -135,20 +135,20 @@ export function DataDisplay({ results, isPolling, pollConfig }: DataDisplayProps
         {gridData.map((row, rowIdx) => (
           <div key={rowIdx} className="grid grid-cols-8 gap-1">
             {row.map((cell) => (
-              <div
-                key={cell.addr}
-                className="flex items-center gap-1 bg-secondary/30 rounded-sm px-1.5 py-1 border border-border/30 hover:border-primary/30 transition-colors"
-              >
+              <div key={cell.addr} className="flex items-center gap-1 bg-secondary/30 rounded-sm px-1.5 py-1 transition-colors gap-3">
                 <span className="text-[10px] font-mono text-foreground/40 w-7 shrink-0 text-right">
                   {cell.addr.toString().padStart(5, '0')}
                 </span>
-                <span
-                  className={`text-xs font-mono font-medium truncate ${
-                    cell.val === null ? 'text-foreground/25' : 'text-primary'
-                  }`}
+                <div
+                  className="border border-border/30 hover:border-primary/30 flex-1 items-center"
                 >
-                  {formatValue(cell.val, isBoolType)}
-                </span>
+                  <span
+                    className={`text-xs font-mono font-medium truncate ${cell.val === null ? 'text-foreground/25' : 'text-primary'
+                      }`}
+                  >
+                    {formatValue(cell.val, isBoolType)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

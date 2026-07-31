@@ -62,10 +62,10 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
       </div>
 
       <div className="space-y-4">
-        <div>
-          <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">FUNCTION CODE</label>
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">FUNCTION CODE</label>
           <Select value={functionCode} onValueChange={setFunctionCode} disabled={!connected}>
-            <SelectTrigger className="font-mono text-sm bg-secondary/50 border-border">
+            <SelectTrigger className="font-mono text-sm bg-secondary/50 flex-1 border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -78,28 +78,28 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">START ADDR</label>
+        <div className="grid grid-cols-2 gap-5">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">START ADDR</label>
             <Input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="0"
               disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-base"
+              className="font-mono bg-secondary/50 border-border text-base flex-1"
               type="number"
               min="0"
               max="65535"
             />
           </div>
-          <div>
-            <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">QUANTITY</label>
+          <div  className="flex items-center gap-3">
+            <label className="text-sm font-mono font-medium text-foreground/70 w-20 block">QUANTITY</label>
             <Input
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="10"
               disabled={!connected}
-              className="font-mono bg-secondary/50 border-border text-base"
+              className="font-mono bg-secondary/50 border-border text-base flex-1"
               type="number"
               min="1"
               max="125"
@@ -137,14 +137,14 @@ export function ReadPanel({ connected, isPolling, onRead, onStartPolling, onStop
             <span className="text-sm font-mono font-medium text-foreground/70 uppercase tracking-wider">Auto Polling</span>
           </div>
           <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-mono font-medium text-foreground/70 mb-2 block">INTERVAL (ms)</label>
+            <div className="flex-1 flex items-center gap-3">
+              <label className="text-sm font-mono font-medium text-foreground/70 w-28 block">INTERVAL (ms)</label>
               <Input
                 value={interval}
                 onChange={(e) => setInterval(e.target.value)}
                 placeholder="1000"
                 disabled={!connected || isPolling}
-                className="font-mono bg-secondary/50 border-border text-base"
+                className="font-mono bg-secondary/50 border-border text-base flex-1"
                 type="number"
                 min="100"
               />
