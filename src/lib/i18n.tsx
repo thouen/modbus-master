@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
+import { initReactI18next, useTranslation } from 'react-i18next';
 
 const resources = {
   zh: {
@@ -54,6 +54,10 @@ const resources = {
         bigEndian: '大端',
         signed: '有符号',
         unsigned: '无符号',
+        address: '地址',
+        value: '值',
+        noData: '暂无数据',
+        connectToRead: '连接并读取寄存器以查看数据',
       },
       log: {
         title: '操作日志',
@@ -62,6 +66,10 @@ const resources = {
       status: {
         online: '在线',
         offline: '离线',
+      },
+      lang: {
+        zh: '中文',
+        en: 'English',
       },
     },
   },
@@ -114,6 +122,10 @@ const resources = {
         bigEndian: 'Big Endian',
         signed: 'Signed',
         unsigned: 'Unsigned',
+        address: 'Address',
+        value: 'Value',
+        noData: 'No data yet',
+        connectToRead: 'Connect and read registers to see data',
       },
       log: {
         title: 'Operation Log',
@@ -123,14 +135,19 @@ const resources = {
         online: 'Online',
         offline: 'Offline',
       },
+      lang: {
+        zh: '中文',
+        en: 'English',
+      },
     },
   },
 };
 
 if (!i18n.isInitialized) {
+  const savedLang = typeof window !== 'undefined' ? localStorage.getItem('modbus-lang') || 'zh' : 'zh';
   i18n.use(initReactI18next).init({
     resources,
-    lng: 'zh',
+    lng: savedLang,
     fallbackLng: 'zh',
     interpolation: {
       escapeValue: false,
@@ -138,10 +155,19 @@ if (!i18n.isInitialized) {
   });
 }
 
-export default function I18nProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    // i18n is already initialized above
-  }, []);
+export function useI18n() {
+  const { i18n } = useTranslation();
+  const [lang, setLang] = useState(i18n.language || 'zh');
 
+  const changeLanguage = (newLang: string) => {
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('modbus-lang', newLang);
+    setLang(newLang);
+  };
+
+  return { lang, changeLanguage };
+}
+
+export default function I18nProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

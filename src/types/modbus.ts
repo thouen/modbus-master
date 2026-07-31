@@ -1,4 +1,6 @@
 export type ModbusProtocol = 'tcp' | 'udp' | 'rtu_tcp';
+export type DisplayFormat = 'hex' | 'dec' | 'bin' | 'flt' | 'dlb';
+export type ByteOrder = 'LE' | 'BE';
 
 export interface ConnectionConfig {
   host: string;
@@ -32,6 +34,9 @@ export interface ReadResult {
   address: number;
   quantity: number;
   values: number[] | boolean[];
+  name: string;
+  startAddr: number;
+  data: number[] | boolean[];
 }
 
 export interface PollConfig {
