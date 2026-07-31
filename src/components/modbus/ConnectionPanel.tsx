@@ -88,7 +88,7 @@ export function ConnectionPanel({ connected, config, onConnect, onDisconnect }: 
               onChange={(e) => setPort(e.target.value)}
               placeholder="502"
               disabled={connected}
-              className="font-mono bg-secondary/50 border-border text-sm w-20 py-1.5"
+              className="font-mono bg-secondary/50 border-border text-sm w-28 py-1.5"
               type="number"
             />
           </div>

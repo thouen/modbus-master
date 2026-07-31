@@ -83,7 +83,7 @@ const GRID_CONFIG: Record<DisplayFormat, { rows: number; cols: number; regsPerCe
   dec: { rows: 16, cols: 16, regsPerCell: 1, regsPerPage: 256, totalPages: 256 },
   bin: { rows: 16, cols: 4, regsPerCell: 1, regsPerPage: 64, totalPages: 1024 },
   flt: { rows: 16, cols: 8, regsPerCell: 2, regsPerPage: 128, totalPages: 512 },
-  dlb: { rows: 8, cols: 8, regsPerCell: 4, regsPerPage: 128, totalPages: 512 },
+  dbl: { rows: 8, cols: 8, regsPerCell: 4, regsPerPage: 128, totalPages: 512 },
 };
 
 export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTrigger }: DataDisplayProps) {
@@ -137,7 +137,7 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
       const start = pageMod * 8;
       return Array.from({ length: 8 }, (_, i) => HEX_CHARS[start + i]);
     }
-    if (displayFormat === 'dlb') {
+    if (displayFormat === 'dbl') {
       // 8 cols: 0-7 (C digit for doubles, each double = 4 regs, so C = 0-7)
       return Array.from({ length: 8 }, (_, i) => HEX_CHARS[i]);
     }
@@ -146,14 +146,14 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
   }, [displayFormat, currentPage]);
 
   const getRowHeaders = useCallback((): string[] => {
-    if (displayFormat === 'dlb') return ROW_HEADERS_DBL;
+    if (displayFormat === 'dbl') return ROW_HEADERS_DBL;
     return ROW_HEADERS_16;
   }, [displayFormat]);
 
   // Calculate register address for cell (row, col) on current page
   const getCellAddr = useCallback((row: number, col: number): number => {
     const pageStartAddr = currentPage * regsPerPage;
-    if (displayFormat === 'dlb') {
+    if (displayFormat === 'dbl') {
       // DBL: 8 rows x 8 cols, each cell = 4 regs
       // Row headers: 0,2,4,6,8,A,C,E (D digit, even only)
       // Col headers: 0-7 (C digit)
@@ -183,9 +183,9 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
       addr: number;
       value: number | boolean | null;
       fltVal?: number;
-      dlbVal?: number;
+      dblVal?: number;
       hasFlt: boolean;
-      hasDlb: boolean;
+      hasDbl: boolean;
     }[] = [];
 
     for (let row = 0; row < rows; row++) {
@@ -194,12 +194,12 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
         const value = getReg(addr);
 
         let fltVal: number | undefined;
-        let dlbVal: number | undefined;
+        let dblVal: number | undefined;
         let hasFlt = false;
-        let hasDlb = false;
+        let hasDbl = false;
 
         // FLT tooltip: always compute for non-DBL modes
-        if (displayFormat !== 'dlb') {
+        if (displayFormat !== 'dbl') {
           const r0 = getReg(addr);
           const r1 = getReg(addr + 1);
           if (r0 !== null && r1 !== null && typeof r0 === 'number' && typeof r1 === 'number') {
@@ -208,7 +208,7 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
           }
         }
 
-        // DLB tooltip: only for even addresses
+        // DBL tooltip: only for even addresses
         if (addr % 2 === 0) {
           const r0 = getReg(addr);
           const r1 = getReg(addr + 1);
@@ -217,24 +217,24 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
           if (r0 !== null && r1 !== null && r2 !== null && r3 !== null &&
               typeof r0 === 'number' && typeof r1 === 'number' &&
               typeof r2 === 'number' && typeof r3 === 'number') {
-            dlbVal = parseFloat64([r0, r1, r2, r3], byteOrder);
-            hasDlb = true;
+            dblVal = parseFloat64([r0, r1, r2, r3], byteOrder);
+            hasDbl = true;
           }
         }
 
-        data.push({ addr, value, fltVal, dlbVal, hasFlt, hasDlb });
+        data.push({ addr, value, fltVal, dblVal, hasFlt, hasDbl });
       }
     }
     return data;
   }, [latestResult, rows, cols, displayFormat, byteOrder, currentPage, getReg, getCellAddr]);
 
-  const formatCellValue = (val: number | boolean | null, fltVal?: number, dlbVal?: number): string => {
+  const formatCellValue = (val: number | boolean | null, fltVal?: number, dblVal?: number): string => {
     if (displayFormat === 'flt') {
       if (fltVal !== undefined) return fltVal.toFixed(4);
       return '0.0000';
     }
-    if (displayFormat === 'dlb') {
-      if (dlbVal !== undefined) return dlbVal.toFixed(6);
+    if (displayFormat === 'dbl') {
+      if (dblVal !== undefined) return dblVal.toFixed(6);
       return '0.000000';
     }
     if (val === null) return '0';
@@ -246,15 +246,15 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
     return numVal > 32767 ? (numVal - 65536).toString() : numVal.toString();
   };
 
-  const handleMouseMove = (e: React.MouseEvent, addr: number, fltVal?: number, dlbVal?: number) => {
+  const handleMouseMove = (e: React.MouseEvent, addr: number, fltVal?: number, dblVal?: number) => {
     const content = (
       <div className="text-xs space-y-1">
         <div><span className="text-muted-foreground">ADDR:</span> {addr} (0x{addr.toString(16).toUpperCase().padStart(4, '0')})</div>
         {fltVal !== undefined && (
           <div><span className="text-muted-foreground">FLT:</span> {fltVal.toFixed(6)} ({byteOrder === 'LE' ? 'LE' : 'BE'})</div>
         )}
-        {dlbVal !== undefined && (
-          <div><span className="text-muted-foreground">DLB:</span> {dlbVal.toFixed(10)} ({byteOrder === 'LE' ? 'LE' : 'BE'})</div>
+        {dblVal !== undefined && (
+          <div><span className="text-muted-foreground">DBL:</span> {dblVal.toFixed(10)} ({byteOrder === 'LE' ? 'LE' : 'BE'})</div>
         )}
       </div>
     );
@@ -274,10 +274,10 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
     }
   };
 
-  const isDlbMode = displayFormat === 'dlb';
+  const isDblMode = displayFormat === 'dbl';
 
   return (
-    <div className="industrial-panel flex flex-col h-full">
+    <div className="industrial-panel flex flex-col h-full p-4">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h2 className="industrial-header flex items-center gap-2">
           <span className="text-primary">▦</span>
@@ -314,7 +314,7 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
           </select>
           {/* Format buttons */}
           <div className="flex items-center gap-1">
-            {(['hex', 'dec', 'bin', 'flt', 'dlb'] as DisplayFormat[]).map((fmt) => (
+            {(['hex', 'dec', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
               <button
                 key={fmt}
                 onClick={() => setDisplayFormat(fmt)}
@@ -349,9 +349,9 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
                 }}
               >
                 {/* Header row */}
-                <div className={isDlbMode ? 'h-12' : 'h-6'}></div>
+                <div className={isDblMode ? 'h-12' : 'h-6'}></div>
                 {colHeaders.map((h, i) => (
-                  <div key={i} className={`${isDlbMode ? 'h-12' : 'h-6'} flex items-center justify-center text-xs font-mono text-muted-foreground`}>
+                  <div key={i} className={`${isDblMode ? 'h-12' : 'h-6'} flex items-center justify-center text-xs font-mono text-muted-foreground`}>
                     {h}
                   </div>
                 ))}
@@ -364,24 +364,24 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
                   return (
                     <div key={rowIdx} className="contents">
                       {/* Row header */}
-                      <div className={`${isDlbMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono text-muted-foreground border-b border-border/30`}>
+                      <div className={`${isDblMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono text-muted-foreground border-b border-border/30`}>
                         {rowHeaders[rowIdx]}
                       </div>
                       {/* Data cells */}
                       {rowData.map((cell, colIdx) => {
-                        const displayValue = formatCellValue(cell.value, cell.fltVal, cell.dlbVal);
+                        const displayValue = formatCellValue(cell.value, cell.fltVal, cell.dblVal);
                         const showFlt = cell.hasFlt;
-                        const showDlb = cell.hasDlb;
+                        const showDbl = cell.hasDbl;
 
                         return (
                           <div
                             key={colIdx}
-                            className={`${isDlbMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono border-b border-border/30 cursor-pointer hover:bg-primary/10 ${
+                            className={`${isDblMode ? 'h-14' : 'h-7'} flex items-center justify-center text-xs font-mono border-b border-border/30 cursor-pointer hover:bg-primary/10 ${
                               cell.value !== null && cell.value !== 0 ? 'text-primary font-medium' : 'text-muted-foreground'
                             }`}
                             onMouseMove={(e) => {
-                              if (showFlt || showDlb) {
-                                handleMouseMove(e, cell.addr, cell.fltVal, cell.dlbVal);
+                              if (showFlt || showDbl) {
+                                handleMouseMove(e, cell.addr, cell.fltVal, cell.dblVal);
                               }
                             }}
                             onMouseLeave={handleMouseLeave}
