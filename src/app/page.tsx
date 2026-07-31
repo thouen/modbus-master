@@ -24,6 +24,7 @@ export default function ModbusMasterPage() {
   const [readResults, setReadResults] = useState<ReadResult[]>([]);
   const [isPolling, setIsPolling] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [readTrigger, setReadTrigger] = useState<number | null>(null);
   const [pollConfig, setPollConfig] = useState<{
     functionCode: number;
     address: number;
@@ -142,6 +143,7 @@ export default function ModbusMasterPage() {
             values: data.data.values,
           };
           setReadResults((prev) => [result, ...prev].slice(0, 50));
+          setReadTrigger(address);
           addLog(data.data.log);
           return result;
         } else {
@@ -277,7 +279,7 @@ export default function ModbusMasterPage() {
 
           {/* Right Column - Data Display, Log */}
           <div className="xl:col-span-8 space-y-4">
-            <DataDisplay results={readResults} isPolling={isPolling} pollConfig={pollConfig} />
+            <DataDisplay readResults={readResults} isPolling={isPolling} pollConfig={pollConfig} onRead={handleRead} readTrigger={readTrigger} />
             <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>
         </div>
