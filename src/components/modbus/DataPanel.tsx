@@ -137,7 +137,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
     setActiveTab((prev) => Math.max(0, prev > index ? prev - 1 : prev));
   }, [tabs.length]);
 
-  // Calculate total pages based on display format
+  // Calculate total pages based on display format and quantity
   const getCellsPerPage = () => {
     if (displayFormat === 'dbl') return 32; // 8 rows x 4 cols
     if (displayFormat === 'bin' || displayFormat === 'flt') return 64; // 16 rows x 4 cols
@@ -145,7 +145,9 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   };
 
   const cellsPerPage = getCellsPerPage();
-  const totalPages = Math.ceil(65536 / cellsPerPage);
+  // Total cells: for DBL = floor(quantity/2), for others = quantity
+  const totalCells = displayFormat === 'dbl' ? Math.floor(currentTab.quantity / 2) : currentTab.quantity;
+  const totalPages = Math.max(1, Math.ceil(totalCells / cellsPerPage));
 
   return (
     <div className="bg-card border border-border rounded-lg p-4">

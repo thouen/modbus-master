@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ConnectionPanel } from '@/components/modbus/ConnectionPanel';
-import { WritePanel } from '@/components/modbus/WritePanel';
 import { DataPanel } from '@/components/modbus/DataPanel';
 import { LogPanel } from '@/components/modbus/LogPanel';
 import { StatusBar } from '@/components/modbus/StatusBar';
@@ -204,17 +203,13 @@ export default function ModbusMasterPage() {
       <main className="max-w-[1920px] mx-auto p-4">
         {/* Two Column Layout: Left (Connection + Log), Right (Data Panel) */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-          {/* Left Column - Connection, Write, Log */}
+          {/* Left Column - Connection + Log */}
           <div className="xl:col-span-4 space-y-4">
             <ConnectionPanel
               connected={connectionStatus.connected}
               config={connectionStatus.config}
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
-            />
-            <WritePanel
-              connected={connectionStatus.connected}
-              onWrite={handleWrite}
             />
             <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>

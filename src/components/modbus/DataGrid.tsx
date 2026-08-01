@@ -81,8 +81,8 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
   const cols = (isDBL || isBinOrFlt) ? 4 : 8;
   const cellsPerPage = rows * cols;
 
-  // Page start address
-  const pageStartAddr = currentPage * cellsPerPage;
+  // Page start address: starts from the input startAddr, not from 0
+  const pageStartAddr = startAddr + currentPage * cellsPerPage;
 
   // Generate row headers: start from D (last hex digit of startAddr), increment
   const rowHeaders = useMemo(() => {
