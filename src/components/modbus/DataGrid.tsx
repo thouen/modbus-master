@@ -1,25 +1,14 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ReadResult, DisplayFormat, ByteOrder } from '@/types/modbus';
+import type { DisplayFormat, ByteOrder } from '@/types/modbus';
 
 const HEX_CHARS = '0123456789ABCDEF';
-const ROW_HEADERS = Array.from({ length: 16 }, (_, i) => HEX_CHARS[i]);
-const COL_HEADERS = Array.from({ length: 16 }, (_, i) => HEX_CHARS[i]);
 
-const DEFAULT_BYTE_ORDER: ByteOrder = 'LE';
-const DEFAULT_SIGNED = true;
-
-function getStoredByteOrder(): ByteOrder {
-  if (typeof window === 'undefined') return DEFAULT_BYTE_ORDER;
-  return (localStorage.getItem('modbus-byte-order') as ByteOrder) || DEFAULT_BYTE_ORDER;
-}
-
-function getStoredSigned(): boolean {
-  if (typeof window === 'undefined') return DEFAULT_SIGNED;
-  const v = localStorage.getItem('modbus-signed');
-  return v === null ? DEFAULT_SIGNED : v === 'true';
+function getHexDigit(addr: number, position: number): string {
+  // position: 0 = lowest nibble (D), 1 = second lowest (C), etc.
+  return HEX_CHARS[(addr >> (position * 4)) & 0xF];
 }
 
 function formatBinary(val: number): string {
@@ -41,6 +30,7 @@ function formatHexAddress(addr: number): string {
 interface DataGridProps {
   data: number[];
   startAddr: number;
+  quantity: number;
   displayFormat: DisplayFormat;
   byteOrder: ByteOrder;
   signed: boolean;
@@ -79,16 +69,58 @@ function parseFloat64(regs: number[], byteOrder: ByteOrder): number {
   return view.getFloat64(0);
 }
 
-export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, currentPage, totalPages, onPageChange }: DataGridProps) {
+export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, signed, currentPage, totalPages, onPageChange }: DataGridProps) {
   const { t } = useTranslation();
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: React.ReactNode } | null>(null);
 
-  const pageStartAddr = currentPage * 256;
+  // Grid dimensions based on display format
+  const isDBL = displayFormat === 'dbl';
+  const isBinOrFlt = displayFormat === 'bin' || displayFormat === 'flt';
+  
+  const rows = isDBL ? 8 : 16;
+  const cols = (isDBL || isBinOrFlt) ? 4 : 8;
+  const cellsPerPage = rows * cols;
+
+  // Page start address
+  const pageStartAddr = currentPage * cellsPerPage;
+
+  // Generate row headers: start from D (last hex digit of startAddr), increment
+  const rowHeaders = useMemo(() => {
+    const d = startAddr & 0xF;
+    return Array.from({ length: rows }, (_, i) => {
+      if (isDBL) {
+        // For DBL: D, F, 1, 3, 5, 7, 9, B (step by 2)
+        return HEX_CHARS[(d + i * 2) % 16];
+      }
+      return HEX_CHARS[(d + i) % 16];
+    });
+  }, [startAddr, rows, isDBL]);
+
+  // Generate column headers: start from C (second-to-last hex digit of startAddr), increment by page
+  const colHeaders = useMemo(() => {
+    const c = (startAddr >> 4) & 0xF;
+    const pageOffset = currentPage * cols;
+    return Array.from({ length: cols }, (_, i) => {
+      return HEX_CHARS[(c + pageOffset + i) % 16];
+    });
+  }, [startAddr, currentPage, cols]);
 
   const getCellValue = useCallback((row: number, col: number): string => {
-    const addr = pageStartAddr + row * 16 + col;
-    const relAddr = addr - startAddr;
-    if (relAddr < 0 || relAddr >= data.length) return '--';
+    // Calculate address: row-major order
+    // For DBL: each cell represents 2 registers, row index is multiplied by 2
+    const rowOffset = isDBL ? row * 2 : row;
+    const addr = pageStartAddr + col * (isDBL ? 16 : (isBinOrFlt ? 16 : 16)) + rowOffset;
+    
+    // Wait, let me reconsider the address calculation
+    // The user said: row = C digit, col = D digit
+    // So address = pageStart + col * 16 + row (for 16-row modes)
+    // For DBL (8 rows): address = pageStart + col * 16 + row * 2
+    
+    const actualAddr = pageStartAddr + col * 16 + (isDBL ? row * 2 : row);
+    const relAddr = actualAddr - startAddr;
+    
+    if (relAddr < 0 || relAddr >= quantity) return '--';
+    if (relAddr >= data.length) return '--';
 
     const val = data[relAddr];
 
@@ -102,24 +134,27 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
       case 'bin':
         return formatBinary(val);
       case 'flt': {
-        if (relAddr + 1 >= data.length) return '--';
+        if (relAddr + 1 >= data.length || relAddr + 1 >= quantity) return '--';
         const f = parseFloat32([val, data[relAddr + 1]], byteOrder);
         return f.toFixed(4);
       }
       case 'dbl': {
-        if (relAddr + 3 >= data.length) return '--';
+        if (relAddr + 3 >= data.length || relAddr + 3 >= quantity) return '--';
         const d = parseFloat64([val, data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]], byteOrder);
         return d.toFixed(6);
       }
       default:
         return val.toString();
     }
-  }, [data, startAddr, displayFormat, byteOrder, signed, pageStartAddr]);
+  }, [data, startAddr, quantity, displayFormat, byteOrder, signed, pageStartAddr, isDBL, isBinOrFlt]);
 
   const getTooltipContent = useCallback((row: number, col: number) => {
-    const addr = pageStartAddr + row * 16 + col;
+    const rowOffset = isDBL ? row * 2 : row;
+    const addr = pageStartAddr + col * 16 + rowOffset;
     const relAddr = addr - startAddr;
-    if (relAddr < 0 || relAddr >= data.length) return null;
+    
+    if (relAddr < 0 || relAddr >= quantity) return null;
+    if (relAddr >= data.length) return null;
 
     const val = data[relAddr];
     const decVal = signed && val > 32767 ? val - 65536 : val;
@@ -138,7 +173,7 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
     );
 
     // Float tooltip (if we have at least 2 regs)
-    if (relAddr + 1 < data.length) {
+    if (relAddr + 1 < data.length && relAddr + 1 < quantity) {
       const f = parseFloat32([val, data[relAddr + 1]], byteOrder);
       content = (
         <div className="text-xs space-y-1">
@@ -152,7 +187,7 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
     }
 
     // Double tooltip (if even address and we have 4 regs)
-    if (addr % 2 === 0 && relAddr + 3 < data.length) {
+    if (addr % 2 === 0 && relAddr + 3 < data.length && relAddr + 3 < quantity) {
       const d = parseFloat64([val, data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]], byteOrder);
       content = (
         <div className="text-xs space-y-1">
@@ -167,7 +202,7 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
     }
 
     return content;
-  }, [data, startAddr, pageStartAddr, signed, byteOrder, t]);
+  }, [data, startAddr, quantity, pageStartAddr, signed, byteOrder, t, isDBL]);
 
   const handleCellHover = useCallback((row: number, col: number, e: React.MouseEvent) => {
     const content = getTooltipContent(row, col);
@@ -180,11 +215,6 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
     setTooltip(null);
   }, []);
 
-  // DBL mode: 8 rows x 8 cols (each cell spans 2 regs)
-  const isDBL = displayFormat === 'dbl';
-  const rows = isDBL ? 8 : 16;
-  const cols = isDBL ? 8 : 16;
-
   return (
     <div className="relative">
       <div className="overflow-auto max-h-[600px]">
@@ -196,9 +226,9 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
         >
           {/* Header row */}
           <div className="bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground"></div>
-          {(isDBL ? [0, 2, 4, 6, 8, 10, 12, 14] : COL_HEADERS).map((h, i) => (
+          {colHeaders.map((h, i) => (
             <div key={i} className="bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground">
-              {isDBL ? h.toString(16).toUpperCase() : h}
+              {h}
             </div>
           ))}
 
@@ -206,7 +236,7 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
           {Array.from({ length: rows }, (_, row) => (
             <div key={row} className="contents">
               <div className={`bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground ${isDBL ? 'row-span-2' : ''}`}>
-                {row.toString(16).toUpperCase()}
+                {rowHeaders[row]}
               </div>
               {Array.from({ length: cols }, (_, col) => {
                 const cellValue = getCellValue(row, col);
@@ -254,7 +284,7 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
           </span>
           <button
             onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
-            disabled={currentPage === totalPages - 1}
+            disabled={currentPage >= totalPages - 1}
             className="px-2 py-1 bg-panel border border-border rounded hover:bg-accent disabled:opacity-50"
           >
             {t('dataGrid.nextPage')}
@@ -265,18 +295,20 @@ export function DataGrid({ data, startAddr, displayFormat, byteOrder, signed, cu
             type="number"
             min={1}
             max={totalPages}
-            placeholder={t('dataGrid.jumpTo')}
+            placeholder={t('dataGrid.jumpToPage')}
             className="w-16 px-2 py-1 bg-panel border border-border rounded text-xs"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                const page = parseInt((e.target as HTMLInputElement).value);
-                if (page >= 1 && page <= totalPages) {
-                  onPageChange(page - 1);
+                const page = parseInt((e.target as HTMLInputElement).value) - 1;
+                if (page >= 0 && page < totalPages) {
+                  onPageChange(page);
                 }
               }
             }}
           />
-          <span className="text-muted-foreground">256 regs/page</span>
+          <span className="text-muted-foreground">
+            {cellsPerPage} regs/page
+          </span>
         </div>
       </div>
     </div>

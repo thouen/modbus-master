@@ -221,7 +221,7 @@ export default function ModbusMasterPage() {
 
           {/* Right Column - Data Panel with Tabs */}
           <div className="xl:col-span-8">
-            <DataPanel onRead={handleRead} />
+            <DataPanel onRead={handleRead} onWrite={handleWrite} />
           </div>
         </div>
       </main>

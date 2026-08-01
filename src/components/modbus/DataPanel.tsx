@@ -10,28 +10,40 @@ const FC_NAMES: Record<number, string> = {
   2: 'FC02 - Read Discrete Inputs',
   3: 'FC03 - Read Holding Registers',
   4: 'FC04 - Read Input Registers',
+  5: 'FC05 - Write Single Coil',
+  6: 'FC06 - Write Single Register',
+  15: 'FC15 - Write Multiple Coils',
+  16: 'FC16 - Write Multiple Registers',
 };
 
-const FC_OPTIONS = [1, 2, 3, 4];
+const READ_FCS = [1, 2, 3, 4];
+const WRITE_FCS = [5, 6, 15, 16];
+const ALL_FCS = [...READ_FCS, ...WRITE_FCS];
+
+function isReadFC(fc: number): boolean {
+  return READ_FCS.includes(fc);
+}
 
 interface DataPanelProps {
   onRead: (functionCode: number, address: number, quantity: number) => Promise<ReadResult | null>;
+  onWrite: (functionCode: number, address: number, values: number[] | boolean[]) => Promise<boolean>;
 }
 
 interface TabData {
   functionCode: number;
   startAddr: number;
   quantity: number;
+  writeValue: string;
   data: number[];
   isPolling: boolean;
   pollInterval: number;
 }
 
-export function DataPanel({ onRead }: DataPanelProps) {
+export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
   const [tabs, setTabs] = useState<TabData[]>([
-    { functionCode: 3, startAddr: 0, quantity: 256, data: [], isPolling: false, pollInterval: 1000 },
+    { functionCode: 3, startAddr: 0, quantity: 128, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 },
   ]);
 
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
@@ -66,33 +78,44 @@ export function DataPanel({ onRead }: DataPanelProps) {
   }, []);
 
   const currentTab = tabs[activeTab];
+  const isRead = isReadFC(currentTab.functionCode);
 
   const updateTab = useCallback((index: number, updates: Partial<TabData>) => {
     setTabs((prev) => prev.map((tab, i) => (i === index ? { ...tab, ...updates } : tab)));
   }, []);
 
-  const handleRead = useCallback(async () => {
-    const result = await onRead(currentTab.functionCode, currentTab.startAddr, currentTab.quantity);
-    if (result) {
-      const numValues = result.values.filter((v): v is number => typeof v === 'number');
-      updateTab(activeTab, { data: numValues });
-      // Jump to page containing startAddr
-      const page = Math.floor(currentTab.startAddr / 256);
-      setCurrentPage(page);
+  const handleExecute = useCallback(async () => {
+    if (isRead) {
+      const result = await onRead(currentTab.functionCode, currentTab.startAddr, currentTab.quantity);
+      if (result) {
+        const numValues = result.values.filter((v): v is number => typeof v === 'number');
+        updateTab(activeTab, { data: numValues });
+        // Jump to page containing startAddr
+        const page = Math.floor(currentTab.startAddr / 128);
+        setCurrentPage(page);
+      }
+    } else {
+      // Write operation
+      const values = currentTab.writeValue.split(',').map((v) => {
+        const num = parseInt(v.trim());
+        return isNaN(num) ? 0 : num;
+      });
+      await onWrite(currentTab.functionCode, currentTab.startAddr, values);
     }
-  }, [onRead, currentTab, activeTab, updateTab]);
+  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead]);
 
   const handleStartPolling = useCallback(() => {
+    if (!isRead) return;
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
     updateTab(activeTab, { isPolling: true });
 
-    handleRead();
+    handleExecute();
     pollingRef.current = setInterval(() => {
-      handleRead();
+      handleExecute();
     }, currentTab.pollInterval);
-  }, [handleRead, activeTab, currentTab.pollInterval, updateTab]);
+  }, [handleExecute, activeTab, currentTab.pollInterval, updateTab, isRead]);
 
   const handleStopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -103,7 +126,7 @@ export function DataPanel({ onRead }: DataPanelProps) {
   }, [activeTab, updateTab]);
 
   const addTab = useCallback(() => {
-    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 256, data: [], isPolling: false, pollInterval: 1000 };
+    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 128, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(tabs.length);
   }, [tabs.length]);
@@ -114,7 +137,15 @@ export function DataPanel({ onRead }: DataPanelProps) {
     setActiveTab((prev) => Math.max(0, prev > index ? prev - 1 : prev));
   }, [tabs.length]);
 
-  const totalPages = 256; // 65536 / 256
+  // Calculate total pages based on display format
+  const getCellsPerPage = () => {
+    if (displayFormat === 'dbl') return 32; // 8 rows x 4 cols
+    if (displayFormat === 'bin' || displayFormat === 'flt') return 64; // 16 rows x 4 cols
+    return 128; // 16 rows x 8 cols (hex/dec)
+  };
+
+  const cellsPerPage = getCellsPerPage();
+  const totalPages = Math.ceil(65536 / cellsPerPage);
 
   return (
     <div className="bg-card border border-border rounded-lg p-4">
@@ -150,22 +181,28 @@ export function DataPanel({ onRead }: DataPanelProps) {
         </button>
       </div>
 
-      {/* Read Config */}
-      <div className="grid grid-cols-4 gap-4 mb-4">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">{t('readPanel.functionCode')}</label>
-          <select
-            value={currentTab.functionCode}
-            onChange={(e) => updateTab(activeTab, { functionCode: parseInt(e.target.value) })}
-            className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
-          >
-            {FC_OPTIONS.map((fc) => (
-              <option key={fc} value={fc}>
-                {FC_NAMES[fc]}
-              </option>
-            ))}
-          </select>
+      {/* Function Code Radio Buttons */}
+      <div className="mb-4">
+        <label className="text-xs text-muted-foreground mb-2 block">{t('dataPanel.functionCode')}</label>
+        <div className="flex flex-wrap gap-2">
+          {ALL_FCS.map((fc) => (
+            <label key={fc} className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="radio"
+                name={`fc-${activeTab}`}
+                value={fc}
+                checked={currentTab.functionCode === fc}
+                onChange={() => updateTab(activeTab, { functionCode: fc })}
+                className="w-3 h-3"
+              />
+              <span className="text-xs">{FC_NAMES[fc]}</span>
+            </label>
+          ))}
         </div>
+      </div>
+
+      {/* Address/Quantity/Value Config */}
+      <div className="grid grid-cols-4 gap-4 mb-4">
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">{t('readPanel.startAddr')}</label>
           <input
@@ -184,50 +221,66 @@ export function DataPanel({ onRead }: DataPanelProps) {
             className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
           />
         </div>
+        {!isRead && (
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">{t('writePanel.value')}</label>
+            <input
+              type="text"
+              value={currentTab.writeValue}
+              onChange={(e) => updateTab(activeTab, { writeValue: e.target.value })}
+              placeholder="0,1,2,..."
+              className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
+            />
+          </div>
+        )}
         <div className="flex items-end">
           <button
-            onClick={handleRead}
+            onClick={handleExecute}
             disabled={currentTab.isPolling}
-            className="w-full px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium disabled:opacity-50"
+            className={`w-full px-4 py-1 text-white rounded text-xs font-medium disabled:opacity-50 ${
+              isRead ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700'
+            }`}
           >
-            {t('readPanel.read')}
+            {isRead ? t('readPanel.read') : t('writePanel.write')}
           </button>
         </div>
       </div>
 
-      {/* Auto Polling */}
-      <div className="flex items-center gap-4 mb-4 pb-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t('readPanel.interval')}:</span>
-          <input
-            type="number"
-            value={currentTab.pollInterval}
-            onChange={(e) => updateTab(activeTab, { pollInterval: parseInt(e.target.value) || 1000 })}
-            className="w-20 px-2 py-1 bg-panel border border-border rounded text-xs"
-          />
-          <span className="text-xs text-muted-foreground">ms</span>
+      {/* Auto Polling (only for read) */}
+      {isRead && (
+        <div className="flex items-center gap-4 mb-4 pb-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t('readPanel.interval')}:</span>
+            <input
+              type="number"
+              value={currentTab.pollInterval}
+              onChange={(e) => updateTab(activeTab, { pollInterval: parseInt(e.target.value) || 1000 })}
+              className="w-20 px-2 py-1 bg-panel border border-border rounded text-xs"
+            />
+            <span className="text-xs text-muted-foreground">ms</span>
+          </div>
+          {currentTab.isPolling ? (
+            <button
+              onClick={handleStopPolling}
+              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+            >
+              {t('readPanel.stop')}
+            </button>
+          ) : (
+            <button
+              onClick={handleStartPolling}
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs"
+            >
+              {t('readPanel.start')}
+            </button>
+          )}
         </div>
-        {currentTab.isPolling ? (
-          <button
-            onClick={handleStopPolling}
-            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
-          >
-            {t('readPanel.stop')}
-          </button>
-        ) : (
-          <button
-            onClick={handleStartPolling}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs"
-          >
-            {t('readPanel.start')}
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Format Selection */}
       <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
         <div className="flex items-center gap-1">
-          {(['dec', 'hex', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
+          {(['hex', 'dec', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
             <button
               key={fmt}
               onClick={() => setDisplayFormat(fmt)}
@@ -264,16 +317,19 @@ export function DataPanel({ onRead }: DataPanelProps) {
       </div>
 
       {/* Data Grid */}
-      <DataGrid
-        data={currentTab.data}
-        startAddr={currentTab.startAddr}
-        displayFormat={displayFormat}
-        byteOrder={byteOrder}
-        signed={signed}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-      />
+      {isRead && (
+        <DataGrid
+          data={currentTab.data}
+          startAddr={currentTab.startAddr}
+          quantity={currentTab.quantity}
+          displayFormat={displayFormat}
+          byteOrder={byteOrder}
+          signed={signed}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      )}
     </div>
   );
 }
