@@ -42,7 +42,7 @@ const resources = {
       settings: {
         title: '全局设置',
         byteOrder: '默认字节序',
-        signed: '符号类型',
+        signed: '默认符号类型',
         signedLabel: '有符号',
         unsignedLabel: '无符号',
       },
@@ -75,6 +75,7 @@ const resources = {
         nextPage: '下一页',
         jumpToPage: '跳转',
         noData: '无数据',
+        regsPerPage: '寄存器/页',
       },
       log: {
         title: '操作日志',
@@ -154,7 +155,7 @@ const resources = {
       settings: {
         title: 'Global Settings',
         byteOrder: 'Default Byte Order',
-        signed: 'Sign Type',
+        signed: 'Default Sign Type',
         signedLabel: 'Signed',
         unsignedLabel: 'Unsigned',
       },
@@ -187,6 +188,7 @@ const resources = {
         nextPage: 'Next',
         jumpToPage: 'Go',
         noData: 'No data',
+        regsPerPage: 'regs/page',
       },
       log: {
         title: 'Operation Log',

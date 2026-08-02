@@ -86,13 +86,13 @@ export function ConnectionManager({
   const openAddModal = useCallback(() => {
     setModalMode('add');
     setEditId(null);
-    setFormName('');
+    setFormName(t('connection.defaultName'));
     setFormHost('127.0.0.1');
     setFormPort('502');
     setFormUnitId('1');
     setFormTimeout('5000');
     setFormProtocol('tcp');
-  }, []);
+  }, [t]);
 
   const openEditModal = useCallback(
     (id: string) => {

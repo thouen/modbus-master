@@ -308,7 +308,7 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
             }}
           />
           <span className="text-muted-foreground">
-            {regsPerPage} regs/page
+            {regsPerPage} {t('dataGrid.regsPerPage')}
           </span>
         </div>
       </div>
