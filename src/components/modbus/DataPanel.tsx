@@ -285,8 +285,8 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
           />
         </div>
         {!isRead && (
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">{t('writePanel.value')}</label>
+          <div className="flex items-center">
+            <label className="text-xs text-muted-foreground w-14 block">{t('writePanel.value')}:</label>
             <input
               type="text"
               value={currentTab.writeValue}

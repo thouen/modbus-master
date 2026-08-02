@@ -70,7 +70,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
 
       <div
         ref={scrollRef}
-        className="overflow-auto max-h-[300px] border border-border rounded-sm bg-background/50"
+        className="overflow-auto max-h-[695px] border border-border rounded-sm bg-background/50"
       >
         {logs.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-foreground/50">

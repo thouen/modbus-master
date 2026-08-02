@@ -100,7 +100,7 @@ export function ConnectionManager({
   }, []);
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4">
+    <div className="bg-card rounded-lg border border-border h-full p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
           {t('connection.connections')}
@@ -274,7 +274,7 @@ export function ConnectionManager({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
-                    {t('connection.host')}
+                    {t('connection.ip')}
                   </label>
                   <input
                     type="text"
