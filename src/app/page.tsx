@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { ConnectionManager } from '@/components/modbus/ConnectionManager';
 import { DataPanel } from '@/components/modbus/DataPanel';
 import { LogPanel } from '@/components/modbus/LogPanel';
-import { StatusBar } from '@/components/modbus/StatusBar';
+import StatusBar from '@/components/modbus/StatusBar';
 import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult, ByteOrder, SavedConnection } from '@/types/modbus';
 
 let resultIdCounter = 0;
@@ -29,6 +29,7 @@ export default function ModbusMasterPage() {
   // Connection management
   const [connections, setConnections] = useState<SavedConnection[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<string>('');
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
 
   // Load settings and connections from localStorage
   useEffect(() => {
@@ -138,21 +139,23 @@ export default function ModbusMasterPage() {
   }, []);
 
   const handleConnect = useCallback(
-    async (config: ConnectionConfig): Promise<boolean> => {
+    async (id: string) => {
+      const conn = connections.find((c) => c.id === id);
+      if (!conn) return;
       try {
         const res = await fetch('/api/modbus/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
+          body: JSON.stringify(conn),
         });
         const data = await res.json();
         if (data.success) {
-          setConnectionStatus({ connected: true, config });
+          setConnectionStatus({ connected: true, config: conn });
+          setConnectedIds((prev) => new Set(prev).add(id));
           addLog(data.data);
         } else {
           addLog(data.data || { type: 'error', message: data.error, success: false, timestamp: Date.now(), id: nextResultId() });
         }
-        return data.success;
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Connection failed';
         addLog({
@@ -162,24 +165,40 @@ export default function ModbusMasterPage() {
           timestamp: Date.now(),
           id: nextResultId(),
         });
-        return false;
       }
     },
-    [addLog]
+    [addLog, connections]
   );
 
-  const handleDisconnect = useCallback(async () => {
-    try {
-      const res = await fetch('/api/modbus/disconnect', { method: 'POST' });
-      const data = await res.json();
-      setConnectionStatus({ connected: false, config: null });
-      if (data.success) {
-        addLog(data.data);
+  const handleDisconnect = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch('/api/modbus/disconnect', { method: 'POST' });
+        const data = await res.json();
+        setConnectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        if (id === activeConnectionId) {
+          setConnectionStatus({ connected: false, config: null });
+        }
+        if (data.success) {
+          addLog(data.data);
+        }
+      } catch {
+        setConnectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        if (id === activeConnectionId) {
+          setConnectionStatus({ connected: false, config: null });
+        }
       }
-    } catch {
-      setConnectionStatus({ connected: false, config: null });
-    }
-  }, [addLog]);
+    },
+    [addLog, activeConnectionId]
+  );
 
   const handleRead = useCallback(
     async (functionCode: number, address: number, quantity: number) => {
@@ -308,14 +327,6 @@ export default function ModbusMasterPage() {
             </div>
           </div>
           <StatusBar
-            isConnected={connectionStatus.connected}
-            isConnecting={false}
-            connectionConfig={connectionStatus.config}
-            isPolling={isPolling}
-            pollInterval={0}
-            lastReadTime={lastReadTime}
-            defaultByteOrder={defaultByteOrder}
-            defaultSigned={defaultSigned}
             onSettingsChange={handleSettingsChange}
           />
         </div>
@@ -330,10 +341,13 @@ export default function ModbusMasterPage() {
             <ConnectionManager
               connections={connections}
               activeConnectionId={activeConnectionId}
+              connectedIds={connectedIds}
               onSelectConnection={handleSelectConnection}
               onAddConnection={handleAddConnection}
               onUpdateConnection={handleUpdateConnection}
               onRemoveConnection={handleDeleteConnection}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
             />
           </div>
 

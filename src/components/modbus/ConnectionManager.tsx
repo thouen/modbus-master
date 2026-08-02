@@ -7,10 +7,13 @@ import type { SavedConnection, ConnectionConfig } from '@/types/modbus';
 interface ConnectionManagerProps {
   connections: SavedConnection[];
   activeConnectionId: string | null;
+  connectedIds: Set<string>;
   onSelectConnection: (id: string) => void;
   onAddConnection: (connection: SavedConnection) => void;
   onRemoveConnection: (id: string) => void;
   onUpdateConnection: (id: string, config: ConnectionConfig) => void;
+  onConnect: (id: string) => void;
+  onDisconnect: (id: string) => void;
 }
 
 const STORAGE_KEY = 'modbus-connections';
@@ -38,10 +41,13 @@ function saveConnections(connections: SavedConnection[]) {
 export function ConnectionManager({
   connections,
   activeConnectionId,
+  connectedIds,
   onSelectConnection,
   onAddConnection,
   onRemoveConnection,
   onUpdateConnection,
+  onConnect,
+  onDisconnect,
 }: ConnectionManagerProps) {
   const { t } = useTranslation();
   const [isAdding, setIsAdding] = useState(false);
@@ -175,51 +181,77 @@ export function ConnectionManager({
             {t('connection.noConnections')}
           </div>
         ) : (
-          connections.map((conn) => (
-            <div
-              key={conn.id}
-              className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors ${
-                activeConnectionId === conn.id
-                  ? 'bg-primary/20 border border-primary/50'
-                  : 'bg-background hover:bg-accent border border-transparent'
-              }`}
-              onClick={() => onSelectConnection(conn.id)}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{conn.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {conn.host}:{conn.port}
+          connections.map((conn) => {
+            const isConnected = connectedIds.has(conn.id);
+            return (
+              <div
+                key={conn.id}
+                className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors ${
+                  activeConnectionId === conn.id
+                    ? 'bg-primary/20 border border-primary/50'
+                    : 'bg-background hover:bg-accent border border-transparent'
+                }`}
+                onClick={() => onSelectConnection(conn.id)}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      isConnected ? 'bg-success' : 'bg-muted-foreground'
+                    }`} />
+                    <span className="text-sm font-medium truncate">{conn.name}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {conn.host}:{conn.port} · UID:{conn.unitId}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isConnected) {
+                        onDisconnect(conn.id);
+                      } else {
+                        onConnect(conn.id);
+                      }
+                    }}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      isConnected
+                        ? 'bg-destructive/20 text-destructive hover:bg-destructive/30'
+                        : 'bg-primary/20 text-primary hover:bg-primary/30'
+                    }`}
+                    title={isConnected ? t('connection.disconnect') : t('connection.connect')}
+                  >
+                    {isConnected ? t('connection.disconnect') : t('connection.connect')}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startEdit(conn);
+                      setIsAdding(false);
+                    }}
+                    className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    title={t('common.edit')}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveConnection(conn.id);
+                    }}
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                    title={t('common.delete')}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1 ml-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    startEdit(conn);
-                    setIsAdding(false);
-                  }}
-                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                  title={t('common.edit')}
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveConnection(conn.id);
-                  }}
-                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                  title={t('common.delete')}
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
