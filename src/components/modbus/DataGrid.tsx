@@ -173,7 +173,7 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     // Check if FLT should be shown (need at least 2 regs)
     const showFLT = relAddr + 1 < data.length && relAddr + 1 < quantity;
 
-    let content = (
+    const content = (
       <div className="text-xs space-y-1">
         <div><span className="text-muted-foreground">{t('dataGrid.address')}:</span> {decAddr} ({hexAddr})</div>
         <div><span className="text-muted-foreground">{t('dataGrid.decimal')}:</span> {decVal}</div>
