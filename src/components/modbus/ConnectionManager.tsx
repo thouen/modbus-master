@@ -280,7 +280,7 @@ export function ConnectionManager({
           onClick={closeModal}
         >
           <div
-            className="bg-card border border-border rounded-sm shadow-2xl w-[440px]"
+            className="bg-card border border-border rounded-sm shadow-2xl w-[420px] max-w-[90vw]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -293,8 +293,8 @@ export function ConnectionManager({
 
             {/* Modal Body */}
             <div className="px-5 py-4 space-y-3">
-              {/* Name - full width */}
-              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
+              {/* Name */}
+              <div className="grid grid-cols-[90px_1fr] items-center gap-3">
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.name')}
                 </label>
@@ -306,8 +306,8 @@ export function ConnectionManager({
                 />
               </div>
 
-              {/* Protocol - full width */}
-              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
+              {/* Protocol */}
+              <div className="grid grid-cols-[90px_1fr] items-center gap-3">
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.protocol')}
                 </label>
@@ -322,50 +322,50 @@ export function ConnectionManager({
                 </select>
               </div>
 
-              {/* Host + Port */}
-              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
+              {/* Host + Port on same row */}
+              <div className="grid grid-cols-[90px_1fr] items-center gap-3">
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.host')}
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <input
                     type="text"
                     value={formHost}
                     onChange={(e) => setFormHost(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="flex-1 min-w-0 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
-                  <span className="text-xs font-mono text-muted-foreground shrink-0 w-[52px] text-right">
+                  <span className="text-xs font-mono text-muted-foreground shrink-0">
                     {t('connection.port')}
                   </span>
                   <input
                     type="text"
                     value={formPort}
                     onChange={(e) => setFormPort(e.target.value)}
-                    className="w-20 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="w-[64px] px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
               </div>
 
-              {/* Unit ID + Timeout */}
-              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
+              {/* Unit ID + Timeout on same row */}
+              <div className="grid grid-cols-[90px_1fr] items-center gap-3">
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.unitId')}
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <input
                     type="text"
                     value={formUnitId}
                     onChange={(e) => setFormUnitId(e.target.value)}
-                    className="w-24 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="w-[64px] px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
-                  <span className="text-xs font-mono text-muted-foreground shrink-0 ml-2">
+                  <span className="text-xs font-mono text-muted-foreground shrink-0">
                     {t('connection.timeout')}
                   </span>
                   <input
                     type="text"
                     value={formTimeout}
                     onChange={(e) => setFormTimeout(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="w-[80px] px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
               </div>
