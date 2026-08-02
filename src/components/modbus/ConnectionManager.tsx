@@ -100,7 +100,7 @@ export function ConnectionManager({
       if (conn) {
         setModalMode('edit');
         setEditId(id);
-        setFormName(conn.name);
+        setFormName(conn.name === 'default' ? t('connection.defaultName') : conn.name);
         setFormHost(conn.host);
         setFormPort(String(conn.port));
         setFormUnitId(String(conn.unitId));
@@ -108,7 +108,7 @@ export function ConnectionManager({
         setFormProtocol(conn.protocol || 'tcp');
       }
     },
-    [connections]
+    [connections, t]
   );
 
   const closeModal = useCallback(() => {
@@ -118,10 +118,12 @@ export function ConnectionManager({
 
   const handleSave = useCallback(() => {
     if (!formName.trim()) return;
+    // If the name matches the translated default name, save as 'default'
+    const savedName = formName.trim() === t('connection.defaultName') ? 'default' : formName.trim();
     if (modalMode === 'add') {
       const connection: SavedConnection = {
         id: `conn-${Date.now()}`,
-        name: formName.trim(),
+        name: savedName,
         host: formHost,
         port: parseInt(formPort) || 502,
         unitId: parseInt(formUnitId) || 1,
@@ -131,7 +133,7 @@ export function ConnectionManager({
       onAddConnection(connection);
     } else if (modalMode === 'edit' && editId) {
       onUpdateConnection(editId, {
-        name: formName.trim(),
+        name: savedName,
         host: formHost,
         port: parseInt(formPort) || 502,
         unitId: parseInt(formUnitId) || 1,
@@ -140,7 +142,7 @@ export function ConnectionManager({
       });
     }
     closeModal();
-  }, [modalMode, editId, formName, formHost, formPort, formUnitId, formTimeout, formProtocol, onAddConnection, onUpdateConnection, closeModal]);
+  }, [modalMode, editId, formName, formHost, formPort, formUnitId, formTimeout, formProtocol, onAddConnection, onUpdateConnection, closeModal, t]);
 
   const handleDelete = useCallback(
     (id: string) => {
