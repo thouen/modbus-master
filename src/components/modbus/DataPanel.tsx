@@ -87,13 +87,15 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }, []);
 
   const currentTab = tabs[activeTab];
-  const isRead = isReadFC(currentTab.functionCode);
+  
+  const isRead = currentTab ? isReadFC(currentTab.functionCode) : true;
 
   const updateTab = useCallback((index: number, updates: Partial<TabData>) => {
     setTabs((prev) => prev.map((tab, i) => (i === index ? { ...tab, ...updates } : tab)));
   }, []);
 
   const handleExecute = useCallback(async () => {
+    if (!currentTab) return;
     if (isRead) {
       const result = await onRead(currentTab.functionCode, currentTab.startAddr, currentTab.quantity);
       if (result) {
@@ -114,7 +116,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead]);
 
   const handleStartPolling = useCallback(() => {
-    if (!isRead) return;
+    if (!isRead || !currentTab) return;
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
@@ -124,7 +126,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
     pollingRef.current = setInterval(() => {
       handleExecute();
     }, currentTab.pollInterval);
-  }, [handleExecute, activeTab, currentTab.pollInterval, updateTab, isRead]);
+  }, [handleExecute, activeTab, currentTab, updateTab, isRead]);
 
   const handleStopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -163,6 +165,11 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       return newTabs;
     });
   }, [tabs.length]);
+  
+  // Guard against undefined currentTab (e.g., after deleting a tab)
+  if (!currentTab) {
+    return <div className="bg-card border border-border rounded-lg p-4 text-center text-muted-foreground">No tabs available</div>;
+  }
 
   // Calculate total pages based on display format and quantity
   const getCellsPerPage = () => {

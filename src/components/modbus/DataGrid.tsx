@@ -209,6 +209,9 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
           className="grid gap-0 border border-border"
           style={{
             gridTemplateColumns: `40px repeat(${cols}, minmax(80px, 1fr))`,
+            gridTemplateRows: isDBL 
+              ? `repeat(${rows}, 48px)` // DBL rows are 2x height (48px vs 24px)
+              : `repeat(${rows}, 24px)`,
           }}
         >
           {/* Header row */}
@@ -222,7 +225,7 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
           {/* Data rows */}
           {Array.from({ length: rows }, (_, row) => (
             <div key={row} className="contents">
-              <div className={`bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground ${isDBL ? 'row-span-2' : ''}`}>
+              <div className="bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground flex items-center justify-center">
                 {rowHeaders[row]}
               </div>
               {Array.from({ length: cols }, (_, col) => {
@@ -231,9 +234,9 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
                 return (
                   <div
                     key={col}
-                    className={`border-b border-border p-1 text-center text-xs font-mono truncate cursor-pointer transition-colors hover:bg-accent ${
+                    className={`border-b border-border p-1 text-center text-xs font-mono truncate cursor-pointer transition-colors hover:bg-accent flex items-center justify-center ${
                       isHighlighted ? 'text-primary' : 'text-muted-foreground'
-                    } ${isDBL ? 'row-span-2' : ''}`}
+                    }`}
                     onMouseEnter={(e) => handleCellHover(row, col, e)}
                     onMouseLeave={handleCellLeave}
                   >

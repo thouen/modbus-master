@@ -5,7 +5,7 @@ import { ConnectionPanel } from '@/components/modbus/ConnectionPanel';
 import { DataPanel } from '@/components/modbus/DataPanel';
 import { LogPanel } from '@/components/modbus/LogPanel';
 import { StatusBar } from '@/components/modbus/StatusBar';
-import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult } from '@/types/modbus';
+import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult, ByteOrder } from '@/types/modbus';
 
 let resultIdCounter = 0;
 function nextResultId(): string {
@@ -21,6 +21,25 @@ export default function ModbusMasterPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isPolling, setIsPolling] = useState(false);
   const [lastReadTime, setLastReadTime] = useState<number | null>(null);
+  
+  // Global settings
+  const [defaultByteOrder, setDefaultByteOrder] = useState<ByteOrder>('LE');
+  const [defaultSigned, setDefaultSigned] = useState(true);
+
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedByteOrder = localStorage.getItem('modbus-byte-order');
+    if (savedByteOrder) setDefaultByteOrder(savedByteOrder as ByteOrder);
+    const savedSigned = localStorage.getItem('modbus-signed');
+    if (savedSigned !== null) setDefaultSigned(savedSigned === 'true');
+  }, []);
+
+  const handleSettingsChange = useCallback((byteOrder: ByteOrder, signed: boolean) => {
+    setDefaultByteOrder(byteOrder);
+    setDefaultSigned(signed);
+    localStorage.setItem('modbus-byte-order', byteOrder);
+    localStorage.setItem('modbus-signed', signed.toString());
+  }, []);
 
   // Check initial connection status
   useEffect(() => {
@@ -195,6 +214,9 @@ export default function ModbusMasterPage() {
             isPolling={isPolling}
             pollInterval={0}
             lastReadTime={lastReadTime}
+            defaultByteOrder={defaultByteOrder}
+            defaultSigned={defaultSigned}
+            onSettingsChange={handleSettingsChange}
           />
         </div>
       </header>
