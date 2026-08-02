@@ -229,9 +229,9 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       </div>
 
       {/* Function Code Radio Buttons */}
-      <div className="mb-4">
+      <div className="mb-4 h-16">
         <label className="text-xs text-muted-foreground mb-2 block">{t('dataPanel.functionCode')}</label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {ALL_FCS.map((fc) => (
             <label key={fc} className="flex items-center gap-1 cursor-pointer">
               <input
@@ -250,8 +250,8 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
 
       {/* Address/Quantity/Value Config */}
       <div className="grid grid-cols-4 gap-4 mb-4">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">{t('readPanel.startAddr')}</label>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground block w-20">{t('readPanel.startAddr')}:</label>
           <input
             type="text"
             value={currentTab.startAddr.toString()}
@@ -264,11 +264,11 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                 if (!isNaN(num)) updateTab(activeTab, { startAddr: num });
               }
             }}
-            className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
+            className="w-full px-2 py-1 bg-panel border border-border rounded text-xs flex-1"
           />
         </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">{t('readPanel.quantity')}</label>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground block w-14">{t('readPanel.quantity')}:</label>
           <input
             type="text"
             value={currentTab.quantity.toString()}
@@ -281,7 +281,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                 if (!isNaN(num) && num > 0) updateTab(activeTab, { quantity: num });
               }
             }}
-            className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
+            className="w-full px-2 py-1 bg-panel border border-border rounded text-xs flex-1"
           />
         </div>
         {!isRead && (
@@ -313,7 +313,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       {isRead && (
         <div className="flex items-center gap-4 mb-4 pb-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t('readPanel.interval')}:</span>
+            <span className="text-xs text-muted-foreground w-20">{t('readPanel.interval')}:</span>
             <input
               type="text"
               value={currentTab.pollInterval.toString()}

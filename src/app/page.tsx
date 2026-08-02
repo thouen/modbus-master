@@ -326,7 +326,7 @@ export default function ModbusMasterPage() {
         {/* Three Column Layout: Left (Connection Manager), Middle (Data Panel), Right (Log Panel) */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
           {/* Left Column - Connection Manager */}
-          <div className="xl:col-span-3">
+          <div className="xl:col-span-2">
             <ConnectionManager
               connections={connections}
               activeConnectionId={activeConnectionId}
@@ -338,7 +338,7 @@ export default function ModbusMasterPage() {
           </div>
 
           {/* Middle Column - Data Panel with Tabs */}
-          <div className="xl:col-span-6">
+          <div className="xl:col-span-7">
             <DataPanel onRead={handleRead} onWrite={handleWrite} />
           </div>
 
