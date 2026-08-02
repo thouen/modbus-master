@@ -163,43 +163,30 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     const hexAddr = formatHexAddress(addr);
     const decAddr = formatAddress(addr);
 
+    // Check if DBL should be shown:
+    // - Address parity matches start address parity (both even or both odd)
+    // - relAddr + 3 < quantity (enough data for double)
+    const startParity = startAddr % 2;
+    const addrParity = addr % 2;
+    const showDBL = startParity === addrParity && relAddr + 3 < data.length && relAddr + 3 < quantity;
+
+    // Check if FLT should be shown (need at least 2 regs)
+    const showFLT = relAddr + 1 < data.length && relAddr + 1 < quantity;
+
     let content = (
       <div className="text-xs space-y-1">
         <div><span className="text-muted-foreground">{t('dataGrid.address')}:</span> {decAddr} ({hexAddr})</div>
         <div><span className="text-muted-foreground">{t('dataGrid.decimal')}:</span> {decVal}</div>
         <div><span className="text-muted-foreground">{t('dataGrid.hex')}:</span> {hexVal}</div>
         <div><span className="text-muted-foreground">{t('dataGrid.binary')}:</span> {binVal}</div>
+        {showFLT && (
+          <div><span className="text-muted-foreground">FLT ({byteOrder}):</span> {parseFloat32([val, data[relAddr + 1]], byteOrder).toFixed(4)}</div>
+        )}
+        {showDBL && (
+          <div><span className="text-muted-foreground">DBL ({byteOrder}):</span> {parseFloat64([val, data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]], byteOrder).toFixed(6)}</div>
+        )}
       </div>
     );
-
-    // Float tooltip (if we have at least 2 regs)
-    if (relAddr + 1 < data.length && relAddr + 1 < quantity) {
-      const f = parseFloat32([val, data[relAddr + 1]], byteOrder);
-      content = (
-        <div className="text-xs space-y-1">
-          <div><span className="text-muted-foreground">{t('dataGrid.address')}:</span> {decAddr} ({hexAddr})</div>
-          <div><span className="text-muted-foreground">{t('dataGrid.decimal')}:</span> {decVal}</div>
-          <div><span className="text-muted-foreground">{t('dataGrid.hex')}:</span> {hexVal}</div>
-          <div><span className="text-muted-foreground">{t('dataGrid.binary')}:</span> {binVal}</div>
-          <div><span className="text-muted-foreground">FLT ({byteOrder}):</span> {f.toFixed(4)}</div>
-        </div>
-      );
-    }
-
-    // Double tooltip (if even address and we have 4 regs)
-    if (addr % 2 === 0 && relAddr + 3 < data.length && relAddr + 3 < quantity) {
-      const d = parseFloat64([val, data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]], byteOrder);
-      content = (
-        <div className="text-xs space-y-1">
-          <div><span className="text-muted-foreground">{t('dataGrid.address')}:</span> {decAddr} ({hexAddr})</div>
-          <div><span className="text-muted-foreground">{t('dataGrid.decimal')}:</span> {decVal}</div>
-          <div><span className="text-muted-foreground">{t('dataGrid.hex')}:</span> {hexVal}</div>
-          <div><span className="text-muted-foreground">{t('dataGrid.binary')}:</span> {binVal}</div>
-          <div><span className="text-muted-foreground">FLT ({byteOrder}):</span> {parseFloat32([val, data[relAddr + 1]], byteOrder).toFixed(4)}</div>
-          <div><span className="text-muted-foreground">DBL ({byteOrder}):</span> {d.toFixed(6)}</div>
-        </div>
-      );
-    }
 
     return content;
   }, [data, startAddr, quantity, pageStartAddr, signed, byteOrder, t, isDBL]);

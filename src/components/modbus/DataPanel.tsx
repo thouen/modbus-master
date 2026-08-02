@@ -5,15 +5,15 @@ import { useTranslation } from 'react-i18next';
 import { DataGrid } from './DataGrid';
 import type { ReadResult, DisplayFormat, ByteOrder } from '@/types/modbus';
 
-const FC_NAMES: Record<number, string> = {
-  1: 'FC01 - Read Coils',
-  2: 'FC02 - Read Discrete Inputs',
-  3: 'FC03 - Read Holding Registers',
-  4: 'FC04 - Read Input Registers',
-  5: 'FC05 - Write Single Coil',
-  6: 'FC06 - Write Single Register',
-  15: 'FC15 - Write Multiple Coils',
-  16: 'FC16 - Write Multiple Registers',
+const FC_NAMES: Record<number, { en: string; zh: string }> = {
+  1: { en: 'FC01 - Read Coils', zh: 'FC01 - 读线圈' },
+  2: { en: 'FC02 - Read Discrete Inputs', zh: 'FC02 - 读离散输入' },
+  3: { en: 'FC03 - Read Holding Registers', zh: 'FC03 - 读保持寄存器' },
+  4: { en: 'FC04 - Read Input Registers', zh: 'FC04 - 读输入寄存器' },
+  5: { en: 'FC05 - Write Single Coil', zh: 'FC05 - 写单个线圈' },
+  6: { en: 'FC06 - Write Single Register', zh: 'FC06 - 写单个寄存器' },
+  15: { en: 'FC15 - Write Multiple Coils', zh: 'FC15 - 写多个线圈' },
+  16: { en: 'FC16 - Write Multiple Registers', zh: 'FC16 - 写多个寄存器' },
 };
 
 const READ_FCS = [1, 2, 3, 4];
@@ -37,26 +37,35 @@ interface TabData {
   data: number[];
   isPolling: boolean;
   pollInterval: number;
+  customName?: string;
+}
+
+function getFCName(fc: number, lang: string): string {
+  const names = FC_NAMES[fc];
+  if (!names) return `FC${fc}`;
+  return lang === 'zh' ? names.zh : names.en;
 }
 
 export function DataPanel({ onRead, onWrite }: DataPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLang = i18n.language?.startsWith('zh') ? 'zh' : 'en';
   const [activeTab, setActiveTab] = useState(0);
   const [tabs, setTabs] = useState<TabData[]>([
     { functionCode: 3, startAddr: 0, quantity: 128, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 },
   ]);
 
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
-  const [byteOrder, setByteOrder] = useState<ByteOrder>(() => {
-    if (typeof window === 'undefined') return 'LE';
-    return (localStorage.getItem('modbus-byte-order') as ByteOrder) || 'LE';
-  });
-  const [signed, setSigned] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const v = localStorage.getItem('modbus-signed');
-    return v === null ? true : v === 'true';
-  });
+  const [byteOrder, setByteOrder] = useState<ByteOrder>('LE');
+  const [signed, setSigned] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
+
+  // Load from localStorage after mount (avoid hydration mismatch)
+  useEffect(() => {
+    const savedByteOrder = localStorage.getItem('modbus-byte-order');
+    if (savedByteOrder) setByteOrder(savedByteOrder as ByteOrder);
+    const savedSigned = localStorage.getItem('modbus-signed');
+    if (savedSigned !== null) setSigned(savedSigned === 'true');
+  }, []);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -131,10 +140,28 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
     setActiveTab(tabs.length);
   }, [tabs.length]);
 
+  const getTabName = useCallback((tab: TabData) => {
+    if (tab.customName) return tab.customName;
+    const fcName = getFCName(tab.functionCode, currentLang);
+    return `${fcName} @${tab.startAddr} [${displayFormat.toUpperCase()}]`;
+  }, [currentLang, displayFormat]);
+
+  const handleTabNameEdit = useCallback((index: number, name: string) => {
+    updateTab(index, { customName: name || undefined });
+  }, [updateTab]);
+
   const removeTab = useCallback((index: number) => {
     if (tabs.length <= 1) return;
-    setTabs((prev) => prev.filter((_, i) => i !== index));
-    setActiveTab((prev) => Math.max(0, prev > index ? prev - 1 : prev));
+    setTabs((prev) => {
+      const newTabs = prev.filter((_, i) => i !== index);
+      // Fix activeTab index after removal
+      setActiveTab((prevActive) => {
+        if (prevActive > index) return prevActive - 1;
+        if (prevActive >= newTabs.length) return newTabs.length - 1;
+        return prevActive;
+      });
+      return newTabs;
+    });
   }, [tabs.length]);
 
   // Calculate total pages based on display format and quantity
@@ -162,8 +189,9 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-panel hover:bg-accent'
               }`}
+              title={getTabName(tab)}
             >
-              {FC_NAMES[tab.functionCode] || `FC${tab.functionCode}`}
+              {tab.customName || `FC${tab.functionCode}`}
             </button>
             {tabs.length > 1 && (
               <button
@@ -181,6 +209,16 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
         >
           +
         </button>
+        {/* Tab name editor */}
+        {currentTab && (
+          <input
+            type="text"
+            value={currentTab.customName || ''}
+            onChange={(e) => handleTabNameEdit(activeTab, e.target.value)}
+            placeholder={getTabName(currentTab)}
+            className="ml-4 px-2 py-1 bg-panel border border-border rounded text-xs w-48"
+          />
+        )}
       </div>
 
       {/* Function Code Radio Buttons */}
@@ -197,7 +235,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                 onChange={() => updateTab(activeTab, { functionCode: fc })}
                 className="w-3 h-3"
               />
-              <span className="text-xs">{FC_NAMES[fc]}</span>
+              <span className="text-xs">{getFCName(fc, currentLang)}</span>
             </label>
           ))}
         </div>
@@ -208,18 +246,34 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">{t('readPanel.startAddr')}</label>
           <input
-            type="number"
-            value={currentTab.startAddr}
-            onChange={(e) => updateTab(activeTab, { startAddr: parseInt(e.target.value) || 0 })}
+            type="text"
+            value={currentTab.startAddr.toString()}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '') {
+                updateTab(activeTab, { startAddr: 0 });
+              } else {
+                const num = parseInt(val);
+                if (!isNaN(num)) updateTab(activeTab, { startAddr: num });
+              }
+            }}
             className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
           />
         </div>
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">{t('readPanel.quantity')}</label>
           <input
-            type="number"
-            value={currentTab.quantity}
-            onChange={(e) => updateTab(activeTab, { quantity: parseInt(e.target.value) || 1 })}
+            type="text"
+            value={currentTab.quantity.toString()}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '') {
+                updateTab(activeTab, { quantity: 1 });
+              } else {
+                const num = parseInt(val);
+                if (!isNaN(num) && num > 0) updateTab(activeTab, { quantity: num });
+              }
+            }}
             className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
           />
         </div>
@@ -254,9 +308,17 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{t('readPanel.interval')}:</span>
             <input
-              type="number"
-              value={currentTab.pollInterval}
-              onChange={(e) => updateTab(activeTab, { pollInterval: parseInt(e.target.value) || 1000 })}
+              type="text"
+              value={currentTab.pollInterval.toString()}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '') {
+                  updateTab(activeTab, { pollInterval: 1000 });
+                } else {
+                  const num = parseInt(val);
+                  if (!isNaN(num) && num > 0) updateTab(activeTab, { pollInterval: num });
+                }
+              }}
               className="w-20 px-2 py-1 bg-panel border border-border rounded text-xs"
             />
             <span className="text-xs text-muted-foreground">ms</span>
@@ -310,10 +372,10 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
           <select
             value={byteOrder}
             onChange={(e) => setByteOrder(e.target.value as ByteOrder)}
-            className="px-2 py-1 bg-panel border border-border rounded text-xs"
+            className="px-2 py-1 bg-card border border-border rounded text-xs text-foreground"
           >
-            <option value="LE">ABCD (LE)</option>
-            <option value="BE">DCBA (BE)</option>
+            <option value="LE" className="bg-card text-foreground">ABCD (LE)</option>
+            <option value="BE" className="bg-card text-foreground">DCBA (BE)</option>
           </select>
         </div>
       </div>
