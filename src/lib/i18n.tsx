@@ -23,6 +23,13 @@ const resources = {
         name: '连接名称',
         noConnections: '暂无连接',
         editing: '编辑连接',
+        addConnection: '添加连接',
+        editConnection: '编辑连接',
+        defaultName: '本地连接',
+        status: {
+          online: '在线',
+          offline: '离线',
+        },
       },
       common: {
         add: '添加',
@@ -67,6 +74,7 @@ const resources = {
         prevPage: '上一页',
         nextPage: '下一页',
         jumpToPage: '跳转',
+        noData: '无数据',
       },
       log: {
         title: '操作日志',
@@ -101,6 +109,13 @@ const resources = {
         name: 'Connection Name',
         noConnections: 'No connections',
         editing: 'Editing Connection',
+        addConnection: 'Add Connection',
+        editConnection: 'Edit Connection',
+        defaultName: 'Local Connection',
+        status: {
+          online: 'Online',
+          offline: 'Offline',
+        },
       },
       common: {
         add: 'Add',
@@ -145,6 +160,7 @@ const resources = {
         prevPage: 'Prev',
         nextPage: 'Next',
         jumpToPage: 'Go',
+        noData: 'No data',
       },
       log: {
         title: 'Operation Log',

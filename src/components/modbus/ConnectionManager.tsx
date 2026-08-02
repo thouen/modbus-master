@@ -19,7 +19,7 @@ export function loadConnections(): SavedConnection[] {
   return [
     {
       id: 'default',
-      name: '本地连接',
+      name: 'default',
       host: '127.0.0.1',
       port: 502,
       unitId: 1,
@@ -198,7 +198,7 @@ export function ConnectionManager({
                   className="flex-1 text-left"
                 >
                   <div className="text-sm font-medium text-foreground">
-                    {conn.name}
+                    {conn.name === 'default' ? t('connection.defaultName') : conn.name}
                   </div>
                   <div className="text-xs text-muted-foreground font-mono">
                     {conn.host}:{conn.port}

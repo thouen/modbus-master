@@ -79,10 +79,11 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
   
   const rows = isDBL ? 8 : 16;
   const cols = (isDBL || isBinOrFlt) ? 4 : 8;
-  const cellsPerPage = rows * cols;
+  // For DBL, each cell uses 2 regs, so regs per page = rows * cols * 2
+  const regsPerPage = isDBL ? rows * cols * 2 : rows * cols;
 
   // Page start address: starts from the input startAddr, not from 0
-  const pageStartAddr = startAddr + currentPage * cellsPerPage;
+  const pageStartAddr = startAddr + currentPage * regsPerPage;
 
   // Generate row headers: start from D (last hex digit of startAddr), increment
   const rowHeaders = useMemo(() => {
@@ -154,14 +155,24 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     const relAddr = addr - startAddr;
     
     if (relAddr < 0 || relAddr >= quantity) return null;
-    if (relAddr >= data.length) return null;
+
+    const hexAddr = formatHexAddress(addr);
+    const decAddr = formatAddress(addr);
+
+    // If no data available, show address only
+    if (relAddr >= data.length) {
+      return (
+        <div className="text-xs space-y-1">
+          <div><span className="text-muted-foreground">{t('dataGrid.address')}:</span> {decAddr} ({hexAddr})</div>
+          <div className="text-muted-foreground">{t('dataGrid.noData')}</div>
+        </div>
+      );
+    }
 
     const val = data[relAddr];
     const decVal = signed && val > 32767 ? val - 65536 : val;
     const hexVal = formatHex(val);
     const binVal = formatBinary(val);
-    const hexAddr = formatHexAddress(addr);
-    const decAddr = formatAddress(addr);
 
     // Check if DBL should be shown:
     // - Address parity matches start address parity (both even or both odd)
@@ -297,7 +308,7 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
             }}
           />
           <span className="text-muted-foreground">
-            {cellsPerPage} regs/page
+            {regsPerPage} regs/page
           </span>
         </div>
       </div>

@@ -55,7 +55,7 @@ export default function ModbusMasterPage() {
           // Create default connection
           const defaultConn: SavedConnection = {
             id: 'default',
-            name: '本地连接',
+            name: 'default',
             protocol: 'tcp',
             host: '127.0.0.1',
             port: 502,
@@ -71,7 +71,7 @@ export default function ModbusMasterPage() {
         // Create default connection on parse error
         const defaultConn: SavedConnection = {
           id: 'default',
-          name: '本地连接',
+          name: 'default',
           protocol: 'tcp',
           host: '127.0.0.1',
           port: 502,
@@ -87,7 +87,7 @@ export default function ModbusMasterPage() {
       // Create default connection
       const defaultConn: SavedConnection = {
         id: 'default',
-        name: '本地连接',
+        name: 'default',
         protocol: 'tcp',
         host: '127.0.0.1',
         port: 502,
@@ -224,7 +224,21 @@ export default function ModbusMasterPage() {
             data: data.data.values,
           } as ReadResult;
         } else {
-          if (data.log) addLog(data.log);
+          // Log error even if no log object is returned
+          if (data.log) {
+            addLog(data.log);
+          } else if (data.error) {
+            addLog({
+              id: Date.now().toString(),
+              timestamp: Date.now(),
+              type: 'error',
+              functionCode,
+              address,
+              quantity,
+              message: data.error,
+              success: false,
+            });
+          }
         }
         return null;
       } catch (err) {
@@ -254,7 +268,21 @@ export default function ModbusMasterPage() {
         if (data.success) {
           addLog(data.data);
         } else {
-          if (data.log) addLog(data.log);
+          // Log error even if no log object is returned
+          if (data.log) {
+            addLog(data.log);
+          } else if (data.error) {
+            addLog({
+              id: Date.now().toString(),
+              timestamp: Date.now(),
+              type: 'error',
+              functionCode,
+              address,
+              quantity: values.length,
+              message: data.error,
+              success: false,
+            });
+          }
         }
         return data.success;
       } catch (err) {
