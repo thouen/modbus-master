@@ -249,7 +249,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       </div>
 
       {/* Address/Quantity/Value Config */}
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="flex items-center gap-4 mb-4">
         <div className="flex items-center gap-2">
           <label className="text-xs text-muted-foreground block w-20">{t('readPanel.startAddr')}:</label>
           <input
@@ -264,11 +264,11 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                 if (!isNaN(num)) updateTab(activeTab, { startAddr: num });
               }
             }}
-            className="w-full px-2 py-1 bg-panel border border-border rounded text-xs flex-1"
+            className="w-28 px-2 py-1 bg-panel border border-border rounded text-xs"
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground block w-14">{t('readPanel.quantity')}:</label>
+          <label className="text-xs text-muted-foreground block w-20">{t('readPanel.quantity')}:</label>
           <input
             type="text"
             value={currentTab.quantity.toString()}
@@ -281,7 +281,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                 if (!isNaN(num) && num > 0) updateTab(activeTab, { quantity: num });
               }
             }}
-            className="w-full px-2 py-1 bg-panel border border-border rounded text-xs flex-1"
+            className="w-28 px-2 py-1 bg-panel border border-border rounded text-xs"
           />
         </div>
         {!isRead && (
@@ -326,21 +326,20 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                   if (!isNaN(num) && num > 0) updateTab(activeTab, { pollInterval: num });
                 }
               }}
-              className="w-20 px-2 py-1 bg-panel border border-border rounded text-xs"
+              className="w-28 px-2 py-1 bg-panel border border-border rounded text-xs"
             />
-            <span className="text-xs text-muted-foreground">ms</span>
           </div>
           {currentTab.isPolling ? (
             <button
               onClick={handleStopPolling}
-              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+              className="w-18 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
             >
               {t('readPanel.stop')}
             </button>
           ) : (
             <button
               onClick={handleStartPolling}
-              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs"
+              className="w-18 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs"
             >
               {t('readPanel.start')}
             </button>

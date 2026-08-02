@@ -186,11 +186,10 @@ export function ConnectionManager({
           return (
             <div
               key={conn.id}
-              className={`p-2 rounded border transition-colors ${
-                isActive
+              className={`p-2 rounded border transition-colors h-18 ${isActive
                   ? 'bg-primary/20 border-primary'
                   : 'bg-panel border-border hover:bg-accent'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <button
@@ -202,28 +201,25 @@ export function ConnectionManager({
                   </div>
                   <div className="text-xs text-muted-foreground font-mono">
                     {conn.host}:{conn.port}
-                    {isConnected && (
-                      <span className="ml-2 text-primary">
-                        UID:{conn.unitId}
-                      </span>
-                    )}
+                    <span className={`ml-2 ${isConnected ? 'text-primary' : ''}`}>
+                      UID:{conn.unitId}
+                    </span>
                   </div>
                 </button>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleConnect(conn.id)}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
-                      isConnected
+                    className={`px-2 py-1 text-xs rounded transition-colors ${isConnected
                         ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                         : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    }`}
+                      }`}
                   >
-                    {isConnected ? t('common.disconnect') : t('common.connect')}
+                    {isConnected ? t('connection.disconnect') : t('connection.connect')}
                   </button>
                   <button
                     onClick={() => openEditModal(conn.id)}
                     className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                    title={t('common.edit')}
+                    title={t('connection.edit')}
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -232,7 +228,7 @@ export function ConnectionManager({
                   <button
                     onClick={() => handleDelete(conn.id)}
                     className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                    title={t('common.delete')}
+                    title={t('connection.delete')}
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -270,7 +266,7 @@ export function ConnectionManager({
               {modalMode === 'add' ? t('connection.addConnection') : t('connection.editConnection')}
             </h3>
             <div className="space-y-4">
-              <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+              <div>
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.name')}
                 </label>
@@ -281,51 +277,7 @@ export function ConnectionManager({
                   className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
-              <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  {t('connection.host')}
-                </label>
-                <input
-                  type="text"
-                  value={formHost}
-                  onChange={(e) => setFormHost(e.target.value)}
-                  className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  {t('connection.port')}
-                </label>
-                <input
-                  type="text"
-                  value={formPort}
-                  onChange={(e) => setFormPort(e.target.value)}
-                  className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  {t('connection.unitId')}
-                </label>
-                <input
-                  type="text"
-                  value={formUnitId}
-                  onChange={(e) => setFormUnitId(e.target.value)}
-                  className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  {t('connection.timeout')}
-                </label>
-                <input
-                  type="text"
-                  value={formTimeout}
-                  onChange={(e) => setFormTimeout(e.target.value)}
-                  className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+              <div>
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.protocol')}
                 </label>
@@ -338,6 +290,54 @@ export function ConnectionManager({
                   <option value="udp">UDP</option>
                   <option value="rtu_tcp">RTU over TCP</option>
                 </select>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                    {t('connection.host')}
+                  </label>
+                  <input
+                    type="text"
+                    value={formHost}
+                    onChange={(e) => setFormHost(e.target.value)}
+                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="w-28">
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                    {t('connection.port')}
+                  </label>
+                  <input
+                    type="text"
+                    value={formPort}
+                    onChange={(e) => setFormPort(e.target.value)}
+                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div>
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                    {t('connection.unitId')}
+                  </label>
+                  <input
+                    type="text"
+                    value={formUnitId}
+                    onChange={(e) => setFormUnitId(e.target.value)}
+                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                    {t('connection.timeout')}
+                  </label>
+                  <input
+                    type="text"
+                    value={formTimeout}
+                    onChange={(e) => setFormTimeout(e.target.value)}
+                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
