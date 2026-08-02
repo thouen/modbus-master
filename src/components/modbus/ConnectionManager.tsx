@@ -167,79 +167,98 @@ export function ConnectionManager({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-mono uppercase tracking-wider text-foreground">
-          {t('connection.title')}
+        <h2 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+          </svg>
+          {t('connection.connections')}
         </h2>
         <button
           onClick={openAddModal}
-          className="px-2 py-1 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="px-2.5 py-1 text-[11px] font-mono uppercase tracking-wider rounded-sm bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-colors"
         >
-          {t('common.add')}
+          + {t('common.add')}
         </button>
       </div>
 
       {/* Connection List */}
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {connections.map((conn) => {
           const isActive = conn.id === activeConnectionId;
           const isConnected = connectedIds.has(conn.id);
           return (
             <div
               key={conn.id}
-              className={`p-2 rounded border transition-colors h-18 ${isActive
-                  ? 'bg-primary/20 border-primary'
-                  : 'bg-panel border-border hover:bg-accent'
+              className={`rounded-sm border transition-colors ${isActive
+                  ? 'bg-primary/10 border-primary/60'
+                  : 'bg-panel border-border hover:bg-accent/50'
                 }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                {/* Status indicator */}
+                <div className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'bg-primary shadow-[0_0_6px_rgba(0,212,170,0.5)]' : 'bg-muted-foreground/30'}`} />
+
+                {/* Connection info */}
                 <button
                   onClick={() => onSelectConnection(conn.id)}
-                  className="flex-1 text-left"
+                  className="flex-1 text-left min-w-0"
                 >
-                  <div className="text-sm font-medium text-foreground">
-                    {conn.name === 'default' ? t('connection.defaultName') : conn.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    {conn.host}:{conn.port}
-                    <span className={`ml-2 ${isConnected ? 'text-primary' : ''}`}>
-                      UID:{conn.unitId}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground truncate">
+                      {conn.name === 'default' ? t('connection.defaultName') : conn.name}
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-background/60 border border-border/50 text-muted-foreground uppercase">
+                      {conn.protocol}
                     </span>
                   </div>
+                  <div className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
+                    <span>{conn.host}:{conn.port}</span>
+                    <span className="text-foreground/40">|</span>
+                    <span>UID:{conn.unitId}</span>
+                  </div>
                 </button>
-                <div className="flex items-center gap-1">
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => handleConnect(conn.id)}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${isConnected
-                        ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    className={`px-2.5 py-1 text-[11px] font-mono uppercase tracking-wider rounded-sm transition-colors ${isConnected
+                        ? 'bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30'
+                        : 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30'
                       }`}
                   >
                     {isConnected ? t('connection.disconnect') : t('connection.connect')}
                   </button>
                   <button
                     onClick={() => openEditModal(conn.id)}
-                    className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-sm hover:bg-accent"
                     title={t('connection.edit')}
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
                   </button>
                   <button
                     onClick={() => handleDelete(conn.id)}
-                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors rounded-sm hover:bg-accent"
                     title={t('connection.delete')}
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
                 </div>
               </div>
+
+              {/* Connected status bar */}
               {isConnected && (
-                <div className="mt-1 flex items-center gap-1">
+                <div className="px-3 py-1 border-t border-primary/20 bg-primary/5 flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  <span className="text-xs text-primary">{t('connection.status.online')}</span>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-primary">
+                    {t('connection.status.online')}
+                  </span>
                 </div>
               )}
             </div>
@@ -247,7 +266,7 @@ export function ConnectionManager({
         })}
         {connections.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            {t('connection.noConnections')}
+            <p className="text-sm font-mono">{t('connection.noConnections')}</p>
           </div>
         )}
       </div>
@@ -255,18 +274,25 @@ export function ConnectionManager({
       {/* Add/Edit Modal */}
       {modalMode && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
           onClick={closeModal}
         >
           <div
-            className="bg-card border border-border rounded-lg p-6 min-w-[400px]"
+            className="bg-card border border-border rounded-sm shadow-2xl w-[440px]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-mono uppercase tracking-wider text-foreground mb-4">
-              {modalMode === 'add' ? t('connection.addConnection') : t('connection.editConnection')}
-            </h3>
-            <div className="space-y-4">
-              <div>
+            {/* Modal Header */}
+            <div className="px-5 py-3 border-b border-border bg-panel">
+              <h3 className="text-sm font-mono uppercase tracking-wider text-foreground flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                {modalMode === 'add' ? t('connection.addConnection') : t('connection.editConnection')}
+              </h3>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-5 py-4 space-y-3">
+              {/* Name - full width */}
+              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.name')}
                 </label>
@@ -274,82 +300,86 @@ export function ConnectionManager({
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                  className="w-full px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
-              <div>
+
+              {/* Protocol - full width */}
+              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
                 <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   {t('connection.protocol')}
                 </label>
                 <select
                   value={formProtocol}
                   onChange={(e) => setFormProtocol(e.target.value as 'tcp' | 'udp' | 'rtu_tcp')}
-                  className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                  className="w-full px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                 >
                   <option value="tcp">TCP</option>
                   <option value="udp">UDP</option>
                   <option value="rtu_tcp">RTU over TCP</option>
                 </select>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                    {t('connection.host')}
-                  </label>
+
+              {/* Host + Port */}
+              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
+                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  {t('connection.host')}
+                </label>
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={formHost}
                     onChange={(e) => setFormHost(e.target.value)}
-                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                    className="flex-1 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
-                </div>
-                <div className="w-28">
-                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  <span className="text-xs font-mono text-muted-foreground shrink-0 w-[52px] text-right">
                     {t('connection.port')}
-                  </label>
+                  </span>
                   <input
                     type="text"
                     value={formPort}
                     onChange={(e) => setFormPort(e.target.value)}
-                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                    className="w-20 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <div>
-                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                    {t('connection.unitId')}
-                  </label>
+
+              {/* Unit ID + Timeout */}
+              <div className="grid grid-cols-[100px_1fr] items-center gap-3">
+                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  {t('connection.unitId')}
+                </label>
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={formUnitId}
                     onChange={(e) => setFormUnitId(e.target.value)}
-                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                    className="w-24 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
-                </div>
-                <div>
-                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  <span className="text-xs font-mono text-muted-foreground shrink-0 ml-2">
                     {t('connection.timeout')}
-                  </label>
+                  </span>
                   <input
                     type="text"
                     value={formTimeout}
                     onChange={(e) => setFormTimeout(e.target.value)}
-                    className="w-full px-2 py-1 text-sm font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
+                    className="flex-1 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-6">
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-border bg-panel flex justify-end gap-2">
               <button
                 onClick={closeModal}
-                className="px-4 py-1.5 text-xs rounded bg-panel hover:bg-accent transition-colors"
+                className="px-4 py-1.5 text-xs font-mono uppercase tracking-wider rounded-sm bg-background border border-border hover:bg-accent transition-colors text-foreground"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="px-4 py-1.5 text-xs font-mono uppercase tracking-wider rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 {t('common.save')}
               </button>

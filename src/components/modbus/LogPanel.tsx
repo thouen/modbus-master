@@ -26,17 +26,6 @@ const TYPE_ICONS: Record<string, string> = {
   error: '!',
 };
 
-const FC_NAMES: Record<number, string> = {
-  1: 'READ_COILS',
-  2: 'READ_DISCRETE',
-  3: 'READ_HOLDING',
-  4: 'READ_INPUT',
-  5: 'WRITE_COIL',
-  6: 'WRITE_REG',
-  15: 'WRITE_MULTI_COIL',
-  16: 'WRITE_MULTI_REG',
-};
-
 export function LogPanel({ logs, onClear }: LogPanelProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -46,6 +35,44 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       scrollRef.current.scrollTop = 0;
     }
   }, [logs]);
+
+  // Generate translated log message
+  const getLogMessage = (log: LogEntry): string => {
+    // If the log already has a message, try to translate it based on type
+    if (log.type === 'connect' && log.success) {
+      // Extract host:port from message if possible
+      const match = log.message.match(/(\d+\.\d+\.\d+\.\d+):(\d+)/);
+      if (match) {
+        return t('log.msg.connected', { host: match[1], port: match[2] });
+      }
+      return t('log.msg.connected', { host: '---', port: '---' });
+    }
+    if (log.type === 'disconnect') {
+      return t('log.msg.disconnected');
+    }
+    if (log.type === 'read') {
+      if (log.success) {
+        const count = log.values?.length ?? log.quantity ?? 0;
+        return t('log.msg.readSuccess', { count });
+      }
+      return t('log.msg.readFailed');
+    }
+    if (log.type === 'write') {
+      if (log.success) {
+        const count = log.values?.length ?? log.quantity ?? 0;
+        return t('log.msg.writeSuccess', { count });
+      }
+      return t('log.msg.writeFailed');
+    }
+    if (log.type === 'error') {
+      // For errors, show the original message but with translated prefix if possible
+      if (log.message?.includes('Not connected')) {
+        return t('log.msg.notConnected');
+      }
+      return log.message || t('log.msg.readFailed');
+    }
+    return log.message || '';
+  };
 
   return (
     <div className="industrial-panel h-full p-4">
@@ -92,13 +119,19 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
                   {TYPE_ICONS[log.type] || '-'}
                 </span>
                 {log.functionCode && (
-                  <span className="shrink-0 text-primary/80 w-[120px]">
-                    {FC_NAMES[log.functionCode] || `FC${log.functionCode}`}
+                  <span className="shrink-0 text-primary/80 w-[100px]" title={`FC${log.functionCode}`}>
+                    FC{String(log.functionCode).padStart(2, '0')}
                   </span>
                 )}
                 <span className={`${log.success ? 'text-foreground/90' : 'text-red-400'} flex-1`}>
-                  {log.message}
+                  {getLogMessage(log)}
                 </span>
+                {log.functionCode && log.address !== undefined && (
+                  <span className="shrink-0 text-foreground/50 text-xs">
+                    0x{log.address.toString(16).toUpperCase().padStart(4, '0')}
+                    {log.quantity ? ` ×${log.quantity}` : ''}
+                  </span>
+                )}
               </div>
             ))}
           </div>
