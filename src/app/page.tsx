@@ -314,7 +314,7 @@ export default function ModbusMasterPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm">
+      <header className="border-b border-border bg-card/50">
         <div className="max-w-[1920px] mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -326,11 +326,15 @@ export default function ModbusMasterPage() {
               <h1 className="text-lg font-semibold tracking-tight">MODBUS MASTER</h1>
             </div>
           </div>
-          <StatusBar
-            onSettingsChange={handleSettingsChange}
-          />
         </div>
       </header>
+
+      {/* StatusBar - Moved outside header to fix modal positioning */}
+      <div className="fixed top-3 right-4 z-40">
+        <StatusBar
+          onSettingsChange={handleSettingsChange}
+        />
+      </div>
 
       {/* Main Content */}
       <main className="max-w-[1920px] mx-auto p-4">

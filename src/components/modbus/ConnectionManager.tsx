@@ -257,67 +257,92 @@ export function ConnectionManager({
 
       {editingId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingId(null)}>
-          <div className="bg-card border border-border rounded-lg p-6 min-w-[360px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card border border-border rounded-lg p-6 min-w-[400px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold mb-4 uppercase tracking-wider text-primary">{t('connection.editing')}</h3>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder={t('connection.name')}
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded text-foreground"
-              />
-              <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                  {t('connection.name')}
+                </label>
                 <input
                   type="text"
-                  placeholder="Host"
-                  value={newHost}
-                  onChange={(e) => setNewHost(e.target.value)}
-                  className="px-2 py-1.5 text-sm bg-input border border-border rounded text-foreground"
-                />
-                <input
-                  type="text"
-                  placeholder="Port"
-                  value={newPort}
-                  onChange={(e) => setNewPort(e.target.value)}
-                  className="px-2 py-1.5 text-sm bg-input border border-border rounded text-foreground"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-input border border-border rounded focus:outline-none focus:border-accent"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <input
-                  type="text"
-                  placeholder="Unit ID"
-                  value={newUnitId}
-                  onChange={(e) => setNewUnitId(e.target.value)}
-                  className="px-2 py-1.5 text-sm bg-input border border-border rounded text-foreground"
-                />
-                <input
-                  type="text"
-                  placeholder="Timeout"
-                  value={newTimeout}
-                  onChange={(e) => setNewTimeout(e.target.value)}
-                  className="px-2 py-1.5 text-sm bg-input border border-border rounded text-foreground"
-                />
-                <select
-                  value={newProtocol}
-                  onChange={(e) => setNewProtocol(e.target.value as 'tcp' | 'udp' | 'rtu_tcp')}
-                  className="px-2 py-1.5 text-sm bg-input border border-border rounded text-foreground"
-                >
-                  <option value="tcp">TCP</option>
-                  <option value="udp">UDP</option>
-                  <option value="rtu_tcp">RTU/TCP</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                    {t('connection.host')}
+                  </label>
+                  <input
+                    type="text"
+                    value={newHost}
+                    onChange={(e) => setNewHost(e.target.value)}
+                    className="w-full px-3 py-2 text-sm bg-input border border-border rounded focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                    {t('connection.port')}
+                  </label>
+                  <input
+                    type="text"
+                    value={newPort}
+                    onChange={(e) => setNewPort(e.target.value)}
+                    className="w-full px-3 py-2 text-sm bg-input border border-border rounded focus:outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                    {t('connection.unitId')}
+                  </label>
+                  <input
+                    type="text"
+                    value={newUnitId}
+                    onChange={(e) => setNewUnitId(e.target.value)}
+                    className="w-full px-3 py-2 text-sm bg-input border border-border rounded focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                    {t('connection.timeout')}
+                  </label>
+                  <input
+                    type="text"
+                    value={newTimeout}
+                    onChange={(e) => setNewTimeout(e.target.value)}
+                    className="w-full px-3 py-2 text-sm bg-input border border-border rounded focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                    {t('connection.protocol')}
+                  </label>
+                  <select
+                    value={newProtocol}
+                    onChange={(e) => setNewProtocol(e.target.value as 'tcp' | 'udp' | 'rtu_tcp')}
+                    className="w-full px-3 py-2 text-sm bg-input border border-border rounded focus:outline-none focus:border-accent"
+                  >
+                    <option value="tcp">TCP</option>
+                    <option value="udp">UDP</option>
+                    <option value="rtu_tcp">RTU/TCP</option>
+                  </select>
+                </div>
               </div>
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => handleUpdate(editingId)}
-                  className="flex-1 px-3 py-1.5 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className="flex-1 px-3 py-2 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                   {t('common.save')}
                 </button>
                 <button
                   onClick={() => setEditingId(null)}
-                  className="flex-1 px-3 py-1.5 text-sm rounded bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors"
+                  className="flex-1 px-3 py-2 text-sm rounded bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors"
                 >
                   {t('common.cancel')}
                 </button>
