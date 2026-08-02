@@ -46,8 +46,7 @@ export interface PollConfig {
   interval: number;
 }
 
-export interface SavedConnection {
+export interface SavedConnection extends ConnectionConfig {
   id: string;
   name: string;
-  config: ConnectionConfig;
 }

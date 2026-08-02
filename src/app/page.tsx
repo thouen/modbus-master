@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { ConnectionPanel } from '@/components/modbus/ConnectionPanel';
+import { ConnectionManager } from '@/components/modbus/ConnectionManager';
 import { DataPanel } from '@/components/modbus/DataPanel';
 import { LogPanel } from '@/components/modbus/LogPanel';
 import { StatusBar } from '@/components/modbus/StatusBar';
-import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult, ByteOrder } from '@/types/modbus';
+import type { ConnectionConfig, ConnectionStatus, LogEntry, ReadResult, ByteOrder, SavedConnection } from '@/types/modbus';
 
 let resultIdCounter = 0;
 function nextResultId(): string {
@@ -26,12 +26,78 @@ export default function ModbusMasterPage() {
   const [defaultByteOrder, setDefaultByteOrder] = useState<ByteOrder>('LE');
   const [defaultSigned, setDefaultSigned] = useState(true);
 
-  // Load settings from localStorage
+  // Connection management
+  const [connections, setConnections] = useState<SavedConnection[]>([]);
+  const [activeConnectionId, setActiveConnectionId] = useState<string>('');
+
+  // Load settings and connections from localStorage
   useEffect(() => {
     const savedByteOrder = localStorage.getItem('modbus-byte-order');
     if (savedByteOrder) setDefaultByteOrder(savedByteOrder as ByteOrder);
     const savedSigned = localStorage.getItem('modbus-signed');
     if (savedSigned !== null) setDefaultSigned(savedSigned === 'true');
+
+    // Load saved connections
+    const savedConnections = localStorage.getItem('modbus-connections');
+    if (savedConnections) {
+      try {
+        const parsed = JSON.parse(savedConnections);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setConnections(parsed);
+          const savedActiveId = localStorage.getItem('modbus-active-connection');
+          if (savedActiveId && parsed.find((c: SavedConnection) => c.id === savedActiveId)) {
+            setActiveConnectionId(savedActiveId);
+          } else {
+            setActiveConnectionId(parsed[0].id);
+          }
+        } else {
+          // Create default connection
+          const defaultConn: SavedConnection = {
+            id: 'default',
+            name: '本地连接',
+            protocol: 'tcp',
+            host: '127.0.0.1',
+            port: 502,
+            unitId: 1,
+            timeout: 5000,
+          };
+          setConnections([defaultConn]);
+          setActiveConnectionId('default');
+          localStorage.setItem('modbus-connections', JSON.stringify([defaultConn]));
+          localStorage.setItem('modbus-active-connection', 'default');
+        }
+      } catch {
+        // Create default connection on parse error
+        const defaultConn: SavedConnection = {
+          id: 'default',
+          name: '本地连接',
+          protocol: 'tcp',
+          host: '127.0.0.1',
+          port: 502,
+          unitId: 1,
+          timeout: 5000,
+        };
+        setConnections([defaultConn]);
+        setActiveConnectionId('default');
+        localStorage.setItem('modbus-connections', JSON.stringify([defaultConn]));
+        localStorage.setItem('modbus-active-connection', 'default');
+      }
+    } else {
+      // Create default connection
+      const defaultConn: SavedConnection = {
+        id: 'default',
+        name: '本地连接',
+        protocol: 'tcp',
+        host: '127.0.0.1',
+        port: 502,
+        unitId: 1,
+        timeout: 5000,
+      };
+      setConnections([defaultConn]);
+      setActiveConnectionId('default');
+      localStorage.setItem('modbus-connections', JSON.stringify([defaultConn]));
+      localStorage.setItem('modbus-active-connection', 'default');
+    }
   }, []);
 
   const handleSettingsChange = useCallback((byteOrder: ByteOrder, signed: boolean) => {
@@ -192,6 +258,40 @@ export default function ModbusMasterPage() {
     setLogs([]);
   }, []);
 
+  // Connection Management
+  const handleSelectConnection = useCallback((id: string) => {
+    setActiveConnectionId(id);
+  }, []);
+
+  const handleAddConnection = useCallback((connection: SavedConnection) => {
+    setConnections((prev) => {
+      const next = [...prev, connection];
+      localStorage.setItem('modbus-connections', JSON.stringify(next));
+      return next;
+    });
+    setActiveConnectionId(connection.id);
+  }, []);
+
+  const handleUpdateConnection = useCallback((id: string, config: Partial<Omit<SavedConnection, 'id'>>) => {
+    setConnections((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, ...config } : c));
+      localStorage.setItem('modbus-connections', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const handleDeleteConnection = useCallback((id: string) => {
+    setConnections((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      localStorage.setItem('modbus-connections', JSON.stringify(next));
+      return next;
+    });
+    if (activeConnectionId === id) {
+      const remaining = connections.filter((c) => c.id !== id);
+      setActiveConnectionId(remaining[0]?.id || '');
+    }
+  }, [activeConnectionId, connections]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -223,22 +323,28 @@ export default function ModbusMasterPage() {
 
       {/* Main Content */}
       <main className="max-w-[1920px] mx-auto p-4">
-        {/* Two Column Layout: Left (Connection + Log), Right (Data Panel) */}
+        {/* Three Column Layout: Left (Connection Manager), Middle (Data Panel), Right (Log Panel) */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-          {/* Left Column - Connection + Log */}
-          <div className="xl:col-span-4 space-y-4">
-            <ConnectionPanel
-              connected={connectionStatus.connected}
-              config={connectionStatus.config}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
+          {/* Left Column - Connection Manager */}
+          <div className="xl:col-span-3">
+            <ConnectionManager
+              connections={connections}
+              activeConnectionId={activeConnectionId}
+              onSelectConnection={handleSelectConnection}
+              onAddConnection={handleAddConnection}
+              onUpdateConnection={handleUpdateConnection}
+              onRemoveConnection={handleDeleteConnection}
             />
-            <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>
 
-          {/* Right Column - Data Panel with Tabs */}
-          <div className="xl:col-span-8">
+          {/* Middle Column - Data Panel with Tabs */}
+          <div className="xl:col-span-6">
             <DataPanel onRead={handleRead} onWrite={handleWrite} />
+          </div>
+
+          {/* Right Column - Log Panel */}
+          <div className="xl:col-span-3">
+            <LogPanel logs={logs} onClear={handleClearLogs} />
           </div>
         </div>
       </main>

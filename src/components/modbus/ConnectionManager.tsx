@@ -58,13 +58,11 @@ export function ConnectionManager({
     const connection: SavedConnection = {
       id: `conn-${Date.now()}`,
       name: newName.trim(),
-      config: {
-        host: newHost,
-        port: parseInt(newPort) || 502,
-        unitId: parseInt(newUnitId) || 1,
-        timeout: parseInt(newTimeout) || 5000,
-        protocol: newProtocol,
-      },
+      host: newHost,
+      port: parseInt(newPort) || 502,
+      unitId: parseInt(newUnitId) || 1,
+      timeout: parseInt(newTimeout) || 5000,
+      protocol: newProtocol,
     };
     onAddConnection(connection);
     setIsAdding(false);
@@ -88,11 +86,11 @@ export function ConnectionManager({
   const startEdit = useCallback((conn: SavedConnection) => {
     setEditingId(conn.id);
     setNewName(conn.name);
-    setNewHost(conn.config.host);
-    setNewPort(conn.config.port.toString());
-    setNewUnitId(conn.config.unitId.toString());
-    setNewTimeout((conn.config.timeout || 5000).toString());
-    setNewProtocol(conn.config.protocol || 'tcp');
+    setNewHost(conn.host);
+    setNewPort(conn.port.toString());
+    setNewUnitId(conn.unitId.toString());
+    setNewTimeout((conn.timeout || 5000).toString());
+    setNewProtocol(conn.protocol || 'tcp');
   }, []);
 
   return (
@@ -190,7 +188,7 @@ export function ConnectionManager({
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{conn.name}</div>
                 <div className="text-xs text-muted-foreground">
-                  {conn.config.host}:{conn.config.port}
+                  {conn.host}:{conn.port}
                 </div>
               </div>
               <div className="flex items-center gap-1 ml-2">

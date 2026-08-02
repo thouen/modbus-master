@@ -210,8 +210,8 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
           style={{
             gridTemplateColumns: `40px repeat(${cols}, minmax(80px, 1fr))`,
             gridTemplateRows: isDBL 
-              ? `repeat(${rows}, 48px)` // DBL rows are 2x height (48px vs 24px)
-              : `repeat(${rows}, 24px)`,
+              ? `24px repeat(${rows}, 48px)` // DBL: header normal (24px), data rows 2x (48px)
+              : `24px repeat(${rows}, 24px)`, // Other modes: all rows normal (24px)
           }}
         >
           {/* Header row */}

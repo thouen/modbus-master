@@ -30,6 +30,14 @@ const resources = {
         delete: '删除',
         save: '保存',
         cancel: '取消',
+        close: '关闭',
+      },
+      settings: {
+        title: '全局设置',
+        byteOrder: '默认字节序',
+        signed: '符号类型',
+        signedLabel: '有符号',
+        unsignedLabel: '无符号',
       },
       readPanel: {
         functionCode: '功能码',
@@ -100,6 +108,14 @@ const resources = {
         delete: 'Delete',
         save: 'Save',
         cancel: 'Cancel',
+        close: 'Close',
+      },
+      settings: {
+        title: 'Global Settings',
+        byteOrder: 'Default Byte Order',
+        signed: 'Sign Type',
+        signedLabel: 'Signed',
+        unsignedLabel: 'Unsigned',
       },
       readPanel: {
         functionCode: 'Function Code',
