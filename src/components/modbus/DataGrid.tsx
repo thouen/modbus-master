@@ -37,6 +37,9 @@ interface DataGridProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  editable?: boolean;
+  editedValues?: Record<number, number>;
+  onCellChange?: (addr: number, value: number) => void;
 }
 
 function parseFloat32(regs: number[], byteOrder: ByteOrder): number {
@@ -69,9 +72,11 @@ function parseFloat64(regs: number[], byteOrder: ByteOrder): number {
   return view.getFloat64(0);
 }
 
-export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, signed, currentPage, totalPages, onPageChange }: DataGridProps) {
+export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, signed, currentPage, totalPages, onPageChange, editable = false, editedValues = {}, onCellChange }: DataGridProps) {
   const { t } = useTranslation();
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: React.ReactNode } | null>(null);
+  const [editingCell, setEditingCell] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   // Grid dimensions based on display format
   const isDBL = displayFormat === 'dbl';
@@ -213,6 +218,46 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     setTooltip(null);
   }, []);
 
+  const getCellAddress = useCallback((row: number, col: number): number => {
+    const rowOffset = isDBL ? row * 2 : row;
+    return pageStartAddr + col * 16 + rowOffset;
+  }, [pageStartAddr, isDBL]);
+
+  const handleCellClick = useCallback((row: number, col: number) => {
+    if (!editable) return;
+    const addr = getCellAddress(row, col);
+    const relAddr = addr - startAddr;
+    if (relAddr < 0 || relAddr >= quantity) return;
+    
+    const currentVal = editedValues[addr] ?? (relAddr < data.length ? data[relAddr] : 0);
+    setEditingCell(addr);
+    setEditValue(currentVal.toString());
+  }, [editable, getCellAddress, startAddr, quantity, editedValues, data]);
+
+  const handleEditChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditValue(e.target.value);
+  }, []);
+
+  const handleEditBlur = useCallback(() => {
+    if (editingCell !== null) {
+      const num = parseInt(editValue);
+      if (!isNaN(num) && onCellChange) {
+        onCellChange(editingCell, num);
+      }
+      setEditingCell(null);
+      setEditValue('');
+    }
+  }, [editingCell, editValue, onCellChange]);
+
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleEditBlur();
+    } else if (e.key === 'Escape') {
+      setEditingCell(null);
+      setEditValue('');
+    }
+  }, [handleEditBlur]);
+
   return (
     <div className="relative">
       <div className="overflow-auto max-h-[600px]">
@@ -241,17 +286,36 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
               </div>
               {Array.from({ length: cols }, (_, col) => {
                 const cellValue = getCellValue(row, col);
+                const addr = getCellAddress(row, col);
+                const relAddr = addr - startAddr;
+                const isEditable = editable && relAddr >= 0 && relAddr < quantity;
+                const isEditing = editingCell === addr;
                 const isHighlighted = cellValue !== '--';
                 return (
                   <div
                     key={col}
-                    className={`border-b border-border p-1 text-center text-xs font-mono truncate cursor-pointer transition-colors hover:bg-accent flex items-center justify-center ${
+                    className={`border-b border-border p-1 text-center text-xs font-mono truncate flex items-center justify-center ${
+                      isEditable ? 'cursor-text' : 'cursor-pointer'
+                    } transition-colors hover:bg-accent ${
                       isHighlighted ? 'text-primary' : 'text-muted-foreground'
-                    }`}
-                    onMouseEnter={(e) => handleCellHover(row, col, e)}
+                    } ${isEditing ? 'bg-accent' : ''}`}
+                    onMouseEnter={(e) => !isEditing && handleCellHover(row, col, e)}
                     onMouseLeave={handleCellLeave}
+                    onClick={() => handleCellClick(row, col)}
                   >
-                    {cellValue}
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={handleEditChange}
+                        onBlur={handleEditBlur}
+                        onKeyDown={handleEditKeyDown}
+                        className="w-full bg-background border border-primary text-primary text-center text-xs font-mono outline-none"
+                        autoFocus
+                      />
+                    ) : (
+                      <span>{cellValue}</span>
+                    )}
                   </div>
                 );
               })}

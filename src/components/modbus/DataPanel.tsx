@@ -58,6 +58,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   const [byteOrder, setByteOrder] = useState<ByteOrder>('LE');
   const [signed, setSigned] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
+  const [editedValues, setEditedValues] = useState<Record<number, number>>({});
 
   // Load from localStorage after mount (avoid hydration mismatch)
   useEffect(() => {
@@ -94,6 +95,10 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
     setTabs((prev) => prev.map((tab, i) => (i === index ? { ...tab, ...updates } : tab)));
   }, []);
 
+  const handleCellChange = useCallback((addr: number, value: number) => {
+    setEditedValues((prev) => ({ ...prev, [addr]: value }));
+  }, []);
+
   const handleExecute = useCallback(async () => {
     if (!currentTab) return;
     if (isRead) {
@@ -106,14 +111,27 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
         setCurrentPage(page);
       }
     } else {
-      // Write operation
-      const values = currentTab.writeValue.split(',').map((v) => {
-        const num = parseInt(v.trim());
-        return isNaN(num) ? 0 : num;
-      });
+      // Write operation - use edited values from grid if available, otherwise use writeValue
+      let values: number[];
+      const hasEditedValues = Object.keys(editedValues).length > 0;
+      
+      if (hasEditedValues) {
+        // Build values array from edited values based on startAddr and quantity
+        values = Array.from({ length: currentTab.quantity }, (_, i) => {
+          const addr = currentTab.startAddr + i;
+          return editedValues[addr] ?? 0;
+        });
+        // Clear edited values after write
+        setEditedValues({});
+      } else {
+        values = currentTab.writeValue.split(',').map((v) => {
+          const num = parseInt(v.trim());
+          return isNaN(num) ? 0 : num;
+        });
+      }
       await onWrite(currentTab.functionCode, currentTab.startAddr, values);
     }
-  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead]);
+  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead, editedValues]);
 
   const handleStartPolling = useCallback(() => {
     if (!isRead || !currentTab) return;
@@ -387,19 +405,20 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       </div>
 
       {/* Data Grid */}
-      {isRead && (
-        <DataGrid
-          data={currentTab.data}
-          startAddr={currentTab.startAddr}
-          quantity={currentTab.quantity}
-          displayFormat={displayFormat}
-          byteOrder={byteOrder}
-          signed={signed}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
-      )}
+      <DataGrid
+        data={currentTab.data}
+        startAddr={currentTab.startAddr}
+        quantity={currentTab.quantity}
+        displayFormat={displayFormat}
+        byteOrder={byteOrder}
+        signed={signed}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        editable={!isRead}
+        editedValues={editedValues}
+        onCellChange={handleCellChange}
+      />
     </div>
   );
 }
