@@ -116,7 +116,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
         }
         updateTab(activeTab, { dataValues });
         // Jump to page containing startAddr
-        const regsPerPage = displayFormat === 'dbl' ? 256 : (displayFormat === 'sht' || displayFormat === 'bin' ? 256 : 128);
+        const regsPerPage = displayFormat === 'flt' ? 64 : (displayFormat === 'bin' ? 64 : 128);
         const page = Math.floor(currentTab.startAddr / regsPerPage);
         setCurrentPage(page);
       }
@@ -184,19 +184,17 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }
 
   // Calculate total pages based on display format and quantity
-  // For 32-bit storage: quantity registers = ceil(quantity/2) 32-bit values
+  // Data array stores 16-bit register values
   const getElementsPerPage = () => {
-    if (displayFormat === 'dbl') return 32; // 8 rows x 4 cols, each cell = 2 elements
-    if (displayFormat === 'bin' || displayFormat === 'flt') return 64; // 16 rows x 4 cols
-    return 128; // 16 rows x 8 cols (hex/dec/bin)
+    if (displayFormat === 'flt') return 32; // 8 rows x 4 cols
+    if (displayFormat === 'bin') return 64; // 16 rows x 4 cols
+    return 128; // 16 rows x 8 cols (hex/dec)
   };
 
   const elementsPerPage = getElementsPerPage();
-  // Total 32-bit values stored
-  const totalValues = Math.ceil(currentTab.quantity / 2);
-  // For DBL, each cell uses 2 values, so total cells = totalValues / 2
-  const totalCells = displayFormat === 'dbl' ? Math.floor(totalValues / 2) : totalValues;
-  const totalPages = Math.max(1, Math.ceil(totalCells / (elementsPerPage / (displayFormat === 'dbl' ? 2 : 1))));
+  // Total 16-bit register values stored
+  const totalValues = currentTab.quantity;
+  const totalPages = Math.max(1, Math.ceil(totalValues / elementsPerPage));
 
   return (
     <div className="bg-card border border-border rounded-lg p-4">
@@ -353,7 +351,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       {/* Format Selection */}
       <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
         <div className="flex items-center gap-1">
-          {(['sht', 'hex', 'dec', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
+          {(['hex', 'dec', 'bin', 'flt'] as DisplayFormat[]).map((fmt) => (
             <button
               key={fmt}
               onClick={() => setDisplayFormat(fmt)}
@@ -363,7 +361,10 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                   : 'bg-panel hover:bg-accent'
               }`}
             >
-              {fmt.toUpperCase()}
+              {fmt === 'hex' ? t('displayFormat.hex') :
+               fmt === 'bin' ? t('displayFormat.binary') :
+               fmt === 'flt' ? t('displayFormat.float') :
+               fmt.toUpperCase()}
             </button>
           ))}
         </div>

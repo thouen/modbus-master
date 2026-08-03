@@ -1,5 +1,5 @@
 export type ModbusProtocol = 'tcp' | 'udp' | 'rtu_tcp';
-export type DisplayFormat = 'hex' | 'dec' | 'bin' | 'flt' | 'dbl' | 'sht';
+export type DisplayFormat = 'hex' | 'dec' | 'bin' | 'flt';
 export type ByteOrder = 'LE' | 'BE';
 
 export interface ConnectionConfig {

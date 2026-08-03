@@ -133,16 +133,16 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
 
   // Grid dimensions based on display format
   // Data array stores 16-bit register values
-  // SHT/BIN: 1 register per cell, 16x16 = 256 cells/page
-  // HEX/DEC/FLT: 2 registers per cell, 16x8 = 128 cells/page
-  // DBL: 4 registers per cell, 8x8 = 64 cells/page
-  const isDBL = displayFormat === 'dbl';
-  const isShtOrBin = displayFormat === 'sht' || displayFormat === 'bin';
-  const isHexOrDecOrFlt = displayFormat === 'hex' || displayFormat === 'dec' || displayFormat === 'flt';
+  // HEX/DEC: 1 register per cell, 16x8 = 128 cells/page
+  // BIN: 1 register per cell, 16x4 = 64 cells/page
+  // FLT: 2 registers per cell, 8x4 = 32 cells/page (double height)
+  const isFlt = displayFormat === 'flt';
+  const isBin = displayFormat === 'bin';
+  const isHexOrDec = displayFormat === 'hex' || displayFormat === 'dec';
   
-  const rows = isDBL ? 8 : 16;
-  const cols = isDBL ? 8 : (isShtOrBin ? 16 : 8);
-  const regsPerCell = isDBL ? 4 : (isShtOrBin ? 1 : 2);
+  const rows = isFlt ? 8 : 16;
+  const cols = isFlt ? 4 : (isBin ? 4 : 8);
+  const regsPerCell = isFlt ? 2 : 1;
   const cellsPerPage = rows * cols;
   const regsPerPage = cellsPerPage * regsPerCell;
 
@@ -153,13 +153,13 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
   const rowHeaders = useMemo(() => {
     const d = startAddr & 0xF;
     return Array.from({ length: rows }, (_, i) => {
-      if (isDBL) {
-        // For DBL: D, F, 1, 3, 5, 7, 9, B (step by 2)
+      if (isFlt) {
+        // For FLT: D, F, 1, 3, 5, 7, 9, B (step by 2)
         return HEX_CHARS[(d + i * 2) % 16];
       }
       return HEX_CHARS[(d + i) % 16];
     });
-  }, [startAddr, rows, isDBL]);
+  }, [startAddr, rows, isFlt]);
 
   // Generate column headers: start from C (second-to-last hex digit of startAddr), increment by page
   const colHeaders = useMemo(() => {
@@ -173,8 +173,8 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
   const getCellValue = useCallback((row: number, col: number): string => {
     // Calculate address: column-major order
     // Address = pageStartAddr + col * 16 + row (for 16-row modes)
-    // For DBL (8 rows): Address = pageStartAddr + col * 16 + row * 2
-    const rowOffset = isDBL ? row * 2 : row;
+    // For FLT (8 rows): Address = pageStartAddr + col * 16 + row * 2
+    const rowOffset = isFlt ? row * 2 : row;
     const actualAddr = pageStartAddr + col * 16 + rowOffset;
     const relAddr = actualAddr - startAddr;
     
@@ -182,29 +182,21 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     if (relAddr >= data.length) return '--';
 
     switch (displayFormat) {
-      case 'sht': {
-        // 16-bit signed integer
-        const val = data[relAddr];
-        if (!signed) return val.toString();
-        return val > 32767 ? (val - 65536).toString() : val.toString();
-      }
       case 'bin': {
         // 16-bit binary
         const val = data[relAddr];
         return formatBinary16(val);
       }
       case 'hex': {
-        // 32-bit hex (combine 2 registers)
-        if (relAddr + 1 >= data.length || relAddr + 1 >= quantity) return '--';
-        const val32 = combineRegs32(data[relAddr], data[relAddr + 1], byteOrder);
-        return formatHex32(val32);
+        // 16-bit hex
+        const val = data[relAddr];
+        return formatHex16(val);
       }
       case 'dec': {
-        // 32-bit decimal (combine 2 registers)
-        if (relAddr + 1 >= data.length || relAddr + 1 >= quantity) return '--';
-        const val32 = combineRegs32(data[relAddr], data[relAddr + 1], byteOrder);
-        if (!signed) return val32.toString();
-        return val32 > 2147483647 ? (val32 - 4294967296).toString() : val32.toString();
+        // 16-bit decimal
+        const val = data[relAddr];
+        if (!signed) return val.toString();
+        return val > 32767 ? (val - 65536).toString() : val.toString();
       }
       case 'flt': {
         // 32-bit float (combine 2 registers)
@@ -213,21 +205,13 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
         const f = uint32ToFloat32(val32);
         return f.toFixed(4);
       }
-      case 'dbl': {
-        // 64-bit double (combine 4 registers)
-        if (relAddr + 3 >= data.length || relAddr + 3 >= quantity) return '--';
-        const regs = [data[relAddr], data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]];
-        const [low32, high32] = combineRegs64(regs, byteOrder);
-        const d = uint64ToFloat64(low32, high32);
-        return d.toFixed(6);
-      }
       default:
         return data[relAddr]?.toString() ?? '--';
     }
-  }, [data, startAddr, quantity, displayFormat, byteOrder, signed, pageStartAddr, isDBL]);
+  }, [data, startAddr, quantity, displayFormat, byteOrder, signed, pageStartAddr, isFlt]);
 
   const getTooltipContent = useCallback((row: number, col: number) => {
-    const rowOffset = isDBL ? row * 2 : row;
+    const rowOffset = isFlt ? row * 2 : row;
     const addr = pageStartAddr + col * 16 + rowOffset;
     const relAddr = addr - startAddr;
     
@@ -250,28 +234,20 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     const content = (
       <div className="text-xs space-y-1">
         <div><span className="text-muted-foreground">{t('dataGrid.address')}:</span> {decAddr} ({hexAddr})</div>
-        <div><span className="text-muted-foreground">SHT:</span> {val16 > 32767 ? val16 - 65536 : val16}</div>
-        <div><span className="text-muted-foreground">{t('dataGrid.binary')}:</span> {formatBinary16(val16)}</div>
+        <div><span className="text-muted-foreground">BIN:</span> {formatBinary16(val16)}</div>
+        <div><span className="text-muted-foreground">HEX:</span> {formatHex16(val16)}</div>
+        <div><span className="text-muted-foreground">DEC:</span> {signed && val16 > 32767 ? val16 - 65536 : val16}</div>
         {relAddr + 1 < data.length && relAddr + 1 < quantity && (() => {
           const val32 = combineRegs32(data[relAddr], data[relAddr + 1], byteOrder);
           return (
-            <>
-              <div><span className="text-muted-foreground">{t('dataGrid.hex')}:</span> {formatHex32(val32)}</div>
-              <div><span className="text-muted-foreground">{t('dataGrid.decimal')}:</span> {val32 > 2147483647 ? val32 - 4294967296 : val32}</div>
-              <div><span className="text-muted-foreground">FLT:</span> {uint32ToFloat32(val32).toFixed(4)}</div>
-            </>
+            <div><span className="text-muted-foreground">FLT:</span> {uint32ToFloat32(val32).toFixed(4)}</div>
           );
-        })()}
-        {relAddr + 3 < data.length && relAddr + 3 < quantity && (() => {
-          const regs = [data[relAddr], data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]];
-          const [low32, high32] = combineRegs64(regs, byteOrder);
-          return <div><span className="text-muted-foreground">DBL:</span> {uint64ToFloat64(low32, high32).toFixed(6)}</div>;
         })()}
       </div>
     );
 
     return content;
-  }, [data, startAddr, quantity, pageStartAddr, byteOrder, t, isDBL]);
+  }, [data, startAddr, quantity, pageStartAddr, byteOrder, signed, isFlt, t]);
 
   const handleCellHover = useCallback((row: number, col: number, e: React.MouseEvent) => {
     const content = getTooltipContent(row, col);
@@ -285,9 +261,9 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
   }, []);
 
   const getCellAddress = useCallback((row: number, col: number): number => {
-    const rowOffset = isDBL ? row * 2 : row;
+    const rowOffset = isFlt ? row * 2 : row;
     return pageStartAddr + col * 16 + rowOffset;
-  }, [pageStartAddr, isDBL]);
+  }, [pageStartAddr, isFlt]);
 
   const handleCellClick = useCallback((row: number, col: number) => {
     if (!editable) return;
@@ -332,8 +308,8 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
           className="grid gap-0 border border-border"
           style={{
             gridTemplateColumns: `40px repeat(${cols}, minmax(80px, 1fr))`,
-            gridTemplateRows: isDBL 
-              ? `24px repeat(${rows}, 48px)` // DBL: header normal (24px), data rows 2x (48px)
+            gridTemplateRows: isFlt 
+              ? `24px repeat(${rows}, 48px)` // FLT: header normal (24px), data rows 2x (48px)
               : `24px repeat(${rows}, 24px)`, // Other modes: all rows normal (24px)
           }}
         >
@@ -369,8 +345,8 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
                           ? 'cursor-text hover:bg-accent/20'
                           : 'cursor-default hover:bg-accent/10'
                         : 'bg-muted/30 text-muted-foreground'
-                    } ${isDBL ? 'text-base' : ''}`}
-                    style={isDBL ? { minHeight: '48px' } : {}}
+                    } ${isFlt ? 'text-base' : ''}`}
+                    style={isFlt ? { minHeight: '48px' } : {}}
                     onClick={() => handleCellClick(row, col)}
                     onMouseEnter={(e) => handleCellHover(row, col, e)}
                     onMouseLeave={handleCellLeave}
