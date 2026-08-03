@@ -390,8 +390,6 @@ export default function ModbusMasterPage() {
               onAddConnection={handleAddConnection}
               onUpdateConnection={handleUpdateConnection}
               onRemoveConnection={handleDeleteConnection}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
             />
           </div>
 
@@ -407,6 +405,10 @@ export default function ModbusMasterPage() {
               onClear={handleClearLogs}
               connectionStatus={connectionStatus}
               connectionTime={activeConnectionId ? connectionTimes[activeConnectionId] : undefined}
+              activeConnection={connections.find(c => c.id === activeConnectionId) || null}
+              isConnected={connectedIds.has(activeConnectionId)}
+              onConnect={() => handleConnect(activeConnectionId)}
+              onDisconnect={() => handleDisconnect(activeConnectionId)}
             />
           </div>
         </div>

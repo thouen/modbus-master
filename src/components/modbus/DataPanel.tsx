@@ -385,6 +385,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
 
       {/* Data Grid */}
       <DataGrid
+        key={`${displayFormat}-${byteOrder}-${signed}`}
         data={currentTab.dataValues}
         startAddr={currentTab.startAddr}
         quantity={currentTab.quantity}

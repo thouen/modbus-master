@@ -3,13 +3,17 @@
 import { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import type { ConnectionStatus, LogEntry } from '@/types/modbus';
+import type { ConnectionStatus, LogEntry, SavedConnection } from '@/types/modbus';
 
 interface LogPanelProps {
   logs: LogEntry[];
   onClear: () => void;
   connectionStatus: ConnectionStatus;
   connectionTime?: number;
+  activeConnection?: SavedConnection | null;
+  isConnected: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -28,7 +32,7 @@ const TYPE_ICONS: Record<string, string> = {
   error: '!',
 };
 
-export function LogPanel({ logs, onClear, connectionStatus, connectionTime }: LogPanelProps) {
+export function LogPanel({ logs, onClear, connectionStatus, connectionTime, activeConnection, isConnected, onConnect, onDisconnect }: LogPanelProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -122,25 +126,58 @@ export function LogPanel({ logs, onClear, connectionStatus, connectionTime }: Lo
         </Button>
       </div>
 
-      {/* Connection Status */}
-      {connectionStatus?.connected && connectionStatus.config && (
-        <div className="mb-3 px-3 py-2 bg-primary/10 border border-primary/30 rounded-sm">
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-            <span className="font-mono text-primary">
-              {connectionStatus.config.host}:{connectionStatus.config.port}
-            </span>
-            <span className="text-foreground/60 text-xs">
-              UID: {connectionStatus.config.unitId}
-            </span>
-            {connectionTime && (
-              <span className="text-foreground/50 text-xs ml-auto">
-                {t('log.connectedSince')}: {formatConnectionTime(connectionTime)}
-              </span>
+      {/* Connection Status & Controls */}
+      <div className="mb-3 px-3 py-2 bg-panel border border-border rounded-sm">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'bg-primary shadow-[0_0_6px_rgba(0,212,170,0.5)] animate-pulse' : 'bg-muted-foreground/30'}`} />
+            {activeConnection ? (
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-mono text-foreground truncate">
+                    {activeConnection.name === 'default' ? t('connection.defaultName') : activeConnection.name}
+                  </span>
+                  <span className="text-[10px] font-mono px-1 py-0.5 rounded-sm bg-background/60 border border-border/50 text-muted-foreground uppercase">
+                    {activeConnection.protocol}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground font-mono flex items-center gap-2">
+                  <span>{activeConnection.host}:{activeConnection.port}</span>
+                  <span className="text-foreground/40">|</span>
+                  <span>UID: {activeConnection.unitId}</span>
+                  {connectionTime && (
+                    <>
+                      <span className="text-foreground/40">|</span>
+                      <span>{t('log.connectedSince')}: {formatConnectionTime(connectionTime)}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">{t('connection.noConnections')}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {isConnected ? (
+              <button
+                onClick={onDisconnect}
+                className="px-2 py-1 text-xs rounded-sm transition-colors bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30 font-mono uppercase"
+                title={t('connection.disconnect')}
+              >
+                {t('connection.disconnect')}
+              </button>
+            ) : (
+              <button
+                onClick={onConnect}
+                className="px-2 py-1 text-xs rounded-sm transition-colors bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 font-mono uppercase"
+                title={t('connection.connect')}
+              >
+                {t('connection.connect')}
+              </button>
             )}
           </div>
         </div>
-      )}
+      </div>
 
       <div
         ref={scrollRef}
