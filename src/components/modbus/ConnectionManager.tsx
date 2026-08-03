@@ -346,26 +346,28 @@ export function ConnectionManager({
                 </div>
               </div>
 
-              {/* Unit ID + Timeout on same row */}
-              <div className="grid grid-cols-[90px_1fr] items-center gap-3">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  {t('connection.unitId')}
-                </label>
-                <div className="flex items-center gap-2 min-w-0">
+              {/* Unit ID + Timeout on same row, each takes half */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground shrink-0">
+                    {t('connection.unitId')}
+                  </label>
                   <input
                     type="text"
                     value={formUnitId}
                     onChange={(e) => setFormUnitId(e.target.value)}
-                    className="w-[64px] px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="flex-1 min-w-0 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
-                  <span className="text-xs font-mono text-muted-foreground shrink-0">
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground shrink-0">
                     {t('connection.timeout')}
-                  </span>
+                  </label>
                   <input
                     type="text"
                     value={formTimeout}
                     onChange={(e) => setFormTimeout(e.target.value)}
-                    className="w-[80px] px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="flex-1 min-w-0 px-2.5 py-1.5 text-sm font-mono bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
               </div>
