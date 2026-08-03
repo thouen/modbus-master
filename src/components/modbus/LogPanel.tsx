@@ -3,11 +3,13 @@
 import { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import type { LogEntry } from '@/types/modbus';
+import type { ConnectionStatus, LogEntry } from '@/types/modbus';
 
 interface LogPanelProps {
   logs: LogEntry[];
   onClear: () => void;
+  connectionStatus: ConnectionStatus;
+  connectionTime?: number;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -26,7 +28,7 @@ const TYPE_ICONS: Record<string, string> = {
   error: '!',
 };
 
-export function LogPanel({ logs, onClear }: LogPanelProps) {
+export function LogPanel({ logs, onClear, connectionStatus, connectionTime }: LogPanelProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +37,11 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       scrollRef.current.scrollTop = 0;
     }
   }, [logs]);
+
+  const formatConnectionTime = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString();
+  };
 
   // Generate translated log message
   const getLogMessage = (log: LogEntry): string => {
@@ -114,6 +121,26 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           {t('log.clear')}
         </Button>
       </div>
+
+      {/* Connection Status */}
+      {connectionStatus?.connected && connectionStatus.config && (
+        <div className="mb-3 px-3 py-2 bg-primary/10 border border-primary/30 rounded-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+            <span className="font-mono text-primary">
+              {connectionStatus.config.host}:{connectionStatus.config.port}
+            </span>
+            <span className="text-foreground/60 text-xs">
+              UID: {connectionStatus.config.unitId}
+            </span>
+            {connectionTime && (
+              <span className="text-foreground/50 text-xs ml-auto">
+                {t('log.connectedSince')}: {formatConnectionTime(connectionTime)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div
         ref={scrollRef}

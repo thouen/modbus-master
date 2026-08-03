@@ -38,7 +38,6 @@ interface DataGridProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   editable?: boolean;
-  editedValues?: Record<number, number>;
   onCellChange?: (addr: number, value: number) => void;
 }
 
@@ -72,7 +71,7 @@ function parseFloat64(regs: number[], byteOrder: ByteOrder): number {
   return view.getFloat64(0);
 }
 
-export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, signed, currentPage, totalPages, onPageChange, editable = false, editedValues = {}, onCellChange }: DataGridProps) {
+export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, signed, currentPage, totalPages, onPageChange, editable = false, onCellChange }: DataGridProps) {
   const { t } = useTranslation();
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: React.ReactNode } | null>(null);
   const [editingCell, setEditingCell] = useState<number | null>(null);
@@ -229,10 +228,10 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     const relAddr = addr - startAddr;
     if (relAddr < 0 || relAddr >= quantity) return;
     
-    const currentVal = editedValues[addr] ?? (relAddr < data.length ? data[relAddr] : 0);
+    const currentVal = relAddr < data.length ? data[relAddr] : 0;
     setEditingCell(addr);
     setEditValue(currentVal.toString());
-  }, [editable, getCellAddress, startAddr, quantity, editedValues, data]);
+  }, [editable, getCellAddress, startAddr, quantity, data]);
 
   const handleEditChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setEditValue(e.target.value);

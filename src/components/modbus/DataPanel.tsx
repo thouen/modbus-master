@@ -33,8 +33,7 @@ interface TabData {
   functionCode: number;
   startAddr: number;
   quantity: number;
-  writeValue: string;
-  data: number[];
+  dataValues: number[];
   isPolling: boolean;
   pollInterval: number;
   customName?: string;
@@ -51,14 +50,13 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   const currentLang = i18n.language?.startsWith('zh') ? 'zh' : 'en';
   const [activeTab, setActiveTab] = useState(0);
   const [tabs, setTabs] = useState<TabData[]>([
-    { functionCode: 3, startAddr: 0, quantity: 125, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 },
+    { functionCode: 3, startAddr: 0, quantity: 125, dataValues: new Array(125).fill(0), isPolling: false, pollInterval: 1000 },
   ]);
 
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
   const [byteOrder, setByteOrder] = useState<ByteOrder>('LE');
   const [signed, setSigned] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
-  const [editedValues, setEditedValues] = useState<Record<number, number>>({});
 
   // Load from localStorage after mount (avoid hydration mismatch)
   useEffect(() => {
@@ -96,8 +94,13 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }, []);
 
   const handleCellChange = useCallback((addr: number, value: number) => {
-    setEditedValues((prev) => ({ ...prev, [addr]: value }));
-  }, []);
+    const index = addr - currentTab.startAddr;
+    if (index >= 0 && index < currentTab.quantity) {
+      updateTab(activeTab, {
+        dataValues: currentTab.dataValues.map((v, i) => i === index ? value : v),
+      });
+    }
+  }, [currentTab, activeTab, updateTab]);
 
   const handleExecute = useCallback(async () => {
     if (!currentTab) return;
@@ -105,33 +108,21 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       const result = await onRead(currentTab.functionCode, currentTab.startAddr, currentTab.quantity);
       if (result) {
         const numValues = result.values.filter((v): v is number => typeof v === 'number');
-        updateTab(activeTab, { data: numValues });
+        // Pad or truncate to match quantity
+        const dataValues = Array.from({ length: currentTab.quantity }, (_, i) => 
+          i < numValues.length ? numValues[i] : 0
+        );
+        updateTab(activeTab, { dataValues });
         // Jump to page containing startAddr
         const page = Math.floor(currentTab.startAddr / 128);
         setCurrentPage(page);
       }
     } else {
-      // Write operation - use edited values from grid if available, otherwise use writeValue
-      let values: number[];
-      const hasEditedValues = Object.keys(editedValues).length > 0;
-      
-      if (hasEditedValues) {
-        // Build values array from edited values based on startAddr and quantity
-        values = Array.from({ length: currentTab.quantity }, (_, i) => {
-          const addr = currentTab.startAddr + i;
-          return editedValues[addr] ?? 0;
-        });
-        // Clear edited values after write
-        setEditedValues({});
-      } else {
-        values = currentTab.writeValue.split(',').map((v) => {
-          const num = parseInt(v.trim());
-          return isNaN(num) ? 0 : num;
-        });
-      }
+      // Write operation - use dataValues array directly
+      const values = currentTab.dataValues.slice(0, currentTab.quantity);
       await onWrite(currentTab.functionCode, currentTab.startAddr, values);
     }
-  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead, editedValues]);
+  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead]);
 
   const handleStartPolling = useCallback(() => {
     if (!isRead || !currentTab) return;
@@ -155,7 +146,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }, [activeTab, updateTab]);
 
   const addTab = useCallback(() => {
-    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 125, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 };
+    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 125, dataValues: new Array(125).fill(0), isPolling: false, pollInterval: 1000 };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(tabs.length);
   }, [tabs.length]);
@@ -302,18 +293,6 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
             className="w-28 px-2 py-1 bg-panel border border-border rounded text-xs"
           />
         </div>
-        {!isRead && (
-          <div className="flex items-center">
-            <label className="text-xs text-muted-foreground w-14 block">{t('writePanel.value')}:</label>
-            <input
-              type="text"
-              value={currentTab.writeValue}
-              onChange={(e) => updateTab(activeTab, { writeValue: e.target.value })}
-              placeholder="0,1,2,..."
-              className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
-            />
-          </div>
-        )}
         <div className="flex items-end">
           <button
             onClick={handleExecute}
@@ -406,7 +385,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
 
       {/* Data Grid */}
       <DataGrid
-        data={currentTab.data}
+        data={currentTab.dataValues}
         startAddr={currentTab.startAddr}
         quantity={currentTab.quantity}
         displayFormat={displayFormat}
@@ -416,7 +395,6 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
         totalPages={totalPages}
         onPageChange={setCurrentPage}
         editable={!isRead}
-        editedValues={editedValues}
         onCellChange={handleCellChange}
       />
     </div>
