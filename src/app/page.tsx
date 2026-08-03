@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ConnectionManager } from '@/components/modbus/ConnectionManager';
+import { ConnectionStatusPanel } from '@/components/modbus/ConnectionStatusPanel';
 import { DataPanel } from '@/components/modbus/DataPanel';
 import { LogPanel } from '@/components/modbus/LogPanel';
 import StatusBar from '@/components/modbus/StatusBar';
@@ -18,6 +19,7 @@ export default function ModbusMasterPage() {
     connected: false,
     config: null,
   });
+  const [connectionTimes, setConnectionTimes] = useState<Record<string, number>>({});
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isPolling, setIsPolling] = useState(false);
   const [lastReadTime, setLastReadTime] = useState<number | null>(null);
@@ -152,6 +154,7 @@ export default function ModbusMasterPage() {
         if (data.success) {
           setConnectionStatus({ connected: true, config: conn });
           setConnectedIds((prev) => new Set(prev).add(id));
+          setConnectionTimes((prev) => ({ ...prev, [id]: Date.now() }));
           addLog(data.data);
         } else {
           addLog(data.data || { type: 'error', message: data.error, success: false, timestamp: Date.now(), id: nextResultId() });
@@ -180,6 +183,11 @@ export default function ModbusMasterPage() {
           next.delete(id);
           return next;
         });
+        setConnectionTimes((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
         if (id === activeConnectionId) {
           setConnectionStatus({ connected: false, config: null });
         }
@@ -190,6 +198,11 @@ export default function ModbusMasterPage() {
         setConnectedIds((prev) => {
           const next = new Set(prev);
           next.delete(id);
+          return next;
+        });
+        setConnectionTimes((prev) => {
+          const next = { ...prev };
+          delete next[id];
           return next;
         });
         if (id === activeConnectionId) {
@@ -378,8 +391,6 @@ export default function ModbusMasterPage() {
               onAddConnection={handleAddConnection}
               onUpdateConnection={handleUpdateConnection}
               onRemoveConnection={handleDeleteConnection}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
             />
           </div>
 
@@ -388,9 +399,19 @@ export default function ModbusMasterPage() {
             <DataPanel onRead={handleRead} onWrite={handleWrite} />
           </div>
 
-          {/* Right Column - Log Panel */}
+          {/* Right Column - Connection Status + Log Panel */}
           <div className="xl:col-span-3">
-            <LogPanel logs={logs} onClear={handleClearLogs} />
+            <ConnectionStatusPanel
+              activeConnection={connections.find(c => c.id === activeConnectionId) || null}
+              isConnected={connectedIds.has(activeConnectionId)}
+              connectionTime={activeConnectionId ? connectionTimes[activeConnectionId] : undefined}
+              onConnect={() => handleConnect(activeConnectionId)}
+              onDisconnect={() => handleDisconnect(activeConnectionId)}
+            />
+            <LogPanel 
+              logs={logs} 
+              onClear={handleClearLogs}
+            />
           </div>
         </div>
       </main>

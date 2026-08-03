@@ -33,8 +33,7 @@ interface TabData {
   functionCode: number;
   startAddr: number;
   quantity: number;
-  writeValue: string;
-  data: number[];
+  dataValues: number[];
   isPolling: boolean;
   pollInterval: number;
   customName?: string;
@@ -51,7 +50,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   const currentLang = i18n.language?.startsWith('zh') ? 'zh' : 'en';
   const [activeTab, setActiveTab] = useState(0);
   const [tabs, setTabs] = useState<TabData[]>([
-    { functionCode: 3, startAddr: 0, quantity: 128, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 },
+    { functionCode: 3, startAddr: 0, quantity: 128, dataValues: new Array(128).fill(0), isPolling: false, pollInterval: 1000 },
   ]);
 
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
@@ -94,26 +93,61 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
     setTabs((prev) => prev.map((tab, i) => (i === index ? { ...tab, ...updates } : tab)));
   }, []);
 
+  const handleCellChange = useCallback((addr: number, value: number) => {
+    const index = addr - currentTab.startAddr;
+    if (index >= 0 && index < currentTab.quantity) {
+      updateTab(activeTab, {
+        dataValues: currentTab.dataValues.map((v, i) => i === index ? value : v),
+      });
+    }
+  }, [currentTab, activeTab, updateTab]);
+
   const handleExecute = useCallback(async () => {
     if (!currentTab) return;
     if (isRead) {
       const result = await onRead(currentTab.functionCode, currentTab.startAddr, currentTab.quantity);
       if (result) {
         const numValues = result.values.filter((v): v is number => typeof v === 'number');
-        updateTab(activeTab, { data: numValues });
+        // Convert 16-bit register values to 32-bit values
+        // Combine pairs of registers based on byte order
+        const dataValues: number[] = [];
+        for (let i = 0; i < currentTab.quantity; i += 2) {
+          const low = i < numValues.length ? numValues[i] : 0;
+          const high = i + 1 < numValues.length ? numValues[i + 1] : 0;
+          // LE: low register first, high register second
+          // BE: high register first, low register second
+          const val32 = byteOrder === 'LE' 
+            ? (low & 0xFFFF) | ((high & 0xFFFF) << 16)
+            : ((low & 0xFFFF) << 16) | (high & 0xFFFF);
+          dataValues.push(val32);
+        }
+        // If quantity is odd, add the last value
+        if (currentTab.quantity % 2 === 1 && numValues.length >= currentTab.quantity) {
+          const lastVal = numValues[currentTab.quantity - 1];
+          dataValues.push(byteOrder === 'LE' ? (lastVal & 0xFFFF) : ((lastVal & 0xFFFF) << 16));
+        }
+        updateTab(activeTab, { dataValues });
         // Jump to page containing startAddr
         const page = Math.floor(currentTab.startAddr / 128);
         setCurrentPage(page);
       }
     } else {
-      // Write operation
-      const values = currentTab.writeValue.split(',').map((v) => {
-        const num = parseInt(v.trim());
-        return isNaN(num) ? 0 : num;
-      });
-      await onWrite(currentTab.functionCode, currentTab.startAddr, values);
+      // Write operation - convert 32-bit values to 16-bit register pairs
+      const values32 = currentTab.dataValues.slice(0, Math.ceil(currentTab.quantity / 2));
+      const values16: number[] = [];
+      for (const val32 of values32) {
+        const low = val32 & 0xFFFF;
+        const high = (val32 >>> 16) & 0xFFFF;
+        if (byteOrder === 'LE') {
+          values16.push(low, high);
+        } else {
+          values16.push(high, low);
+        }
+      }
+      // Truncate to quantity
+      await onWrite(currentTab.functionCode, currentTab.startAddr, values16.slice(0, currentTab.quantity));
     }
-  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead]);
+  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead, byteOrder]);
 
   const handleStartPolling = useCallback(() => {
     if (!isRead || !currentTab) return;
@@ -137,7 +171,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }, [activeTab, updateTab]);
 
   const addTab = useCallback(() => {
-    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 128, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 };
+    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 128, dataValues: new Array(128).fill(0), isPolling: false, pollInterval: 1000 };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(tabs.length);
   }, [tabs.length]);
@@ -172,16 +206,19 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }
 
   // Calculate total pages based on display format and quantity
-  const getCellsPerPage = () => {
-    if (displayFormat === 'dbl') return 32; // 8 rows x 4 cols
+  // For 32-bit storage: quantity registers = ceil(quantity/2) 32-bit values
+  const getElementsPerPage = () => {
+    if (displayFormat === 'dbl') return 32; // 8 rows x 4 cols, each cell = 2 elements
     if (displayFormat === 'bin' || displayFormat === 'flt') return 64; // 16 rows x 4 cols
-    return 128; // 16 rows x 8 cols (hex/dec)
+    return 128; // 16 rows x 8 cols (hex/dec/bin)
   };
 
-  const cellsPerPage = getCellsPerPage();
-  // Total cells: for DBL = floor(quantity/2), for others = quantity
-  const totalCells = displayFormat === 'dbl' ? Math.floor(currentTab.quantity / 2) : currentTab.quantity;
-  const totalPages = Math.max(1, Math.ceil(totalCells / cellsPerPage));
+  const elementsPerPage = getElementsPerPage();
+  // Total 32-bit values stored
+  const totalValues = Math.ceil(currentTab.quantity / 2);
+  // For DBL, each cell uses 2 values, so total cells = totalValues / 2
+  const totalCells = displayFormat === 'dbl' ? Math.floor(totalValues / 2) : totalValues;
+  const totalPages = Math.max(1, Math.ceil(totalCells / (elementsPerPage / (displayFormat === 'dbl' ? 2 : 1))));
 
   return (
     <div className="bg-card border border-border rounded-lg p-4">
@@ -284,18 +321,6 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
             className="w-28 px-2 py-1 bg-panel border border-border rounded text-xs"
           />
         </div>
-        {!isRead && (
-          <div className="flex items-center">
-            <label className="text-xs text-muted-foreground w-14 block">{t('writePanel.value')}:</label>
-            <input
-              type="text"
-              value={currentTab.writeValue}
-              onChange={(e) => updateTab(activeTab, { writeValue: e.target.value })}
-              placeholder="0,1,2,..."
-              className="w-full px-2 py-1 bg-panel border border-border rounded text-xs"
-            />
-          </div>
-        )}
         <div className="flex items-end">
           <button
             onClick={handleExecute}
@@ -387,19 +412,20 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       </div>
 
       {/* Data Grid */}
-      {isRead && (
-        <DataGrid
-          data={currentTab.data}
-          startAddr={currentTab.startAddr}
-          quantity={currentTab.quantity}
-          displayFormat={displayFormat}
-          byteOrder={byteOrder}
-          signed={signed}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
-      )}
+      <DataGrid
+        key={`${displayFormat}-${byteOrder}-${signed}`}
+        data={currentTab.dataValues}
+        startAddr={currentTab.startAddr}
+        quantity={currentTab.quantity}
+        displayFormat={displayFormat}
+        byteOrder={byteOrder}
+        signed={signed}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        editable={!isRead}
+        onCellChange={handleCellChange}
+      />
     </div>
   );
 }

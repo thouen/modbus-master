@@ -53,8 +53,6 @@ interface ConnectionManagerProps {
   onAddConnection: (connection: SavedConnection) => void;
   onRemoveConnection: (id: string) => void;
   onUpdateConnection: (id: string, config: Partial<SavedConnection>) => void;
-  onConnect: (id: string) => void;
-  onDisconnect: (id: string) => void;
 }
 
 export function ConnectionManager({
@@ -65,8 +63,6 @@ export function ConnectionManager({
   onAddConnection,
   onRemoveConnection,
   onUpdateConnection,
-  onConnect,
-  onDisconnect,
 }: ConnectionManagerProps) {
   const { t } = useTranslation();
   const [modalMode, setModalMode] = useState<'add' | 'edit' | null>(null);
@@ -146,21 +142,9 @@ export function ConnectionManager({
 
   const handleDelete = useCallback(
     (id: string) => {
-      onDisconnect(id);
       onRemoveConnection(id);
     },
-    [onDisconnect, onRemoveConnection]
-  );
-
-  const handleConnect = useCallback(
-    (id: string) => {
-      if (connectedIds.has(id)) {
-        onDisconnect(id);
-      } else {
-        onConnect(id);
-      }
-    },
-    [connectedIds, onConnect, onDisconnect]
+    [onRemoveConnection]
   );
 
   const activeConnection = connections.find((c) => c.id === activeConnectionId);
@@ -224,24 +208,6 @@ export function ConnectionManager({
 
                 {/* Action buttons */}
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => handleConnect(conn.id)}
-                    className={`p-1.5 rounded-sm transition-colors ${isConnected
-                        ? 'bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30'
-                        : 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30'
-                      }`}
-                    title={isConnected ? t('connection.disconnect') : t('connection.connect')}
-                  >
-                    {isConnected ? (
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 0112.728 0M12 12h.01" />
-                      </svg>
-                    ) : (
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    )}
-                  </button>
                   <button
                     onClick={() => openEditModal(conn.id)}
                     className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-sm hover:bg-accent"

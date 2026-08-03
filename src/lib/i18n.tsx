@@ -81,6 +81,7 @@ const resources = {
         title: '操作日志',
         clear: '清除',
         noLogs: '暂无操作记录',
+        connectedSince: '连接于',
         fc: {
           1: '读线圈',
           2: '读离散输入',
@@ -198,6 +199,7 @@ const resources = {
         title: 'Operation Log',
         clear: 'Clear',
         noLogs: 'No operations logged',
+        connectedSince: 'Connected since',
         fc: {
           1: 'Read Coils',
           2: 'Read Discrete Inputs',

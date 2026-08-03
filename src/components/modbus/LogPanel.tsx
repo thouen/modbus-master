@@ -115,6 +115,8 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
         </Button>
       </div>
 
+      {/* Connection Status & Controls - Moved to ConnectionStatusPanel */}
+
       <div
         ref={scrollRef}
         className="overflow-auto max-h-[695px] border border-border rounded-sm bg-background/50"
