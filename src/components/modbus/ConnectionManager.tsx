@@ -262,16 +262,6 @@ export function ConnectionManager({
                   </button>
                 </div>
               </div>
-
-              {/* Connected status bar */}
-              {isConnected && (
-                <div className="px-3 py-1 border-t border-primary/20 bg-primary/5 flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-primary">
-                    {t('connection.status.online')}
-                  </span>
-                </div>
-              )}
             </div>
           );
         })}

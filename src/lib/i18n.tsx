@@ -108,10 +108,6 @@ const resources = {
           notConnected: '未连接到设备',
         },
       },
-      status: {
-        online: '在线',
-        offline: '离线',
-      },
       lang: {
         zh: '中文',
         en: 'English',
@@ -220,10 +216,6 @@ const resources = {
           writeFailed: 'Write failed',
           notConnected: 'Not connected to device',
         },
-      },
-      status: {
-        online: 'Online',
-        offline: 'Offline',
       },
       lang: {
         zh: '中文',
