@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ConnectionManager } from '@/components/modbus/ConnectionManager';
+import { ConnectionStatusPanel } from '@/components/modbus/ConnectionStatusPanel';
 import { DataPanel } from '@/components/modbus/DataPanel';
 import { LogPanel } from '@/components/modbus/LogPanel';
 import StatusBar from '@/components/modbus/StatusBar';
@@ -398,17 +399,18 @@ export default function ModbusMasterPage() {
             <DataPanel onRead={handleRead} onWrite={handleWrite} />
           </div>
 
-          {/* Right Column - Log Panel */}
+          {/* Right Column - Connection Status + Log Panel */}
           <div className="xl:col-span-3">
+            <ConnectionStatusPanel
+              activeConnection={connections.find(c => c.id === activeConnectionId) || null}
+              isConnected={connectedIds.has(activeConnectionId)}
+              connectionTime={activeConnectionId ? connectionTimes[activeConnectionId] : undefined}
+              onConnect={() => handleConnect(activeConnectionId)}
+              onDisconnect={() => handleDisconnect(activeConnectionId)}
+            />
             <LogPanel 
               logs={logs} 
               onClear={handleClearLogs}
-              connectionStatus={connectionStatus}
-              connectionTime={activeConnectionId ? connectionTimes[activeConnectionId] : undefined}
-              activeConnection={connections.find(c => c.id === activeConnectionId) || null}
-              isConnected={connectedIds.has(activeConnectionId)}
-              onConnect={() => handleConnect(activeConnectionId)}
-              onDisconnect={() => handleDisconnect(activeConnectionId)}
             />
           </div>
         </div>
