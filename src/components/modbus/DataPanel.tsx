@@ -51,7 +51,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   const currentLang = i18n.language?.startsWith('zh') ? 'zh' : 'en';
   const [activeTab, setActiveTab] = useState(0);
   const [tabs, setTabs] = useState<TabData[]>([
-    { functionCode: 3, startAddr: 0, quantity: 125, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 },
+    { functionCode: 3, startAddr: 0, quantity: 128, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 },
   ]);
 
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('hex');
@@ -137,7 +137,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }, [activeTab, updateTab]);
 
   const addTab = useCallback(() => {
-    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 125, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 };
+    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 128, writeValue: '0', data: [], isPolling: false, pollInterval: 1000 };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(tabs.length);
   }, [tabs.length]);
