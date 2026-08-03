@@ -11,12 +11,20 @@ function getHexDigit(addr: number, position: number): string {
   return HEX_CHARS[(addr >> (position * 4)) & 0xF];
 }
 
-function formatBinary(val: number, bits: number = 32): string {
-  return '0b' + val.toString(2).padStart(bits, '0').replace(/(.{4})/g, '$1 ').trim();
+function formatBinary16(val: number): string {
+  return '0b' + val.toString(2).padStart(16, '0').replace(/(.{4})/g, '$1 ').trim();
 }
 
-function formatHex(val: number, digits: number = 8): string {
-  return '0x' + val.toString(16).toUpperCase().padStart(digits, '0');
+function formatBinary32(val: number): string {
+  return '0b' + val.toString(2).padStart(32, '0').replace(/(.{4})/g, '$1 ').trim();
+}
+
+function formatHex16(val: number): string {
+  return '0x' + val.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function formatHex32(val: number): string {
+  return '0x' + val.toString(16).toUpperCase().padStart(8, '0');
 }
 
 function formatAddress(addr: number): string {
@@ -27,38 +35,59 @@ function formatHexAddress(addr: number): string {
   return '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
 }
 
-// Swap bytes in a 32-bit value: ABCD -> DCBA
-function swapBytes32(val: number): number {
-  const b0 = val & 0xFF;
-  const b1 = (val >> 8) & 0xFF;
-  const b2 = (val >> 16) & 0xFF;
-  const b3 = (val >> 24) & 0xFF;
-  return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+// Combine two 16-bit registers into a 32-bit value based on byte order
+function combineRegs32(low: number, high: number, byteOrder: ByteOrder): number {
+  if (byteOrder === 'LE') {
+    return (high << 16) | low;
+  }
+  return (low << 16) | high;
+}
+
+// Combine four 16-bit registers into a 64-bit value (as two 32-bit halves)
+function combineRegs64(regs: number[], byteOrder: ByteOrder): [number, number] {
+  // regs[0], regs[1], regs[2], regs[3]
+  if (byteOrder === 'LE') {
+    // LE: regs[0]=low16, regs[1]=high16 of low32; regs[2]=low16, regs[3]=high16 of high32
+    const low32 = (regs[1] << 16) | regs[0];
+    const high32 = (regs[3] << 16) | regs[2];
+    return [low32, high32];
+  }
+  // BE: regs[0]=high16, regs[1]=low16 of high32; regs[2]=high16, regs[3]=low16 of low32
+  const high32 = (regs[0] << 16) | regs[1];
+  const low32 = (regs[2] << 16) | regs[3];
+  return [low32, high32];
 }
 
 // Parse input value: supports binary (0b...), hex (0x...), and signed decimal
-function parseInputValue(input: string): number {
+function parseInputValue(input: string, bits: number = 16): number {
   const trimmed = input.trim();
+  const maxVal = bits === 16 ? 0xFFFF : 0xFFFFFFFF;
   
   // Binary with spaces: "0b0000 0000 1001 1010"
   if (trimmed.startsWith('0b') || trimmed.startsWith('0B')) {
     const binStr = trimmed.slice(2).replace(/\s+/g, '');
     const val = parseInt(binStr, 2);
-    return isNaN(val) ? 0 : Math.min(val, 0xFFFFFFFF);
+    return isNaN(val) ? 0 : Math.min(Math.max(val, 0), maxVal);
   }
   
   // Hex: "0xABCd" (case-insensitive)
   if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
     const val = parseInt(trimmed.slice(2), 16);
-    return isNaN(val) ? 0 : Math.min(val, 0xFFFFFFFF);
+    return isNaN(val) ? 0 : Math.min(Math.max(val, 0), maxVal);
   }
   
   // Signed decimal: "-123"
   const num = parseInt(trimmed, 10);
   if (isNaN(num)) return 0;
-  // Clamp to valid 32-bit unsigned integer range (0 to 4294967295)
+  if (bits === 16) {
+    // 16-bit signed: -32768 to 32767, stored as unsigned 0-65535
+    if (num < -32768) return 0;
+    if (num > 32767) return 0xFFFF;
+    return num < 0 ? num + 65536 : num;
+  }
+  // 32-bit: clamp to valid range
   if (num < 0) return 0;
-  if (num > 0xFFFFFFFF) return 0xFFFFFFFF;
+  if (num > maxVal) return maxVal;
   return num;
 }
 
@@ -88,20 +117,11 @@ function uint32ToFloat32(val: number): number {
   return new DataView(buf).getFloat32(0);
 }
 
-function float64ToUint64(val: number): [number, number] {
-  const buf = new ArrayBuffer(8);
-  new DataView(buf).setFloat64(0, val);
-  return [
-    new DataView(buf).getUint32(0),
-    new DataView(buf).getUint32(4),
-  ];
-}
-
-function uint64ToFloat64(high: number, low: number): number {
+function uint64ToFloat64(low: number, high: number): number {
   const buf = new ArrayBuffer(8);
   const view = new DataView(buf);
-  view.setUint32(0, high >>> 0);
-  view.setUint32(4, low >>> 0);
+  view.setUint32(0, low >>> 0);
+  view.setUint32(4, high >>> 0);
   return view.getFloat64(0);
 }
 
@@ -112,21 +132,22 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
   const [editValue, setEditValue] = useState('');
 
   // Grid dimensions based on display format
-  // For 32-bit storage: each array element is one 32-bit value
-  // FLT: 16 rows x 4 cols = 64 cells/page (each cell = 1 float32)
-  // DBL: 8 rows x 4 cols = 32 cells/page (each cell = 1 float64 = 2 array elements)
-  // HEX/DEC/BIN: 16 rows x 8 cols = 128 cells/page (each cell = 1 uint32)
+  // Data array stores 16-bit register values
+  // SHT/BIN: 1 register per cell, 16x16 = 256 cells/page
+  // HEX/DEC/FLT: 2 registers per cell, 16x8 = 128 cells/page
+  // DBL: 4 registers per cell, 8x8 = 64 cells/page
   const isDBL = displayFormat === 'dbl';
-  const isBinOrFlt = displayFormat === 'bin' || displayFormat === 'flt';
+  const isShtOrBin = displayFormat === 'sht' || displayFormat === 'bin';
+  const isHexOrDecOrFlt = displayFormat === 'hex' || displayFormat === 'dec' || displayFormat === 'flt';
   
   const rows = isDBL ? 8 : 16;
-  const cols = (isDBL || isBinOrFlt) ? 4 : 8;
-  // For DBL, each cell uses 2 array elements (64-bit = 2 x 32-bit)
+  const cols = isDBL ? 8 : (isShtOrBin ? 16 : 8);
+  const regsPerCell = isDBL ? 4 : (isShtOrBin ? 1 : 2);
   const cellsPerPage = rows * cols;
-  const elementsPerPage = isDBL ? cellsPerPage * 2 : cellsPerPage;
+  const regsPerPage = cellsPerPage * regsPerCell;
 
   // Page start address: starts from the input startAddr, not from 0
-  const pageStartAddr = startAddr + currentPage * elementsPerPage;
+  const pageStartAddr = startAddr + currentPage * regsPerPage;
 
   // Generate row headers: start from D (last hex digit of startAddr), increment
   const rowHeaders = useMemo(() => {
@@ -160,37 +181,48 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     if (relAddr < 0 || relAddr >= quantity) return '--';
     if (relAddr >= data.length) return '--';
 
-    const val = data[relAddr];
-
     switch (displayFormat) {
-      case 'hex': {
-        // Apply byte order for display
-        const displayVal = byteOrder === 'BE' ? swapBytes32(val) : val;
-        return formatHex(displayVal);
-      }
-      case 'dec': {
-        // Apply byte order for display
-        const displayVal = byteOrder === 'BE' ? swapBytes32(val) : val;
-        if (!signed) return displayVal.toString();
-        return displayVal > 2147483647 ? (displayVal - 4294967296).toString() : displayVal.toString();
+      case 'sht': {
+        // 16-bit signed integer
+        const val = data[relAddr];
+        if (!signed) return val.toString();
+        return val > 32767 ? (val - 65536).toString() : val.toString();
       }
       case 'bin': {
-        const displayVal = byteOrder === 'BE' ? swapBytes32(val) : val;
-        return formatBinary(displayVal);
+        // 16-bit binary
+        const val = data[relAddr];
+        return formatBinary16(val);
+      }
+      case 'hex': {
+        // 32-bit hex (combine 2 registers)
+        if (relAddr + 1 >= data.length || relAddr + 1 >= quantity) return '--';
+        const val32 = combineRegs32(data[relAddr], data[relAddr + 1], byteOrder);
+        return formatHex32(val32);
+      }
+      case 'dec': {
+        // 32-bit decimal (combine 2 registers)
+        if (relAddr + 1 >= data.length || relAddr + 1 >= quantity) return '--';
+        const val32 = combineRegs32(data[relAddr], data[relAddr + 1], byteOrder);
+        if (!signed) return val32.toString();
+        return val32 > 2147483647 ? (val32 - 4294967296).toString() : val32.toString();
       }
       case 'flt': {
-        // Interpret 32-bit value as float32
-        const f = uint32ToFloat32(val);
+        // 32-bit float (combine 2 registers)
+        if (relAddr + 1 >= data.length || relAddr + 1 >= quantity) return '--';
+        const val32 = combineRegs32(data[relAddr], data[relAddr + 1], byteOrder);
+        const f = uint32ToFloat32(val32);
         return f.toFixed(4);
       }
       case 'dbl': {
-        // Combine two consecutive 32-bit values into float64
-        if (relAddr + 1 >= data.length || relAddr + 1 >= quantity) return '--';
-        const d = uint64ToFloat64(val, data[relAddr + 1]);
+        // 64-bit double (combine 4 registers)
+        if (relAddr + 3 >= data.length || relAddr + 3 >= quantity) return '--';
+        const regs = [data[relAddr], data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]];
+        const [low32, high32] = combineRegs64(regs, byteOrder);
+        const d = uint64ToFloat64(low32, high32);
         return d.toFixed(6);
       }
       default:
-        return val.toString();
+        return data[relAddr]?.toString() ?? '--';
     }
   }, [data, startAddr, quantity, displayFormat, byteOrder, signed, pageStartAddr, isDBL]);
 
@@ -214,27 +246,32 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
       );
     }
 
-    const val = data[relAddr];
-    const displayVal = byteOrder === 'BE' ? swapBytes32(val) : val;
-    const decVal = signed && displayVal > 2147483647 ? displayVal - 4294967296 : displayVal;
-    const hexVal = formatHex(displayVal);
-    const binVal = formatBinary(displayVal);
-
+    const val16 = data[relAddr];
     const content = (
       <div className="text-xs space-y-1">
         <div><span className="text-muted-foreground">{t('dataGrid.address')}:</span> {decAddr} ({hexAddr})</div>
-        <div><span className="text-muted-foreground">{t('dataGrid.decimal')}:</span> {decVal}</div>
-        <div><span className="text-muted-foreground">{t('dataGrid.hex')}:</span> {hexVal}</div>
-        <div><span className="text-muted-foreground">{t('dataGrid.binary')}:</span> {binVal}</div>
-        <div><span className="text-muted-foreground">FLT:</span> {uint32ToFloat32(val).toFixed(4)}</div>
-        {relAddr + 1 < data.length && relAddr + 1 < quantity && (
-          <div><span className="text-muted-foreground">DBL:</span> {uint64ToFloat64(val, data[relAddr + 1]).toFixed(6)}</div>
-        )}
+        <div><span className="text-muted-foreground">SHT:</span> {val16 > 32767 ? val16 - 65536 : val16}</div>
+        <div><span className="text-muted-foreground">{t('dataGrid.binary')}:</span> {formatBinary16(val16)}</div>
+        {relAddr + 1 < data.length && relAddr + 1 < quantity && (() => {
+          const val32 = combineRegs32(data[relAddr], data[relAddr + 1], byteOrder);
+          return (
+            <>
+              <div><span className="text-muted-foreground">{t('dataGrid.hex')}:</span> {formatHex32(val32)}</div>
+              <div><span className="text-muted-foreground">{t('dataGrid.decimal')}:</span> {val32 > 2147483647 ? val32 - 4294967296 : val32}</div>
+              <div><span className="text-muted-foreground">FLT:</span> {uint32ToFloat32(val32).toFixed(4)}</div>
+            </>
+          );
+        })()}
+        {relAddr + 3 < data.length && relAddr + 3 < quantity && (() => {
+          const regs = [data[relAddr], data[relAddr + 1], data[relAddr + 2], data[relAddr + 3]];
+          const [low32, high32] = combineRegs64(regs, byteOrder);
+          return <div><span className="text-muted-foreground">DBL:</span> {uint64ToFloat64(low32, high32).toFixed(6)}</div>;
+        })()}
       </div>
     );
 
     return content;
-  }, [data, startAddr, quantity, pageStartAddr, signed, byteOrder, t, isDBL]);
+  }, [data, startAddr, quantity, pageStartAddr, byteOrder, t, isDBL]);
 
   const handleCellHover = useCallback((row: number, col: number, e: React.MouseEvent) => {
     const content = getTooltipContent(row, col);
@@ -261,7 +298,7 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
     const currentVal = relAddr < data.length ? data[relAddr] : 0;
     setEditingCell(addr);
     // Show hex format for editing
-    setEditValue(formatHex(currentVal));
+    setEditValue(formatHex16(currentVal));
   }, [editable, getCellAddress, startAddr, quantity, data]);
 
   const handleEditChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,7 +307,7 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
 
   const handleEditBlur = useCallback(() => {
     if (editingCell !== null) {
-      const num = parseInputValue(editValue);
+      const num = parseInputValue(editValue, 16);
       if (onCellChange) {
         onCellChange(editingCell, num);
       }
@@ -301,9 +338,11 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
           }}
         >
           {/* Header row */}
-          <div className="bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground"></div>
+          <div className="bg-panel border-b border-r border-border flex items-center justify-center text-xs font-mono text-muted-foreground">
+            {t('dataGrid.row')}
+          </div>
           {colHeaders.map((h, i) => (
-            <div key={i} className="bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground">
+            <div key={i} className="bg-panel border-b border-border flex items-center justify-center text-xs font-mono text-accent">
               {h}
             </div>
           ))}
@@ -311,27 +350,30 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
           {/* Data rows */}
           {Array.from({ length: rows }, (_, row) => (
             <div key={row} className="contents">
-              <div className="bg-panel border-b border-border p-1 text-center text-xs font-mono text-muted-foreground flex items-center justify-center">
+              <div className="bg-panel border-r border-border flex items-center justify-center text-xs font-mono text-accent">
                 {rowHeaders[row]}
               </div>
               {Array.from({ length: cols }, (_, col) => {
                 const cellValue = getCellValue(row, col);
                 const addr = getCellAddress(row, col);
                 const relAddr = addr - startAddr;
-                const isEditable = editable && relAddr >= 0 && relAddr < quantity;
                 const isEditing = editingCell === addr;
-                const isHighlighted = cellValue !== '--';
+                const inRange = relAddr >= 0 && relAddr < quantity;
+
                 return (
                   <div
                     key={col}
-                    className={`border-b border-border p-1 text-center text-xs font-mono truncate flex items-center justify-center ${
-                      isEditable ? 'cursor-text' : 'cursor-pointer'
-                    } transition-colors hover:bg-accent ${
-                      isHighlighted ? 'text-primary' : 'text-muted-foreground'
-                    } ${isEditing ? 'bg-accent' : ''}`}
-                    onMouseEnter={(e) => !isEditing && handleCellHover(row, col, e)}
-                    onMouseLeave={handleCellLeave}
+                    className={`border-b border-r border-border flex items-center justify-center text-xs font-mono transition-colors ${
+                      inRange
+                        ? editable
+                          ? 'cursor-text hover:bg-accent/20'
+                          : 'cursor-default hover:bg-accent/10'
+                        : 'bg-muted/30 text-muted-foreground'
+                    } ${isDBL ? 'text-base' : ''}`}
+                    style={isDBL ? { minHeight: '48px' } : {}}
                     onClick={() => handleCellClick(row, col)}
+                    onMouseEnter={(e) => handleCellHover(row, col, e)}
+                    onMouseLeave={handleCellLeave}
                   >
                     {isEditing ? (
                       <input
@@ -340,11 +382,13 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
                         onChange={handleEditChange}
                         onBlur={handleEditBlur}
                         onKeyDown={handleEditKeyDown}
-                        className="w-full bg-background border border-primary text-primary text-center text-xs font-mono outline-none"
+                        className="w-full h-full bg-input text-foreground px-1 text-xs font-mono outline-none border border-accent"
                         autoFocus
                       />
                     ) : (
-                      <span>{cellValue}</span>
+                      <span className={cellValue === '--' ? 'text-muted-foreground' : 'text-foreground'}>
+                        {cellValue}
+                      </span>
                     )}
                   </div>
                 );
@@ -354,19 +398,11 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
         </div>
       </div>
 
-      {/* Tooltip */}
-      {tooltip && (
-        <div
-          className="fixed z-50 bg-card border border-border rounded p-2 shadow-lg pointer-events-none"
-          style={{ left: tooltip.x + 10, top: tooltip.y + 10 }}
-        >
-          {tooltip.content}
-        </div>
-      )}
-
       {/* Pagination */}
-      <div className="flex items-center justify-between mt-2 text-xs">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+        <div>{t('dataGrid.page')} {currentPage + 1} / {totalPages}</div>
+        <div>{regsPerPage} {t('dataGrid.regsPerPage')}</div>
+        <div className="flex gap-1">
           <button
             onClick={() => onPageChange(Math.max(0, currentPage - 1))}
             disabled={currentPage === 0}
@@ -374,9 +410,6 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
           >
             {t('dataGrid.prevPage')}
           </button>
-          <span className="text-muted-foreground">
-            {t('dataGrid.page')} {currentPage + 1} / {totalPages}
-          </span>
           <button
             onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
             disabled={currentPage >= totalPages - 1}
@@ -385,10 +418,17 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
             {t('dataGrid.nextPage')}
           </button>
         </div>
-        <div className="text-muted-foreground">
-          {elementsPerPage} {t('dataGrid.regsPerPage')}
-        </div>
       </div>
+
+      {/* Tooltip */}
+      {tooltip && (
+        <div
+          className="fixed z-50 bg-panel border border-border rounded px-2 py-1.5 shadow-lg pointer-events-none"
+          style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
+        >
+          {tooltip.content}
+        </div>
+      )}
     </div>
   );
 }

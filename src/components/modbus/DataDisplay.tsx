@@ -79,6 +79,7 @@ interface DataDisplayProps {
 // Grid config per display mode
 // rows x cols, regs per cell, regs per page, total pages
 const GRID_CONFIG: Record<DisplayFormat, { rows: number; cols: number; regsPerCell: number; regsPerPage: number; totalPages: number }> = {
+  sht: { rows: 16, cols: 16, regsPerCell: 1, regsPerPage: 256, totalPages: 256 },
   hex: { rows: 16, cols: 16, regsPerCell: 1, regsPerPage: 256, totalPages: 256 },
   dec: { rows: 16, cols: 16, regsPerCell: 1, regsPerPage: 256, totalPages: 256 },
   bin: { rows: 16, cols: 4, regsPerCell: 1, regsPerPage: 64, totalPages: 1024 },
@@ -141,7 +142,7 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
       // 8 cols: 0-7 (C digit for doubles, each double = 4 regs, so C = 0-7)
       return Array.from({ length: 8 }, (_, i) => HEX_CHARS[i]);
     }
-    // hex/dec: 16 cols, 0-F
+    // hex/dec/sht: 16 cols, 0-F
     return ROW_HEADERS_16;
   }, [displayFormat, currentPage]);
 
@@ -242,6 +243,10 @@ export function DataDisplay({ readResults, isPolling, pollConfig, onRead, readTr
     const numVal = val & 0xffff;
     if (displayFormat === 'hex') return numVal.toString(16).toUpperCase().padStart(4, '0');
     if (displayFormat === 'bin') return numVal.toString(2).padStart(16, '0');
+    if (displayFormat === 'sht') {
+      // SHT: signed 16-bit integer
+      return numVal > 32767 ? (numVal - 65536).toString() : numVal.toString();
+    }
     if (!signed) return numVal.toString();
     return numVal > 32767 ? (numVal - 65536).toString() : numVal.toString();
   };

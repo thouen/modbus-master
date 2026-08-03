@@ -108,46 +108,24 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       const result = await onRead(currentTab.functionCode, currentTab.startAddr, currentTab.quantity);
       if (result) {
         const numValues = result.values.filter((v): v is number => typeof v === 'number');
-        // Convert 16-bit register values to 32-bit values
-        // Combine pairs of registers based on byte order
-        const dataValues: number[] = [];
-        for (let i = 0; i < currentTab.quantity; i += 2) {
-          const low = i < numValues.length ? numValues[i] : 0;
-          const high = i + 1 < numValues.length ? numValues[i + 1] : 0;
-          // LE: low register first, high register second
-          // BE: high register first, low register second
-          const val32 = byteOrder === 'LE' 
-            ? (low & 0xFFFF) | ((high & 0xFFFF) << 16)
-            : ((low & 0xFFFF) << 16) | (high & 0xFFFF);
-          dataValues.push(val32);
-        }
-        // If quantity is odd, add the last value
-        if (currentTab.quantity % 2 === 1 && numValues.length >= currentTab.quantity) {
-          const lastVal = numValues[currentTab.quantity - 1];
-          dataValues.push(byteOrder === 'LE' ? (lastVal & 0xFFFF) : ((lastVal & 0xFFFF) << 16));
+        // Store 16-bit register values directly
+        const dataValues: number[] = numValues.slice(0, currentTab.quantity);
+        // Pad with zeros if needed
+        while (dataValues.length < currentTab.quantity) {
+          dataValues.push(0);
         }
         updateTab(activeTab, { dataValues });
         // Jump to page containing startAddr
-        const page = Math.floor(currentTab.startAddr / 128);
+        const regsPerPage = displayFormat === 'dbl' ? 256 : (displayFormat === 'sht' || displayFormat === 'bin' ? 256 : 128);
+        const page = Math.floor(currentTab.startAddr / regsPerPage);
         setCurrentPage(page);
       }
     } else {
-      // Write operation - convert 32-bit values to 16-bit register pairs
-      const values32 = currentTab.dataValues.slice(0, Math.ceil(currentTab.quantity / 2));
-      const values16: number[] = [];
-      for (const val32 of values32) {
-        const low = val32 & 0xFFFF;
-        const high = (val32 >>> 16) & 0xFFFF;
-        if (byteOrder === 'LE') {
-          values16.push(low, high);
-        } else {
-          values16.push(high, low);
-        }
-      }
-      // Truncate to quantity
-      await onWrite(currentTab.functionCode, currentTab.startAddr, values16.slice(0, currentTab.quantity));
+      // Write operation - send 16-bit values directly
+      const values16 = currentTab.dataValues.slice(0, currentTab.quantity);
+      await onWrite(currentTab.functionCode, currentTab.startAddr, values16);
     }
-  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead, byteOrder]);
+  }, [onRead, onWrite, currentTab, activeTab, updateTab, isRead, displayFormat]);
 
   const handleStartPolling = useCallback(() => {
     if (!isRead || !currentTab) return;
@@ -171,7 +149,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
   }, [activeTab, updateTab]);
 
   const addTab = useCallback(() => {
-    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 125, dataValues: new Array(125).fill(0), isPolling: false, pollInterval: 1000 };
+    const newTab: TabData = { functionCode: 3, startAddr: 0, quantity: 256, dataValues: new Array(256).fill(0), isPolling: false, pollInterval: 1000 };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(tabs.length);
   }, [tabs.length]);
@@ -375,7 +353,7 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
       {/* Format Selection */}
       <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
         <div className="flex items-center gap-1">
-          {(['hex', 'dec', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
+          {(['sht', 'hex', 'dec', 'bin', 'flt', 'dbl'] as DisplayFormat[]).map((fmt) => (
             <button
               key={fmt}
               onClick={() => setDisplayFormat(fmt)}
