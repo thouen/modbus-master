@@ -174,6 +174,25 @@ class ModbusClientManager {
     return 'Unknown error';
   }
 
+  /**
+   * 解析 Modbus 异常码（Modbus 规范定义）
+   * 异常码 = 功能码 + 0x80，数据字节为异常码
+   */
+  private getModbusExceptionMessage(exceptionCode: number): string {
+    const exceptions: Record<number, string> = {
+      1: 'Illegal Function (非法功能码)',
+      2: 'Illegal Data Address (非法数据地址)',
+      3: 'Illegal Data Value (非法数据值)',
+      4: 'Slave Device Failure (从站设备故障)',
+      5: 'Acknowledge (确认)',
+      6: 'Slave Device Busy (从站设备忙)',
+      8: 'Memory Parity Error (存储奇偶校验错误)',
+      10: 'Gateway Path Unavailable (网关路径不可用)',
+      11: 'Gateway Target Device Failed to Respond (网关目标设备无响应)',
+    };
+    return exceptions[exceptionCode] || `Unknown Exception Code ${exceptionCode}`;
+  }
+
   private ensureConnected(): void {
     if (!this.connected || !this.client) {
       throw new Error('Not connected to any Modbus device');

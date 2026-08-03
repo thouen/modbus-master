@@ -24,6 +24,29 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Modbus 规范数量限制：
+    // FC05/FC06（写单个）：必须为 1 个
+    // FC15（写多个线圈）：最大 1968 个
+    // FC16（写多个寄存器）：最大 123 个
+    if (functionCode === 5 || functionCode === 6) {
+      if (values.length !== 1) {
+        return NextResponse.json(
+          { success: false, error: `FC${functionCode} requires exactly 1 value` },
+          { status: 400 }
+        );
+      }
+    } else if (functionCode === 15 && values.length > 1968) {
+      return NextResponse.json(
+        { success: false, error: 'FC15: maximum 1968 coils allowed' },
+        { status: 400 }
+      );
+    } else if (functionCode === 16 && values.length > 123) {
+      return NextResponse.json(
+        { success: false, error: 'FC16: maximum 123 registers allowed' },
+        { status: 400 }
+      );
+    }
     // Filter out NaN/Infinity values that could cause buffer length mismatch
     const cleanValues = values.filter((v: number | boolean) => typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)));
     if (cleanValues.length === 0) {

@@ -23,9 +23,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (typeof quantity !== 'number' || quantity < 1 || quantity > 125) {
+    // Modbus 规范数量限制：
+    // FC01/FC02（读线圈/离散输入）：最大 2000 个
+    // FC03/FC04（读寄存器）：最大 125 个
+    const maxQuantity = (functionCode === 1 || functionCode === 2) ? 2000 : 125;
+    if (typeof quantity !== 'number' || quantity < 1 || quantity > maxQuantity) {
       return NextResponse.json(
-        { success: false, error: 'Valid quantity (1-125) is required' },
+        { success: false, error: `Valid quantity (1-${maxQuantity}) is required for FC${functionCode}` },
         { status: 400 }
       );
     }
