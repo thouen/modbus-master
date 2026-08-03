@@ -117,10 +117,6 @@ const resources = {
           },
         },
       },
-      status: {
-        online: '在线',
-        offline: '离线',
-      },
       lang: {
         zh: '中文',
         en: 'English',
@@ -238,10 +234,6 @@ const resources = {
             rtu_tcp: 'Modbus RTU over TCP/IP',
           },
         },
-      },
-      status: {
-        online: 'Online',
-        offline: 'Offline',
       },
       lang: {
         zh: '中文',
