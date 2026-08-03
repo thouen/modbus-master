@@ -42,25 +42,40 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
     if (log.type === 'connect' && log.success) {
       // Extract host:port from message if possible
       const match = log.message.match(/(\d+\.\d+\.\d+\.\d+):(\d+)/);
+      // Extract protocol
+      const protocolMatch = log.message.match(/via (Modbus \w+(?: over \w+)?)/);
+      // Extract unit ID
+      const unitIdMatch = log.message.match(/Unit ID: (\d+)/);
       if (match) {
-        return t('log.msg.connected', { host: match[1], port: match[2] });
+        const protocol = protocolMatch ? protocolMatch[1].toLowerCase().replace(/ /g, '_').replace('modbus_', '') : 'tcp';
+        const unitId = unitIdMatch ? unitIdMatch[1] : '1';
+        return t('log.msg.connectedFull', { host: match[1], port: match[2], protocol: t(`log.msg.protocol.${protocol}`), unitId });
       }
       return t('log.msg.connected', { host: '---', port: '---' });
     }
     if (log.type === 'disconnect') {
+      // Extract host:port from message if possible
+      const match = log.message.match(/(\d+\.\d+\.\d+\.\d+):(\d+)/);
+      if (match) {
+        return t('log.msg.disconnectedFull', { host: match[1], port: match[2] });
+      }
       return t('log.msg.disconnected');
     }
     if (log.type === 'read') {
       if (log.success) {
         const count = log.values?.length ?? log.quantity ?? 0;
-        return t('log.msg.readSuccess', { count });
+        const fc = log.functionCode ? `FC${log.functionCode.toString().padStart(2, '0')}` : '';
+        const address = log.address !== undefined ? `0x${log.address.toString(16).toUpperCase().padStart(4, '0')}` : '';
+        return t('log.msg.readSuccess', { fc, address, count });
       }
       return t('log.msg.readFailed');
     }
     if (log.type === 'write') {
       if (log.success) {
         const count = log.values?.length ?? log.quantity ?? 0;
-        return t('log.msg.writeSuccess', { count });
+        const fc = log.functionCode ? `FC${log.functionCode.toString().padStart(2, '0')}` : '';
+        const address = log.address !== undefined ? `0x${log.address.toString(16).toUpperCase().padStart(4, '0')}` : '';
+        return t('log.msg.writeSuccess', { fc, address, count });
       }
       return t('log.msg.writeFailed');
     }
@@ -68,6 +83,11 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       // For errors, show the original message but with translated prefix if possible
       if (log.message?.includes('Not connected')) {
         return t('log.msg.notConnected');
+      }
+      if (log.message?.includes('Connection failed')) {
+        const errorMatch = log.message.match(/Connection failed: (.+)/);
+        const error = errorMatch ? errorMatch[1] : log.message;
+        return t('log.msg.connectionFailed', { error });
       }
       return log.message || t('log.msg.readFailed');
     }
