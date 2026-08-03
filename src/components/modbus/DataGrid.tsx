@@ -43,17 +43,23 @@ function parseInputValue(input: string): number {
   // Binary with spaces: "0b0000 0000 1001 1010"
   if (trimmed.startsWith('0b') || trimmed.startsWith('0B')) {
     const binStr = trimmed.slice(2).replace(/\s+/g, '');
-    return parseInt(binStr, 2);
+    const val = parseInt(binStr, 2);
+    return isNaN(val) ? 0 : Math.min(val, 0xFFFFFFFF);
   }
   
   // Hex: "0xABCd" (case-insensitive)
   if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
-    return parseInt(trimmed.slice(2), 16);
+    const val = parseInt(trimmed.slice(2), 16);
+    return isNaN(val) ? 0 : Math.min(val, 0xFFFFFFFF);
   }
   
   // Signed decimal: "-123"
   const num = parseInt(trimmed, 10);
-  return isNaN(num) ? 0 : num;
+  if (isNaN(num)) return 0;
+  // Clamp to valid 32-bit unsigned integer range (0 to 4294967295)
+  if (num < 0) return 0;
+  if (num > 0xFFFFFFFF) return 0xFFFFFFFF;
+  return num;
 }
 
 interface DataGridProps {
