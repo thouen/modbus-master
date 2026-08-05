@@ -315,7 +315,7 @@ export function DataGrid({ data, startAddr, quantity, displayFormat, byteOrder, 
         >
           {/* Header row */}
           <div className="bg-panel border-b border-r border-border flex items-center justify-center text-xs font-mono text-muted-foreground">
-            {t('dataGrid.row')}
+            
           </div>
           {colHeaders.map((h, i) => (
             <div key={i} className="bg-panel border-b border-border flex items-center justify-center text-xs font-mono text-accent">

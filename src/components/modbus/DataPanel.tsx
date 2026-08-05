@@ -361,10 +361,10 @@ export function DataPanel({ onRead, onWrite }: DataPanelProps) {
                   : 'bg-panel hover:bg-accent'
               }`}
             >
-              {fmt === 'hex' ? t('displayFormat.hex') :
+              {fmt === 'hex' ? t('displayFormat.hexadecimal') :
                fmt === 'bin' ? t('displayFormat.binary') :
                fmt === 'flt' ? t('displayFormat.float') :
-               fmt.toUpperCase()}
+               t('displayFormat.decimal')}
             </button>
           ))}
         </div>

@@ -66,6 +66,12 @@ const resources = {
       dataPanel: {
         functionCode: '功能码',
       },
+      displayFormat: {
+        decimal: '十进制',
+        hexadecimal: '十六进制',
+        binary: '二进制',
+        float: '浮点数',
+      },
       dataGrid: {
         address: '地址',
         decimal: '十进制',
@@ -185,6 +191,12 @@ const resources = {
       },
       dataPanel: {
         functionCode: 'Function Code',
+      },
+      displayFormat: {
+        decimal: 'Decimal',
+        hexadecimal: 'Hexadecimal',
+        binary: 'Binary',
+        float: 'Float',
       },
       dataGrid: {
         address: 'Address',

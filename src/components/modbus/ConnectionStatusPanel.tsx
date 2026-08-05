@@ -93,7 +93,7 @@ export function ConnectionStatusPanel({
           <span className="text-foreground">{activeConnection.host}:{activeConnection.port}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">{t('connection.uid')}:</span>
+          <span className="text-muted-foreground">{t('connection.unitId')}:</span>
           <span className="text-foreground">{activeConnection.unitId}</span>
         </div>
         {isConnected && connectionTime && (
