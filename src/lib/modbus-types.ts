@@ -46,6 +46,10 @@ export interface ConnectionConfig {
   tcpConfig?: TcpConfig;
   udpConfig?: UdpConfig;
   slaveId: number;
+  /** Per-connection default byte order for 32-bit values */
+  byteOrder32: ByteOrder32;
+  /** Per-connection default byte order for 64-bit values */
+  byteOrder64: ByteOrder64;
 }
 
 export interface RegisterTab {
@@ -72,7 +76,7 @@ export interface LogEntry {
   timestamp: number;
   connectionId: string;
   tabId?: string; // optional: which tab triggered this log
-  direction: 'tx' | 'rx';
+  direction: 'tx' | 'rx' | 'sys';
   type: 'info' | 'data' | 'error';
   message: string;
   rawData?: string;

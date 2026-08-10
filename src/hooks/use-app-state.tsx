@@ -7,6 +7,9 @@ import type {
   RegisterData,
   LogEntry,
   SavedProfile,
+  ByteOrder32,
+  ByteOrder64,
+  FunctionCode,
 } from '@/lib/modbus-types';
 import { generateId } from '@/lib/modbus-utils';
 
@@ -20,9 +23,12 @@ interface AppState {
   profiles: SavedProfile[];
   showConnectionPanel: boolean;
   editingConnection: ConnectionConfig | null;
+  /** Global default byte order for new connections */
+  globalByteOrder32: ByteOrder32;
+  globalByteOrder64: ByteOrder64;
 }
 
-type Action =
+export type Action =
   | { type: 'ADD_CONNECTION'; payload: ConnectionConfig }
   | { type: 'UPDATE_CONNECTION'; payload: ConnectionConfig }
   | { type: 'DELETE_CONNECTION'; payload: string }
@@ -38,7 +44,8 @@ type Action =
   | { type: 'LOAD_PROFILE'; payload: SavedProfile }
   | { type: 'DELETE_PROFILE'; payload: string }
   | { type: 'TOGGLE_CONNECTION_PANEL'; payload?: boolean }
-  | { type: 'SET_EDITING_CONNECTION'; payload: ConnectionConfig | null };
+  | { type: 'SET_EDITING_CONNECTION'; payload: ConnectionConfig | null }
+  | { type: 'SET_GLOBAL_BYTE_ORDER'; payload: { type: '32' | '64'; order: ByteOrder32 | ByteOrder64 } };
 
 const initialState: AppState = {
   connections: [],
@@ -50,17 +57,42 @@ const initialState: AppState = {
   profiles: [],
   showConnectionPanel: false,
   editingConnection: null,
+  globalByteOrder32: 'ABCD',
+  globalByteOrder64: 'ABCDEFGH',
 };
+
+/** Create a default tab for a given connection */
+function createDefaultTab(connectionId: string, tabIndex: number, conn: ConnectionConfig): RegisterTab {
+  return {
+    id: generateId(),
+    name: `Reg ${tabIndex}`,
+    connectionId,
+    startAddress: 0,
+    registerCount: 10,
+    functionCode: '03' as FunctionCode,
+    pollInterval: 1000,
+    displayFormat: 'hex',
+    byteOrder32: conn.byteOrder32,
+    byteOrder64: conn.byteOrder64,
+    isPolling: false,
+  };
+}
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'ADD_CONNECTION':
+    case 'ADD_CONNECTION': {
+      // Auto-create a default tab for the new connection
+      const tabIndex = state.tabs.filter(t => t.connectionId === action.payload.id).length + 1;
+      const defaultTab = createDefaultTab(action.payload.id, tabIndex, action.payload);
       return {
         ...state,
         connections: [...state.connections, action.payload],
         connectionStatus: { ...state.connectionStatus, [action.payload.id]: 'disconnected' },
         logs: { ...state.logs, [action.payload.id]: [] },
+        tabs: [...state.tabs, defaultTab],
+        activeTabId: state.activeTabId ?? defaultTab.id,
       };
+    }
     case 'UPDATE_CONNECTION':
       return {
         ...state,
@@ -70,6 +102,10 @@ function appReducer(state: AppState, action: Action): AppState {
       };
     case 'DELETE_CONNECTION': {
       const { [action.payload]: _removedLogs, ...remainingLogs } = state.logs;
+      const remainingTabs = state.tabs.filter(t => t.connectionId !== action.payload);
+      const newActiveId = state.activeTabId && state.tabs.find(t => t.id === state.activeTabId)?.connectionId === action.payload
+        ? (remainingTabs.length > 0 ? remainingTabs[remainingTabs.length - 1].id : null)
+        : state.activeTabId;
       return {
         ...state,
         connections: state.connections.filter(c => c.id !== action.payload),
@@ -77,6 +113,8 @@ function appReducer(state: AppState, action: Action): AppState {
           Object.entries(state.connectionStatus).filter(([k]) => k !== action.payload)
         ),
         logs: remainingLogs,
+        tabs: remainingTabs,
+        activeTabId: newActiveId,
       };
     }
     case 'SET_CONNECTION_STATUS':
@@ -168,6 +206,11 @@ function appReducer(state: AppState, action: Action): AppState {
       };
     case 'SET_EDITING_CONNECTION':
       return { ...state, editingConnection: action.payload };
+    case 'SET_GLOBAL_BYTE_ORDER':
+      if (action.payload.type === '32') {
+        return { ...state, globalByteOrder32: action.payload.order as ByteOrder32 };
+      }
+      return { ...state, globalByteOrder64: action.payload.order as ByteOrder64 };
     default:
       return state;
   }
@@ -198,4 +241,3 @@ export function useAppState() {
 }
 
 export { generateId };
-export type { Action };

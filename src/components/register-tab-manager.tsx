@@ -29,26 +29,28 @@ function getFormatLabel(format: DataDisplayFormat, t: (key: TranslationKey) => s
 export function RegisterTabManager() {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
-  const [showConfig, setShowConfig] = useState(false);
+  const [showConfig, setShowConfig] = useState(true);
 
   const activeTab = state.tabs.find(tab => tab.id === state.activeTabId);
 
   const handleAddTab = () => {
     const connectionId = state.connections.length > 0 ? state.connections[0].id : '';
+    const conn = state.connections.find(c => c.id === connectionId);
     const newTab: RegisterTab = {
       id: generateId(),
-      name: `Tab ${state.tabs.length + 1}`,
+      name: `Reg ${state.tabs.length + 1}`,
       connectionId,
       startAddress: 0,
       registerCount: 10,
       functionCode: '03',
       pollInterval: 1000,
       displayFormat: 'hex',
-      byteOrder32: 'ABCD',
-      byteOrder64: 'ABCDEFGH',
+      byteOrder32: conn?.byteOrder32 ?? state.globalByteOrder32,
+      byteOrder64: conn?.byteOrder64 ?? state.globalByteOrder64,
       isPolling: false,
     };
     dispatch({ type: 'ADD_TAB', payload: newTab });
+    setShowConfig(true);
   };
 
   const handleDeleteTab = (tabId: string) => {
@@ -57,6 +59,7 @@ export function RegisterTabManager() {
 
   const handleTabChange = (tabId: string) => {
     dispatch({ type: 'SET_ACTIVE_TAB', payload: tabId });
+    setShowConfig(true);
   };
 
   return (
@@ -67,6 +70,7 @@ export function RegisterTabManager() {
           <div className="flex items-center gap-1">
             {state.tabs.map(tab => {
               const conn = state.connections.find(c => c.id === tab.connectionId);
+              const status = conn ? state.connectionStatus[conn.id] : 'disconnected';
               return (
                 <button
                   key={tab.id}
@@ -81,8 +85,11 @@ export function RegisterTabManager() {
                   <span className="text-[9px] text-muted-foreground/60 hidden group-hover:inline">
                     {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + tab.registerCount - 1}
                   </span>
-                  {tab.isPolling && (
+                  {tab.isPolling && status === 'connected' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  )}
+                  {tab.isPolling && status !== 'connected' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Connection not established" />
                   )}
                   <span
                     className="ml-1 text-muted-foreground hover:text-red-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
@@ -155,7 +162,14 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('connection')}</label>
-          <Select value={tab.connectionId} onValueChange={v => updateTab({ connectionId: v })}>
+          <Select value={tab.connectionId} onValueChange={v => {
+            const newConn = state.connections.find(c => c.id === v);
+            updateTab({
+              connectionId: v,
+              byteOrder32: newConn?.byteOrder32 ?? tab.byteOrder32,
+              byteOrder64: newConn?.byteOrder64 ?? tab.byteOrder64,
+            });
+          }}>
             <SelectTrigger className="h-7 text-xs bg-background border-border">
               <SelectValue />
             </SelectTrigger>
@@ -223,38 +237,35 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {(tab.displayFormat === 'long' || tab.displayFormat === 'ulong' || tab.displayFormat === 'float') && (
-          <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (32-bit)</label>
-            <Select value={tab.byteOrder32} onValueChange={v => updateTab({ byteOrder32: v as ByteOrder32 })}>
-              <SelectTrigger className="h-7 text-xs bg-background border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ABCD">ABCD ({t('bigEndian')})</SelectItem>
-                <SelectItem value="DCBA">DCBA ({t('littleEndian')})</SelectItem>
-                <SelectItem value="BADC">BADC ({t('bigEndianSwap')})</SelectItem>
-                <SelectItem value="CDAB">CDAB ({t('littleEndianSwap')})</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        {tab.displayFormat === 'double' && (
-          <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (64-bit)</label>
-            <Select value={tab.byteOrder64} onValueChange={v => updateTab({ byteOrder64: v as ByteOrder64 })}>
-              <SelectTrigger className="h-7 text-xs bg-background border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ABCDEFGH">ABCDEFGH ({t('bigEndian')})</SelectItem>
-                <SelectItem value="HGFEDCBA">HGFEDCBA ({t('littleEndian')})</SelectItem>
-                <SelectItem value="BADCFEHG">BADCFEHG ({t('bigEndianSwap')})</SelectItem>
-                <SelectItem value="GHEFCDAB">GHEFCDAB ({t('littleEndianSwap')})</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        {/* Always show byte order selectors - they apply to any format that uses multiple registers */}
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (32-bit)</label>
+          <Select value={tab.byteOrder32} onValueChange={v => updateTab({ byteOrder32: v as ByteOrder32 })}>
+            <SelectTrigger className="h-7 text-xs bg-background border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ABCD">ABCD ({t('bigEndian')})</SelectItem>
+              <SelectItem value="DCBA">DCBA ({t('littleEndian')})</SelectItem>
+              <SelectItem value="BADC">BADC ({t('bigEndianSwap')})</SelectItem>
+              <SelectItem value="CDAB">CDAB ({t('littleEndianSwap')})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (64-bit)</label>
+          <Select value={tab.byteOrder64} onValueChange={v => updateTab({ byteOrder64: v as ByteOrder64 })}>
+            <SelectTrigger className="h-7 text-xs bg-background border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ABCDEFGH">ABCDEFGH ({t('bigEndian')})</SelectItem>
+              <SelectItem value="HGFEDCBA">HGFEDCBA ({t('littleEndian')})</SelectItem>
+              <SelectItem value="BADCFEHG">BADCFEHG ({t('bigEndianSwap')})</SelectItem>
+              <SelectItem value="GHEFCDAB">GHEFCDAB ({t('littleEndianSwap')})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('pollInterval')}</label>
           <Input
@@ -281,7 +292,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           variant="outline"
           className="h-7 text-xs"
           onClick={() => {
-            // Trigger single read
             if (connection) {
               simulateRead(tab, connection, dispatch);
             }
@@ -289,7 +299,9 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         >
           {t('readOnce')}
         </Button>
-        <span className="text-[10px] text-muted-foreground ml-auto">{t('maxRegisters')}</span>
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {connection ? `${connection.byteOrder32} / ${connection.byteOrder64}` : ''}
+        </span>
       </div>
     </div>
   );
@@ -322,7 +334,7 @@ function simulateRead(tab: RegisterTab, connection: ConnectionConfig, dispatch: 
     tabId: tab.id,
     direction: 'tx',
     type: 'data',
-    message: `[${tab.name}] FC${tab.functionCode} Addr:${tab.startAddress} Qty:${tab.registerCount}`,
+    message: `[${tab.name}] FC${tab.functionCode} Start:${tab.startAddress} Qty:${tab.registerCount}`,
     rawData: toHexString(txFrame),
   };
 
@@ -346,7 +358,7 @@ function simulateRead(tab: RegisterTab, connection: ConnectionConfig, dispatch: 
       tabId: tab.id,
       direction: 'rx',
       type: 'data',
-      message: `[${tab.name}] Response ${tab.registerCount} registers`,
+      message: `[${tab.name}] Response ${tab.registerCount} regs | ${tab.registerCount * 2} bytes`,
       rawData: toHexString(rxBytes),
     };
 
@@ -377,7 +389,6 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
     );
   }
 
-  // Calculate display rows based on format
   const displayRows = data.length / regsPerValue;
 
   return (
@@ -395,6 +406,9 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         <span>Addr: {tab.startAddress} ~ {tab.startAddress + tab.registerCount - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
+        {regsPerValue > 1 && (
+          <span className="text-cyan-400/70">32:{tab.byteOrder32} / 64:{tab.byteOrder64}</span>
+        )}
         <span className="ml-auto">{Math.floor(displayRows)} values</span>
         {tab.isPolling && (
           <span className="text-green-400 flex items-center gap-1">
@@ -511,18 +525,21 @@ export function usePolling() {
     for (const tab of currentPolling) {
       if (!intervalsRef.current[tab.id]) {
         const conn = state.connections.find(c => c.id === tab.connectionId);
-        if (conn) {
+        // Only poll if connection exists and is connected
+        if (conn && state.connectionStatus[conn.id] === 'connected') {
           intervalsRef.current[tab.id] = setInterval(() => {
-            simulateRead(tab, conn, dispatch);
+            // Re-check connection status each poll tick
+            const currentConn = state.connections.find(c => c.id === tab.connectionId);
+            if (currentConn && state.connectionStatus[currentConn.id] === 'connected') {
+              simulateRead(tab, currentConn, dispatch);
+            }
           }, tab.pollInterval);
         }
       }
     }
 
-    return () => {
-      // Cleanup on unmount
-    };
-  }, [state.tabs, state.connections, dispatch]);
+    // Cleanup on unmount
+  }, [state.tabs, state.connections, state.connectionStatus, dispatch]);
 
   // Cleanup on unmount
   useEffect(() => {

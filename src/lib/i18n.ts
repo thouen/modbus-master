@@ -70,6 +70,10 @@ export const translations = {
     littleEndian: 'Little-endian',
     bigEndianSwap: 'Big-endian byte swap',
     littleEndianSwap: 'Little-endian byte swap',
+    globalByteOrder32: 'Global 32-bit byte order',
+    globalByteOrder64: 'Global 64-bit byte order',
+    connectionByteOrder32: '32-bit byte order (default for new tabs)',
+    connectionByteOrder64: '64-bit byte order (default for new tabs)',
 
     // Function Codes
     fc01: '01 - Read Coils',
@@ -201,6 +205,10 @@ export const translations = {
     littleEndian: '小端序',
     bigEndianSwap: '大端字节交换',
     littleEndianSwap: '小端字节交换',
+    globalByteOrder32: '全局32位字节序',
+    globalByteOrder64: '全局64位字节序',
+    connectionByteOrder32: '32位字节序（新标签默认）',
+    connectionByteOrder64: '64位字节序（新标签默认）',
 
     // Function Codes
     fc01: '01 - 读线圈',

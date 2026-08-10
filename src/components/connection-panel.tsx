@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAppState } from '@/hooks/use-app-state';
-import type { ConnectionConfig, Protocol, Mode } from '@/lib/modbus-types';
+import type { ConnectionConfig, Protocol, Mode, ByteOrder32, ByteOrder64, LogEntry } from '@/lib/modbus-types';
 import { generateId } from '@/lib/modbus-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+/** Helper to create a system log entry */
+function createSysLog(conn: ConnectionConfig, message: string): LogEntry {
+  return {
+    id: generateId(),
+    timestamp: new Date().getTime(),
+    connectionId: conn.id,
+    direction: 'sys',
+    type: 'info',
+    message,
+  };
+}
 
 export function ConnectionPanel() {
   const { t } = useI18n();
@@ -31,14 +43,38 @@ export function ConnectionPanel() {
     dispatch({ type: 'DELETE_CONNECTION', payload: id });
   };
 
-  const handleConnect = (id: string) => {
-    const currentStatus = state.connectionStatus[id];
+  const handleConnect = (conn: ConnectionConfig) => {
+    const currentStatus = state.connectionStatus[conn.id];
+
     if (currentStatus === 'connected') {
-      dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id, status: 'disconnected' } });
+      // Disconnect: just change status, keep tabs and logs
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id: conn.id, status: 'disconnected' } });
+      dispatch({
+        type: 'ADD_LOG',
+        payload: {
+          connectionId: conn.id,
+          log: createSysLog(conn, `[${conn.name}] Disconnected (${conn.protocol.toUpperCase()}/${conn.mode.toUpperCase()})`),
+        },
+      });
     } else {
-      dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id, status: 'connecting' } });
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id: conn.id, status: 'connecting' } });
+      dispatch({
+        type: 'ADD_LOG',
+        payload: {
+          connectionId: conn.id,
+          log: createSysLog(conn, `[${conn.name}] Connecting... (${conn.protocol.toUpperCase()}/${conn.mode.toUpperCase()} Slave:${conn.slaveId})`),
+        },
+      });
+
       setTimeout(() => {
-        dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id, status: 'connected' } });
+        dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id: conn.id, status: 'connected' } });
+        dispatch({
+          type: 'ADD_LOG',
+          payload: {
+            connectionId: conn.id,
+            log: createSysLog(conn, `[${conn.name}] Connected successfully`),
+          },
+        });
       }, 1000);
     }
   };
@@ -102,6 +138,10 @@ export function ConnectionPanel() {
                   <span>Slave:{conn.slaveId}</span>
                   <span className="truncate">{configDetail}</span>
                 </div>
+                <div className="flex items-center text-[10px] text-muted-foreground/50 pl-4 gap-2">
+                  <span>32:{conn.byteOrder32}</span>
+                  <span>64:{conn.byteOrder64}</span>
+                </div>
                 <div className="flex items-center justify-between pl-4">
                   <div className="flex items-center gap-2 text-[9px] text-muted-foreground/60">
                     <span>{tabCount} tabs</span>
@@ -112,7 +152,7 @@ export function ConnectionPanel() {
                       size="sm"
                       variant="ghost"
                       className="h-5 px-1.5 text-[9px]"
-                      onClick={() => handleConnect(conn.id)}
+                      onClick={() => handleConnect(conn)}
                     >
                       {status === 'connected' ? (
                         <span className="text-red-400">{t('disconnect')}</span>
@@ -161,6 +201,8 @@ function ConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
   const [port, setPort] = useState(editing?.tcpConfig?.port ?? 502);
   const [serialPort, setSerialPort] = useState(editing?.serialConfig?.port ?? '/dev/ttyUSB0');
   const [baudRate, setBaudRate] = useState(editing?.serialConfig?.baudRate ?? 9600);
+  const [byteOrder32, setByteOrder32] = useState<ByteOrder32>(editing?.byteOrder32 ?? state.globalByteOrder32);
+  const [byteOrder64, setByteOrder64] = useState<ByteOrder64>(editing?.byteOrder64 ?? state.globalByteOrder64);
 
   const handleSave = () => {
     const config: ConnectionConfig = {
@@ -169,13 +211,15 @@ function ConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
       protocol,
       mode,
       slaveId,
+      byteOrder32,
+      byteOrder64,
       ...(protocol === 'serial' ? {
         serialConfig: {
           port: serialPort,
           baudRate,
-          dataBits: 8,
-          stopBits: 1,
-          parity: 'none',
+          dataBits: 8 as const,
+          stopBits: 1 as const,
+          parity: 'none' as const,
         },
       } : protocol === 'tcp' ? {
         tcpConfig: { host, port },
@@ -247,6 +291,37 @@ function ConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
               max={247}
               onChange={e => setSlaveId(Number(e.target.value))}
             />
+          </div>
+          {/* Byte Order Configuration */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">{t('connectionByteOrder32')}</label>
+              <Select value={byteOrder32} onValueChange={v => setByteOrder32(v as ByteOrder32)}>
+                <SelectTrigger className="h-8 text-xs bg-background border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ABCD">ABCD ({t('bigEndian')})</SelectItem>
+                  <SelectItem value="DCBA">DCBA ({t('littleEndian')})</SelectItem>
+                  <SelectItem value="BADC">BADC ({t('bigEndianSwap')})</SelectItem>
+                  <SelectItem value="CDAB">CDAB ({t('littleEndianSwap')})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">{t('connectionByteOrder64')}</label>
+              <Select value={byteOrder64} onValueChange={v => setByteOrder64(v as ByteOrder64)}>
+                <SelectTrigger className="h-8 text-xs bg-background border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ABCDEFGH">ABCDEFGH ({t('bigEndian')})</SelectItem>
+                  <SelectItem value="HGFEDCBA">HGFEDCBA ({t('littleEndian')})</SelectItem>
+                  <SelectItem value="BADCFEHG">BADCFEHG ({t('bigEndianSwap')})</SelectItem>
+                  <SelectItem value="GHEFCDAB">GHEFCDAB ({t('littleEndianSwap')})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           {protocol === 'serial' ? (
             <div className="grid grid-cols-2 gap-3">
