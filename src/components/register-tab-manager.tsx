@@ -208,11 +208,19 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
           <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start flex-wrap gap-0.5">
-            {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => (
-              <ToggleGroupItem key={fc} value={fc} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50">
-                FC{fc}
-              </ToggleGroupItem>
-            ))}
+            {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => {
+              const fcKey = `fc${fc}` as const;
+              return (
+                <ToggleGroupItem key={fc} value={fc} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50 group" title={t(fcKey)}>
+                  <span className="flex flex-col items-center leading-tight">
+                    <span className="font-mono">FC{fc}</span>
+                    <span className="text-[7px] text-muted-foreground/50 group-data-[state=on]:text-blue-400/60 hidden sm:inline whitespace-nowrap">
+                      {t(fcKey).replace(/^\d+ - /, '')}
+                    </span>
+                  </span>
+                </ToggleGroupItem>
+              );
+            })}
           </ToggleGroup>
         </div>
         <div className="space-y-1">

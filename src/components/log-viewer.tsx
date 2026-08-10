@@ -13,7 +13,9 @@ export function LogViewer() {
   const { state, dispatch } = useAppState();
   const [autoScroll, setAutoScroll] = useState(true);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const prevLogsLengthRef = useRef(0);
 
   const activeTab = state.tabs.find(tab => tab.id === state.activeTabId);
   const effectiveConnectionId = selectedConnectionId
@@ -34,20 +36,49 @@ export function LogViewer() {
     return map;
   }, [state.tabs]);
 
-  const doAutoScroll = useCallback(() => {
-    if (!autoScroll) return;
-    if (!viewportRef.current) {
-      viewportRef.current = document.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
-    }
-    if (viewportRef.current) {
-      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
-    }
-  }, [autoScroll]);
-
+  // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
-    const id = requestAnimationFrame(() => doAutoScroll());
-    return () => cancelAnimationFrame(id);
-  }, [logs, doAutoScroll]);
+    if (!autoScroll) return;
+
+    // Find the scroll viewport element
+    if (!scrollContainerRef.current) {
+      scrollContainerRef.current = document.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
+    }
+    const viewport = scrollContainerRef.current;
+    if (!viewport) return;
+
+    // Only auto-scroll when new logs are added (length increased)
+    if (logs.length > prevLogsLengthRef.current) {
+      requestAnimationFrame(() => {
+        viewport.scrollTop = viewport.scrollHeight;
+      });
+    }
+    prevLogsLengthRef.current = logs.length;
+  }, [logs.length, autoScroll]);
+
+  // Also scroll on first load
+  useEffect(() => {
+    if (!autoScroll || logs.length === 0) return;
+    const viewport = scrollContainerRef.current ?? document.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
+    if (viewport) {
+      scrollContainerRef.current = viewport;
+      requestAnimationFrame(() => {
+        viewport.scrollTop = viewport.scrollHeight;
+      });
+    }
+  }, [autoScroll, logs.length]);
+
+  const toggleExpand = (logId: string) => {
+    setExpandedLogs(prev => {
+      const next = new Set(prev);
+      if (next.has(logId)) {
+        next.delete(logId);
+      } else {
+        next.add(logId);
+      }
+      return next;
+    });
+  };
 
   const handleClear = () => {
     if (effectiveConnectionId) {
@@ -93,7 +124,16 @@ export function LogViewer() {
     for (let i = 0; i < bytes.length; i += 8) {
       groups.push(bytes.slice(i, i + 8).join(' '));
     }
-    return groups.join('  |  ');
+    return groups.join('  │  ');
+  };
+
+  const parseLogMessage = (message: string) => {
+    // Try to extract ModBus frame details from the message
+    // e.g. "FC03 Read holding registers: Addr=0, Qty=10"
+    const fcMatch = message.match(/FC(\d{2})/);
+    const addrMatch = message.match(/Addr=(\d+)/i);
+    const qtyMatch = message.match(/Qty=(\d+)/i);
+    return { fc: fcMatch?.[1], addr: addrMatch?.[1], qty: qtyMatch?.[1] };
   };
 
   return (
@@ -162,21 +202,39 @@ export function LogViewer() {
             </div>
           ) : (
             <div>
-              <div className="divide-y divide-border/10">
-                {logs.map(log => {
-                  const isSys = log.direction === 'sys';
-                  const isTx = log.direction === 'tx';
-                  const isError = log.type === 'error';
-                  const isInfo = log.type === 'info';
-                  let rowClass = 'flex items-start gap-2 px-3 py-1.5 transition-colors hover:bg-white/[0.02]';
-                  if (isError) rowClass += ' bg-red-500/[0.04] border-l-2 border-l-red-500/40';
-                  else if (isSys) rowClass += ' bg-amber-500/[0.03]';
-                  else if (isTx) rowClass += ' bg-blue-500/[0.02]';
-                  return (
-                    <div key={log.id} className={rowClass}>
+              {logs.map(log => {
+                const isExpanded = expandedLogs.has(log.id);
+                const isSys = log.direction === 'sys';
+                const isTx = log.direction === 'tx';
+                const isError = log.type === 'error';
+                const isInfo = log.type === 'info';
+                const isData = !isError && !isInfo;
+                const parsed = parseLogMessage(log.message);
+
+                let rowClass = 'flex flex-col transition-colors hover:bg-white/[0.03] cursor-pointer';
+                if (isError) rowClass += ' bg-red-500/[0.04]';
+                else if (isSys) rowClass += ' bg-amber-500/[0.03]';
+                else if (isTx) rowClass += ' bg-blue-500/[0.02]';
+
+                return (
+                  <div
+                    key={log.id}
+                    className={rowClass}
+                    onClick={() => toggleExpand(log.id)}
+                  >
+                    {/* Summary line */}
+                    <div className="flex items-start gap-2 px-3 py-1.5 min-h-0">
+                      {/* Expand/collapse indicator */}
+                      <span className="shrink-0 text-muted-foreground/30 text-[10px] leading-5 pt-0.5 w-3 text-center select-none transition-transform">
+                        {isExpanded ? '▼' : '▶'}
+                      </span>
+
+                      {/* Timestamp */}
                       <span className="text-muted-foreground/40 shrink-0 w-[80px] text-[11px] leading-5 pt-0.5 select-none">
                         {formatTime(log.timestamp)}
                       </span>
+
+                      {/* Direction badge */}
                       <span className={'shrink-0 w-[30px] text-center text-[10px] font-bold leading-5 rounded-sm select-none ' + (
                         isSys ? 'bg-amber-500/15 text-amber-400' :
                         isTx ? 'bg-blue-500/15 text-blue-400' :
@@ -184,11 +242,15 @@ export function LogViewer() {
                       )}>
                         {isSys ? 'SYS' : isTx ? 'TX' : 'RX'}
                       </span>
+
+                      {/* Tab name */}
                       {log.tabId && (
                         <span className="shrink-0 text-purple-400/60 text-[10px] leading-5 w-[48px] truncate select-none" title={tabNameMap[log.tabId]}>
                           {tabNameMap[log.tabId] ?? '?'}
                         </span>
                       )}
+
+                      {/* Type badge */}
                       <span className={'shrink-0 w-[28px] text-center text-[10px] leading-5 rounded-sm select-none ' + (
                         isError ? 'bg-red-500/15 text-red-400' :
                         isInfo ? 'bg-amber-500/15 text-amber-400' :
@@ -196,18 +258,74 @@ export function LogViewer() {
                       )}>
                         {isError ? 'ERR' : isInfo ? 'INF' : 'DAT'}
                       </span>
-                      <span className="text-foreground/85 text-[12px] leading-5 flex-1 break-all min-w-0">
+
+                      {/* Message - main content */}
+                      <span className="text-foreground/85 text-[12px] leading-5 flex-1 min-w-0 break-all">
                         {log.message}
                       </span>
-                      {log.rawData && (
-                        <span className="text-cyan-400/80 text-[11px] leading-5 max-w-[280px] shrink-0 font-mono select-all cursor-pointer hover:text-cyan-300 transition-colors truncate" title={log.rawData}>
+
+                      {/* Raw data preview (compact) */}
+                      {log.rawData && !isExpanded && (
+                        <span className="text-cyan-400/80 text-[11px] leading-5 max-w-[200px] shrink-0 font-mono select-all truncate" title={log.rawData}>
                           {formatHexDump(log.rawData)}
                         </span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Expanded details */}
+                    {isExpanded && (
+                      <div className="px-3 pb-2 pt-0.5 ml-3 border-l-2 border-border/30 ml-[22px]">
+                        {/* ModBus frame details */}
+                        {parsed.fc && (
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-muted-foreground/70 mb-1">
+                            <span>Function: <span className="text-foreground/80 font-mono">FC{parsed.fc}</span></span>
+                            {parsed.addr && <span>Address: <span className="text-foreground/80 font-mono">{parsed.addr}</span></span>}
+                            {parsed.qty && <span>Quantity: <span className="text-foreground/80 font-mono">{parsed.qty}</span></span>}
+                          </div>
+                        )}
+
+                        {/* Full raw data */}
+                        {log.rawData && (
+                          <div className="space-y-0.5">
+                            <div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">{t('rawData')}</div>
+                            <div className="bg-black/30 rounded p-2 font-mono text-[11px] leading-relaxed select-all">
+                              {/* Address header */}
+                              <div className="text-muted-foreground/40 text-[10px] mb-0.5">
+                                offset  │ 00 01 02 03 04 05 06 07
+                              </div>
+                              {/* Hex dump with line numbers */}
+                              {(() => {
+                                const bytes = log.rawData!.split(' ').filter(Boolean);
+                                const lines: { offset: string; hex: string; ascii: string }[] = [];
+                                const lineLen = 8;
+                                for (let i = 0; i < bytes.length; i += lineLen) {
+                                  const chunk = bytes.slice(i, i + lineLen);
+                                  const offset = i.toString(16).padStart(4, '0');
+                                  const hex = chunk.map(b => b.padStart(2, '0')).join(' ');
+                                  const ascii = chunk.map(b => {
+                                    const code = parseInt(b, 16);
+                                    return code >= 0x20 && code <= 0x7e ? String.fromCharCode(code) : '.';
+                                  }).join('');
+                                  lines.push({ offset, hex: hex.padEnd(lineLen * 3 - 1), ascii });
+                                }
+                                return lines.map(l => (
+                                  <div key={l.offset} className="text-cyan-300/90">
+                                    <span className="text-muted-foreground/40">{l.offset}</span>
+                                    {'  │  '}
+                                    <span className="text-cyan-300/90">{l.hex}</span>
+                                    {'  '}
+                                    <span className="text-muted-foreground/50">{l.ascii}</span>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </ScrollArea>
