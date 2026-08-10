@@ -8,6 +8,7 @@ import { generateId, formatRegisterValue, getRegistersPerValue, buildRTUFrame, t
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { TranslationKey } from '@/lib/i18n';
 
@@ -151,7 +152,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
 
   return (
     <div className="p-3 border-b border-border bg-muted/10 space-y-2">
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('tabName')}</label>
           <Input
@@ -202,69 +203,75 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             onChange={e => updateTab({ registerCount: Math.min(125, Number(e.target.value)) })}
           />
         </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
-          <Select value={tab.functionCode} onValueChange={v => updateTab({ functionCode: v as FunctionCode })}>
-            <SelectTrigger className="h-7 text-xs bg-background border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="01">{t('fc01')}</SelectItem>
-              <SelectItem value="02">{t('fc02')}</SelectItem>
-              <SelectItem value="03">{t('fc03')}</SelectItem>
-              <SelectItem value="04">{t('fc04')}</SelectItem>
-            </SelectContent>
-          </Select>
+          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start">
+            {(['01', '02', '03', '04'] as const).map(fc => (
+              <ToggleGroupItem key={fc} value={fc} size="sm" className="h-7 text-xs px-2 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50">
+                FC{fc}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('displayFormat')}</label>
-          <Select value={tab.displayFormat} onValueChange={v => updateTab({ displayFormat: v as DataDisplayFormat })}>
-            <SelectTrigger className="h-7 text-xs bg-background border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="led">{t('formatLed')}</SelectItem>
-              <SelectItem value="short">{t('formatShort')}</SelectItem>
-              <SelectItem value="ushort">{t('formatUShort')}</SelectItem>
-              <SelectItem value="hex">{t('formatHex')}</SelectItem>
-              <SelectItem value="binary">{t('formatBinary')}</SelectItem>
-              <SelectItem value="long">{t('formatLong')}</SelectItem>
-              <SelectItem value="ulong">{t('formatULong')}</SelectItem>
-              <SelectItem value="float">{t('formatFloat')}</SelectItem>
-              <SelectItem value="double">{t('formatDouble')}</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap gap-1">
+            <ToggleGroup type="single" value={tab.displayFormat} onValueChange={v => v && updateTab({ displayFormat: v as DataDisplayFormat })} className="justify-start flex-wrap gap-0.5">
+              <ToggleGroupItem value="led" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
+                LED
+              </ToggleGroupItem>
+              <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
+              <ToggleGroupItem value="short" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                Short
+              </ToggleGroupItem>
+              <ToggleGroupItem value="ushort" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                UShort
+              </ToggleGroupItem>
+              <ToggleGroupItem value="hex" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                Hex
+              </ToggleGroupItem>
+              <ToggleGroupItem value="binary" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                Binary
+              </ToggleGroupItem>
+              <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
+              <ToggleGroupItem value="long" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+                Long
+              </ToggleGroupItem>
+              <ToggleGroupItem value="ulong" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+                ULong
+              </ToggleGroupItem>
+              <ToggleGroupItem value="float" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+                Float
+              </ToggleGroupItem>
+              <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
+              <ToggleGroupItem value="double" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-400 data-[state=on]:border-purple-500/30 border border-border/50">
+                Double
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {/* Always show byte order selectors - they apply to any format that uses multiple registers */}
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (32-bit)</label>
-          <Select value={tab.byteOrder32} onValueChange={v => updateTab({ byteOrder32: v as ByteOrder32 })}>
-            <SelectTrigger className="h-7 text-xs bg-background border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ABCD">ABCD ({t('bigEndian')})</SelectItem>
-              <SelectItem value="DCBA">DCBA ({t('littleEndian')})</SelectItem>
-              <SelectItem value="BADC">BADC ({t('bigEndianSwap')})</SelectItem>
-              <SelectItem value="CDAB">CDAB ({t('littleEndianSwap')})</SelectItem>
-            </SelectContent>
-          </Select>
+          <ToggleGroup type="single" value={tab.byteOrder32} onValueChange={v => v && updateTab({ byteOrder32: v as ByteOrder32 })} className="justify-start flex-wrap gap-0.5">
+            <ToggleGroupItem value="ABCD" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCD</ToggleGroupItem>
+            <ToggleGroupItem value="DCBA" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">DCBA</ToggleGroupItem>
+            <ToggleGroupItem value="BADC" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADC</ToggleGroupItem>
+            <ToggleGroupItem value="CDAB" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">CDAB</ToggleGroupItem>
+          </ToggleGroup>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (64-bit)</label>
-          <Select value={tab.byteOrder64} onValueChange={v => updateTab({ byteOrder64: v as ByteOrder64 })}>
-            <SelectTrigger className="h-7 text-xs bg-background border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ABCDEFGH">ABCDEFGH ({t('bigEndian')})</SelectItem>
-              <SelectItem value="HGFEDCBA">HGFEDCBA ({t('littleEndian')})</SelectItem>
-              <SelectItem value="BADCFEHG">BADCFEHG ({t('bigEndianSwap')})</SelectItem>
-              <SelectItem value="GHEFCDAB">GHEFCDAB ({t('littleEndianSwap')})</SelectItem>
-            </SelectContent>
-          </Select>
+          <ToggleGroup type="single" value={tab.byteOrder64} onValueChange={v => v && updateTab({ byteOrder64: v as ByteOrder64 })} className="justify-start flex-wrap gap-0.5">
+            <ToggleGroupItem value="ABCDEFGH" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCDEFGH</ToggleGroupItem>
+            <ToggleGroupItem value="HGFEDCBA" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">HGFEDCBA</ToggleGroupItem>
+            <ToggleGroupItem value="BADCFEHG" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADCFEHG</ToggleGroupItem>
+            <ToggleGroupItem value="GHEFCDAB" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">GHEFCDAB</ToggleGroupItem>
+          </ToggleGroup>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('pollInterval')}</label>

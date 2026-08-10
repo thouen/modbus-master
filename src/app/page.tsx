@@ -86,13 +86,13 @@ function AppContent() {
         {/* Center + bottom log */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <ResizablePanelGroup orientation="vertical">
-            <ResizablePanel defaultSize={showLogPanel ? 65 : 100} minSize={30}>
+            <ResizablePanel defaultSize={showLogPanel ? 50 : 100} minSize={30}>
               <RegisterTabManager />
             </ResizablePanel>
             {showLogPanel && (
               <>
-                <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
-                <ResizablePanel defaultSize={35} minSize={15} maxSize={60}>
+                <ResizableHandle className="h-1.5 bg-border hover:bg-primary/50 transition-colors cursor-row-resize" />
+                <ResizablePanel defaultSize={50} minSize={25} maxSize={70}>
                   <LogViewer />
                 </ResizablePanel>
               </>
