@@ -207,9 +207,9 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
-          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start">
-            {(['01', '02', '03', '04'] as const).map(fc => (
-              <ToggleGroupItem key={fc} value={fc} size="sm" className="h-7 text-xs px-2 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50">
+          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start flex-wrap gap-0.5">
+            {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => (
+              <ToggleGroupItem key={fc} value={fc} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50">
                 FC{fc}
               </ToggleGroupItem>
             ))}
@@ -315,7 +315,53 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
 }
 
 function simulateRead(tab: RegisterTab, connection: ConnectionConfig, dispatch: React.Dispatch<Action>) {
-  // Simulate reading registers with random data
+  const slaveId = connection.slaveId;
+  const fc = parseInt(tab.functionCode);
+  const isWrite = fc === 5 || fc === 6 || fc === 15 || fc === 16;
+
+  // For write functions, simulate writing data
+  if (isWrite) {
+    const txFrame = buildRTUFrame(slaveId, fc, tab.startAddress, tab.registerCount);
+
+    const txLog: LogEntry = {
+      id: generateId(),
+      timestamp: Date.now(),
+      connectionId: connection.id,
+      tabId: tab.id,
+      direction: 'tx',
+      type: 'data',
+      message: `[${tab.name}] FC${tab.functionCode} Write Addr:${tab.startAddress} Qty:${tab.registerCount}`,
+      rawData: toHexString(txFrame),
+    };
+
+    dispatch({
+      type: 'ADD_LOG',
+      payload: { connectionId: connection.id, log: txLog },
+    });
+
+    // Simulate write response (echo back)
+    setTimeout(() => {
+      const rxLog: LogEntry = {
+        id: generateId(),
+        timestamp: Date.now(),
+        connectionId: connection.id,
+        tabId: tab.id,
+        direction: 'rx',
+        type: 'data',
+        message: `[${tab.name}] Write OK Addr:${tab.startAddress} Qty:${tab.registerCount}`,
+        rawData: toHexString(txFrame),
+      };
+
+      dispatch({
+        type: 'ADD_LOG',
+        payload: { connectionId: connection.id, log: rxLog },
+      });
+    }, 50);
+
+    return;
+  }
+
+  // Read functions (FC01-FC04)
   const data: RegisterData[] = [];
   for (let i = 0; i < tab.registerCount; i++) {
     data.push({
@@ -329,9 +375,6 @@ function simulateRead(tab: RegisterTab, connection: ConnectionConfig, dispatch: 
     payload: { tabId: tab.id, data },
   });
 
-  // Build request frame based on protocol mode
-  const slaveId = connection.slaveId;
-  const fc = parseInt(tab.functionCode);
   const txFrame = buildRTUFrame(slaveId, fc, tab.startAddress, tab.registerCount);
 
   const txLog: LogEntry = {

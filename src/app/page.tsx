@@ -88,12 +88,9 @@ function AppContent() {
             <RegisterTabManager />
           </div>
           {showLogPanel && (
-            <>
-              <div className="h-1.5 bg-border hover:bg-primary/50 transition-colors cursor-row-resize shrink-0" />
-              <div className="h-[250px] min-h-[150px] max-h-[50vh] border-t border-border overflow-hidden shrink-0">
-                <LogViewer />
-              </div>
-            </>
+            <div className="h-[250px] min-h-[150px] max-h-[50vh] border-t border-border overflow-hidden shrink-0">
+              <LogViewer />
+            </div>
           )}
         </div>
       </div>

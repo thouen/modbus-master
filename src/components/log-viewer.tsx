@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAppState } from '@/hooks/use-app-state';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,8 @@ export function LogViewer() {
   const { state, dispatch } = useAppState();
   const [autoScroll, setAutoScroll] = useState(true);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  // Determine active connection: selected > active tab's connection > first connection
   const activeTab = state.tabs.find(tab => tab.id === state.activeTabId);
   const effectiveConnectionId = selectedConnectionId
     ?? activeTab?.connectionId
@@ -27,7 +26,6 @@ export function LogViewer() {
     [effectiveConnectionId, state.logs]
   );
 
-  // Build tab name lookup for display
   const tabNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const tab of state.tabs) {
@@ -36,11 +34,20 @@ export function LogViewer() {
     return map;
   }, [state.tabs]);
 
-  useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  const doAutoScroll = useCallback(() => {
+    if (!autoScroll) return;
+    if (!viewportRef.current) {
+      viewportRef.current = document.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
     }
-  }, [logs, autoScroll]);
+    if (viewportRef.current) {
+      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+    }
+  }, [autoScroll]);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => doAutoScroll());
+    return () => cancelAnimationFrame(id);
+  }, [logs, doAutoScroll]);
 
   const handleClear = () => {
     if (effectiveConnectionId) {
@@ -82,12 +89,11 @@ export function LogViewer() {
     if (!rawData) return '';
     const bytes = rawData.split(' ').filter(Boolean);
     if (bytes.length <= 8) return rawData;
-    // Group into 8-byte chunks for readability
     const groups: string[] = [];
     for (let i = 0; i < bytes.length; i += 8) {
       groups.push(bytes.slice(i, i + 8).join(' '));
     }
-    return groups.join('  │  ');
+    return groups.join('  |  ');
   };
 
   return (
@@ -145,8 +151,8 @@ export function LogViewer() {
       )}
 
       {/* Log entries */}
-      <ScrollArea className="flex-1 min-h-0">
-        <div ref={scrollRef} className="font-mono">
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
           {logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground/50">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,69 +161,57 @@ export function LogViewer() {
               <p className="text-xs">{t('noData')}</p>
             </div>
           ) : (
-            <div className="divide-y divide-border/10">
-              {logs.map(log => {
-                const isSys = log.direction === 'sys';
-                const isTx = log.direction === 'tx';
-                const isError = log.type === 'error';
-                const isInfo = log.type === 'info';
-                return (
-                  <div
-                    key={log.id}
-                    className={`flex items-start gap-2 px-3 py-1.5 transition-colors hover:bg-white/[0.02] ${
-                      isError ? 'bg-red-500/[0.04] border-l-2 border-l-red-500/40' :
-                      isSys ? 'bg-amber-500/[0.03]' :
-                      isTx ? 'bg-blue-500/[0.02]' : ''
-                    }`}
-                  >
-                    {/* Timestamp */}
-                    <span className="text-muted-foreground/40 shrink-0 w-[80px] text-[11px] leading-5 pt-0.5 select-none">
-                      {formatTime(log.timestamp)}
-                    </span>
-
-                    {/* Direction badge */}
-                    <span className={`shrink-0 w-[30px] text-center text-[10px] font-bold leading-5 rounded-sm select-none ${
-                      isSys ? 'bg-amber-500/15 text-amber-400' :
-                      isTx ? 'bg-blue-500/15 text-blue-400' :
-                      'bg-green-500/15 text-green-400'
-                    }`}>
-                      {isSys ? 'SYS' : isTx ? 'TX' : 'RX'}
-                    </span>
-
-                    {/* Tab name */}
-                    {log.tabId && (
-                      <span className="shrink-0 text-purple-400/60 text-[10px] leading-5 w-[48px] truncate select-none" title={tabNameMap[log.tabId]}>
-                        {tabNameMap[log.tabId] ?? '?'}
+            <div>
+              <div className="divide-y divide-border/10">
+                {logs.map(log => {
+                  const isSys = log.direction === 'sys';
+                  const isTx = log.direction === 'tx';
+                  const isError = log.type === 'error';
+                  const isInfo = log.type === 'info';
+                  let rowClass = 'flex items-start gap-2 px-3 py-1.5 transition-colors hover:bg-white/[0.02]';
+                  if (isError) rowClass += ' bg-red-500/[0.04] border-l-2 border-l-red-500/40';
+                  else if (isSys) rowClass += ' bg-amber-500/[0.03]';
+                  else if (isTx) rowClass += ' bg-blue-500/[0.02]';
+                  return (
+                    <div key={log.id} className={rowClass}>
+                      <span className="text-muted-foreground/40 shrink-0 w-[80px] text-[11px] leading-5 pt-0.5 select-none">
+                        {formatTime(log.timestamp)}
                       </span>
-                    )}
-
-                    {/* Type badge */}
-                    <span className={`shrink-0 w-[28px] text-center text-[10px] leading-5 rounded-sm select-none ${
-                      isError ? 'bg-red-500/15 text-red-400' :
-                      isInfo ? 'bg-amber-500/15 text-amber-400' :
-                      'text-foreground/40'
-                    }`}>
-                      {isError ? 'ERR' : isInfo ? 'INF' : 'DAT'}
-                    </span>
-
-                    {/* Message content - no truncation */}
-                    <span className="text-foreground/85 text-[12px] leading-5 flex-1 break-all min-w-0">
-                      {log.message}
-                    </span>
-
-                    {/* Raw hex data */}
-                    {log.rawData && (
-                      <span className="text-cyan-400/80 text-[11px] leading-5 max-w-[280px] shrink-0 font-mono select-all cursor-pointer hover:text-cyan-300 transition-colors truncate" title={log.rawData}>
-                        {formatHexDump(log.rawData)}
+                      <span className={'shrink-0 w-[30px] text-center text-[10px] font-bold leading-5 rounded-sm select-none ' + (
+                        isSys ? 'bg-amber-500/15 text-amber-400' :
+                        isTx ? 'bg-blue-500/15 text-blue-400' :
+                        'bg-green-500/15 text-green-400'
+                      )}>
+                        {isSys ? 'SYS' : isTx ? 'TX' : 'RX'}
                       </span>
-                    )}
-                  </div>
-                );
-              })}
+                      {log.tabId && (
+                        <span className="shrink-0 text-purple-400/60 text-[10px] leading-5 w-[48px] truncate select-none" title={tabNameMap[log.tabId]}>
+                          {tabNameMap[log.tabId] ?? '?'}
+                        </span>
+                      )}
+                      <span className={'shrink-0 w-[28px] text-center text-[10px] leading-5 rounded-sm select-none ' + (
+                        isError ? 'bg-red-500/15 text-red-400' :
+                        isInfo ? 'bg-amber-500/15 text-amber-400' :
+                        'text-foreground/40'
+                      )}>
+                        {isError ? 'ERR' : isInfo ? 'INF' : 'DAT'}
+                      </span>
+                      <span className="text-foreground/85 text-[12px] leading-5 flex-1 break-all min-w-0">
+                        {log.message}
+                      </span>
+                      {log.rawData && (
+                        <span className="text-cyan-400/80 text-[11px] leading-5 max-w-[280px] shrink-0 font-mono select-all cursor-pointer hover:text-cyan-300 transition-colors truncate" title={log.rawData}>
+                          {formatHexDump(log.rawData)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </div>
   );
 }
