@@ -267,22 +267,40 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {/* Always show byte order selectors - they apply to any format that uses multiple registers */}
         <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (32-bit)</label>
-          <ToggleGroup type="single" value={tab.byteOrder32} onValueChange={v => v && updateTab({ byteOrder32: v as ByteOrder32 })} className="justify-start flex-wrap gap-0.5">
-            <ToggleGroupItem value="ABCD" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCD</ToggleGroupItem>
-            <ToggleGroupItem value="DCBA" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">DCBA</ToggleGroupItem>
-            <ToggleGroupItem value="BADC" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADC</ToggleGroupItem>
-            <ToggleGroupItem value="CDAB" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">CDAB</ToggleGroupItem>
-          </ToggleGroup>
+          <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (32-bit)</label>
+          <div className="flex flex-wrap gap-1">
+            {(['ABCD', 'DCBA', 'BADC', 'CDAB'] as const).map(bo => (
+              <button
+                key={bo}
+                onClick={() => updateTab({ byteOrder32: bo })}
+                className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
+                  tab.byteOrder32 === bo
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm'
+                    : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
+                }`}
+              >
+                {bo}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (64-bit)</label>
-          <ToggleGroup type="single" value={tab.byteOrder64} onValueChange={v => v && updateTab({ byteOrder64: v as ByteOrder64 })} className="justify-start flex-wrap gap-0.5">
-            <ToggleGroupItem value="ABCDEFGH" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCDEFGH</ToggleGroupItem>
-            <ToggleGroupItem value="HGFEDCBA" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">HGFEDCBA</ToggleGroupItem>
-            <ToggleGroupItem value="BADCFEHG" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADCFEHG</ToggleGroupItem>
-            <ToggleGroupItem value="GHEFCDAB" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">GHEFCDAB</ToggleGroupItem>
-          </ToggleGroup>
+          <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (64-bit)</label>
+          <div className="flex flex-wrap gap-1">
+            {(['ABCDEFGH', 'HGFEDCBA', 'BADCFEHG', 'GHEFCDAB'] as const).map(bo => (
+              <button
+                key={bo}
+                onClick={() => updateTab({ byteOrder64: bo })}
+                className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
+                  tab.byteOrder64 === bo
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm'
+                    : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
+                }`}
+              >
+                {bo}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('pollInterval')}</label>
