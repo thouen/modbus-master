@@ -37,12 +37,21 @@ export function ConnectionPanel() {
       dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id, status: 'disconnected' } });
     } else {
       dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id, status: 'connecting' } });
-      // Simulate connection delay
       setTimeout(() => {
         dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id, status: 'connected' } });
       }, 1000);
     }
   };
+
+  // Count tabs and logs per connection
+  const tabCountByConn = state.tabs.reduce<Record<string, number>>((acc, tab) => {
+    acc[tab.connectionId] = (acc[tab.connectionId] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const logCountByConn = Object.fromEntries(
+    Object.entries(state.logs).map(([connId, logs]) => [connId, logs.length])
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -59,60 +68,76 @@ export function ConnectionPanel() {
           )}
           {state.connections.map(conn => {
             const status = state.connectionStatus[conn.id] ?? 'disconnected';
+            const tabCount = tabCountByConn[conn.id] ?? 0;
+            const logCount = logCountByConn[conn.id] ?? 0;
+            const configDetail = conn.protocol === 'serial'
+              ? `${conn.serialConfig?.port ?? '-'} @ ${conn.serialConfig?.baudRate ?? '-'}`
+              : `${conn.tcpConfig?.host ?? conn.udpConfig?.host ?? '-'}:${conn.tcpConfig?.port ?? conn.udpConfig?.port ?? '-'}`;
+
             return (
               <div
                 key={conn.id}
-                className="flex items-center gap-2 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors group"
+                className="flex flex-col gap-1 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors group"
               >
-                <div className={`w-2 h-2 rounded-full shrink-0 ${
-                  status === 'connected' ? 'bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]' :
-                  status === 'connecting' ? 'bg-amber-500 animate-pulse' :
-                  'bg-zinc-600'
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-foreground truncate">{conn.name}</div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {conn.protocol.toUpperCase()} / {conn.mode.toUpperCase()} / Slave:{conn.slaveId}
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${
+                    status === 'connected' ? 'bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]' :
+                    status === 'connecting' ? 'bg-amber-500 animate-pulse' :
+                    'bg-zinc-600'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-foreground truncate">{conn.name}</div>
+                  </div>
+                  <Badge variant="outline" className={`text-[9px] h-4 px-1 ${
+                    status === 'connected' ? 'border-green-500/50 text-green-400' :
+                    status === 'connecting' ? 'border-amber-500/50 text-amber-400' :
+                    'border-zinc-600 text-zinc-500'
+                  }`}>
+                    {status === 'connected' ? t('connected') :
+                     status === 'connecting' ? t('connecting') : t('disconnected')}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground pl-4">
+                  <span>{conn.protocol.toUpperCase()}/{conn.mode.toUpperCase()}</span>
+                  <span>Slave:{conn.slaveId}</span>
+                  <span className="truncate">{configDetail}</span>
+                </div>
+                <div className="flex items-center justify-between pl-4">
+                  <div className="flex items-center gap-2 text-[9px] text-muted-foreground/60">
+                    <span>{tabCount} tabs</span>
+                    <span>{logCount} logs</span>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 text-[9px]"
+                      onClick={() => handleConnect(conn.id)}
+                    >
+                      {status === 'connected' ? (
+                        <span className="text-red-400">{t('disconnect')}</span>
+                      ) : (
+                        <span className="text-green-400">{t('connect')}</span>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 text-[9px] text-blue-400"
+                      onClick={() => handleEdit(conn)}
+                    >
+                      {t('edit')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 text-[9px] text-red-400"
+                      onClick={() => handleDelete(conn.id)}
+                    >
+                      {t('delete')}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    onClick={() => handleConnect(conn.id)}
-                  >
-                    {status === 'connected' ? (
-                      <span className="text-[10px] text-red-400">DC</span>
-                    ) : (
-                      <span className="text-[10px] text-green-400">CN</span>
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    onClick={() => handleEdit(conn)}
-                  >
-                    <span className="text-[10px] text-blue-400">ED</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    onClick={() => handleDelete(conn.id)}
-                  >
-                    <span className="text-[10px] text-red-400">DL</span>
-                  </Button>
-                </div>
-                <Badge variant="outline" className={`text-[9px] h-4 px-1 ${
-                  status === 'connected' ? 'border-green-500/50 text-green-400' :
-                  status === 'connecting' ? 'border-amber-500/50 text-amber-400' :
-                  'border-zinc-600 text-zinc-500'
-                }`}>
-                  {status === 'connected' ? t('connected') :
-                   status === 'connecting' ? t('connecting') : t('disconnected')}
-                </Badge>
               </div>
             );
           })}

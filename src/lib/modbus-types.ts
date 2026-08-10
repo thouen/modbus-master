@@ -70,7 +70,8 @@ export interface RegisterData {
 export interface LogEntry {
   id: string;
   timestamp: number;
-  tabId: string;
+  connectionId: string;
+  tabId?: string; // optional: which tab triggered this log
   direction: 'tx' | 'rx';
   type: 'info' | 'data' | 'error';
   message: string;

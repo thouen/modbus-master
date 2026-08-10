@@ -16,7 +16,7 @@ interface AppState {
   tabs: RegisterTab[];
   activeTabId: string | null;
   registerData: Record<string, RegisterData[]>; // tabId -> data
-  logs: Record<string, LogEntry[]>; // tabId -> logs
+  logs: Record<string, LogEntry[]>; // connectionId -> logs (merged per connection)
   profiles: SavedProfile[];
   showConnectionPanel: boolean;
   editingConnection: ConnectionConfig | null;
@@ -32,8 +32,8 @@ type Action =
   | { type: 'DELETE_TAB'; payload: string }
   | { type: 'SET_ACTIVE_TAB'; payload: string }
   | { type: 'SET_REGISTER_DATA'; payload: { tabId: string; data: RegisterData[] } }
-  | { type: 'ADD_LOG'; payload: { tabId: string; log: LogEntry } }
-  | { type: 'CLEAR_LOGS'; payload: string }
+  | { type: 'ADD_LOG'; payload: { connectionId: string; log: LogEntry } }
+  | { type: 'CLEAR_LOGS'; payload: string } // connectionId
   | { type: 'SAVE_PROFILE'; payload: SavedProfile }
   | { type: 'LOAD_PROFILE'; payload: SavedProfile }
   | { type: 'DELETE_PROFILE'; payload: string }
@@ -59,6 +59,7 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         connections: [...state.connections, action.payload],
         connectionStatus: { ...state.connectionStatus, [action.payload.id]: 'disconnected' },
+        logs: { ...state.logs, [action.payload.id]: [] },
       };
     case 'UPDATE_CONNECTION':
       return {
@@ -67,14 +68,17 @@ function appReducer(state: AppState, action: Action): AppState {
           c.id === action.payload.id ? action.payload : c
         ),
       };
-    case 'DELETE_CONNECTION':
+    case 'DELETE_CONNECTION': {
+      const { [action.payload]: _removedLogs, ...remainingLogs } = state.logs;
       return {
         ...state,
         connections: state.connections.filter(c => c.id !== action.payload),
         connectionStatus: Object.fromEntries(
           Object.entries(state.connectionStatus).filter(([k]) => k !== action.payload)
         ),
+        logs: remainingLogs,
       };
+    }
     case 'SET_CONNECTION_STATUS':
       return {
         ...state,
@@ -88,7 +92,6 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         tabs: [...state.tabs, action.payload],
         activeTabId: state.activeTabId ?? action.payload.id,
-        logs: { ...state.logs, [action.payload.id]: [] },
       };
     case 'UPDATE_TAB':
       return {
@@ -103,13 +106,11 @@ function appReducer(state: AppState, action: Action): AppState {
         ? (newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null)
         : state.activeTabId;
       const { [action.payload]: _removedData, ...remainingData } = state.registerData;
-      const { [action.payload]: _removedLogs, ...remainingLogs } = state.logs;
       return {
         ...state,
         tabs: newTabs,
         activeTabId: newActiveId,
         registerData: remainingData,
-        logs: remainingLogs,
       };
     }
     case 'SET_ACTIVE_TAB':
@@ -124,10 +125,10 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         logs: {
           ...state.logs,
-          [action.payload.tabId]: [
-            ...(state.logs[action.payload.tabId] ?? []),
+          [action.payload.connectionId]: [
+            ...(state.logs[action.payload.connectionId] ?? []),
             action.payload.log,
-          ].slice(-500), // keep last 500 entries
+          ].slice(-1000), // keep last 1000 entries per connection
         },
       };
     case 'CLEAR_LOGS':
@@ -149,6 +150,9 @@ function appReducer(state: AppState, action: Action): AppState {
         activeTabId: profile.tabs.length > 0 ? profile.tabs[0].id : null,
         connectionStatus: Object.fromEntries(
           profile.connections.map(c => [c.id, 'disconnected' as const])
+        ),
+        logs: Object.fromEntries(
+          profile.connections.map(c => [c.id, []])
         ),
       };
     }

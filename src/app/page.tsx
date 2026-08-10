@@ -11,11 +11,12 @@ import { ProfileManager } from '@/components/profile-manager';
 import { Button } from '@/components/ui/button';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
-type SidePanel = 'connections' | 'profiles' | 'logs' | null;
+type SidePanel = 'connections' | 'profiles' | null;
 
 function AppContent() {
   const { t, locale, setLocale } = useI18n();
   const [sidePanel, setSidePanel] = useState<SidePanel>('connections');
+  const [showLogPanel, setShowLogPanel] = useState(true);
   usePolling();
 
   const togglePanel = (panel: SidePanel) => {
@@ -25,7 +26,7 @@ function AppContent() {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-[#0f1319] shrink-0">
+      <header className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-[#0f1319] shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
@@ -52,9 +53,9 @@ function AppContent() {
           </Button>
           <Button
             size="sm"
-            variant={sidePanel === 'logs' ? 'secondary' : 'ghost'}
+            variant={showLogPanel ? 'secondary' : 'ghost'}
             className="h-7 text-[10px] px-2"
-            onClick={() => togglePanel('logs')}
+            onClick={() => setShowLogPanel(!showLogPanel)}
           >
             {t('logs')}
           </Button>
@@ -70,34 +71,38 @@ function AppContent() {
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Left side panel */}
         {sidePanel && (
-          <ResizablePanelGroup orientation="horizontal">
-            <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="bg-[#0f1319] border-r border-border overflow-hidden">
+          <>
+            <div className="w-[240px] shrink-0 bg-[#0f1319] border-r border-border overflow-hidden">
               {sidePanel === 'connections' && <ConnectionPanel />}
               {sidePanel === 'profiles' && <ProfileManager />}
-              {sidePanel === 'logs' && <LogViewer />}
-            </ResizablePanel>
-            <ResizableHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
-            <ResizablePanel defaultSize={80}>
-              <MainArea />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+            </div>
+          </>
         )}
-        {!sidePanel && <MainArea />}
+
+        {/* Center + bottom log */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <ResizablePanelGroup orientation="vertical">
+            <ResizablePanel defaultSize={showLogPanel ? 65 : 100} minSize={30}>
+              <RegisterTabManager />
+            </ResizablePanel>
+            {showLogPanel && (
+              <>
+                <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
+                <ResizablePanel defaultSize={35} minSize={15} maxSize={60}>
+                  <LogViewer />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        </div>
       </div>
 
       {/* Status bar */}
       <StatusBar />
-    </div>
-  );
-}
-
-function MainArea() {
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <RegisterTabManager />
     </div>
   );
 }
