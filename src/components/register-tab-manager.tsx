@@ -144,7 +144,10 @@ export function RegisterTabManager() {
 function TabConfigPanel({ tab }: { tab: RegisterTab }) {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
-  const { readRegisters } = useModbusWs();
+  const { readRegisters, writeRegisters } = useModbusWs();
+  const [writeValue, setWriteValue] = useState('');
+  const [writeStatus, setWriteStatus] = useState<string | null>(null);
+  const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
 
   const connection = state.connections.find(c => c.id === tab.connectionId);
 
@@ -340,6 +343,110 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           {connection ? `${connection.byteOrder32} / ${connection.byteOrder64}` : ''}
         </span>
       </div>
+
+      {isWriteFC && (
+        <div className="border-t border-border/50 pt-2 mt-2 space-y-2">
+          <div className="text-[11px] font-medium text-amber-400/80">
+            {t('writeOperation')}
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] text-muted-foreground shrink-0">{t('address')}:</label>
+            <Input
+              type="number"
+              min={0}
+              max={65535}
+              value={tab.startAddress}
+              className="h-6 w-20 text-[11px] font-mono"
+              onChange={(e) => updateTab({ startAddress: parseInt(e.target.value) || 0 })}
+            />
+            {tab.functionCode === '05' && (
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-[10px] text-muted-foreground">{t('value')}:</label>
+                <select
+                  value={writeValue}
+                  onChange={(e) => setWriteValue(e.target.value)}
+                  className="h-6 text-[11px] font-mono bg-background border border-border/50 rounded px-1"
+                >
+                  <option value="FF00">{t('on')} (0xFF00)</option>
+                  <option value="0000">{t('off')} (0x0000)</option>
+                </select>
+              </div>
+            )}
+            {tab.functionCode === '06' && (
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-[10px] text-muted-foreground">{t('value')}:</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={65535}
+                  placeholder="0-65535"
+                  value={writeValue}
+                  onChange={(e) => setWriteValue(e.target.value)}
+                  className="h-6 w-28 text-[11px] font-mono"
+                />
+              </div>
+            )}
+            {tab.functionCode === '15' && (
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-[10px] text-muted-foreground">{t('values')}:</label>
+                <Input
+                  placeholder="e.g. 101010"
+                  value={writeValue}
+                  onChange={(e) => setWriteValue(e.target.value)}
+                  className="h-6 w-28 text-[11px] font-mono"
+                />
+              </div>
+            )}
+            {tab.functionCode === '16' && (
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-[10px] text-muted-foreground">{t('values')}:</label>
+                <Input
+                  placeholder="e.g. 100,200,300"
+                  value={writeValue}
+                  onChange={(e) => setWriteValue(e.target.value)}
+                  className="h-6 w-36 text-[11px] font-mono"
+                />
+              </div>
+            )}
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-6 text-[10px] shrink-0"
+              onClick={async () => {
+                if (!connection) return;
+                setWriteStatus(null);
+                try {
+                  const values = tab.functionCode === '05' || tab.functionCode === '15'
+                    ? (writeValue || '').split('').map(c => c === '1' ? 1 : 0)
+                    : (writeValue || '').split(',').map(v => parseInt(v.trim()) || 0);
+                  await writeRegisters(
+                    connection.id,
+                    tab.id,
+                    connection.slaveId,
+                    parseInt(tab.functionCode),
+                    tab.startAddress,
+                    values,
+                    connection.mode,
+                  );
+                  setWriteStatus('success');
+                  setTimeout(() => setWriteStatus(null), 2000);
+                } catch {
+                  setWriteStatus('error');
+                  setTimeout(() => setWriteStatus(null), 2000);
+                }
+              }}
+            >
+              {t('write')}
+            </Button>
+            {writeStatus === 'success' && (
+              <span className="text-[10px] text-green-400 shrink-0">{t('writeSuccess')}</span>
+            )}
+            {writeStatus === 'error' && (
+              <span className="text-[10px] text-red-400 shrink-0">{t('writeFailed')}</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

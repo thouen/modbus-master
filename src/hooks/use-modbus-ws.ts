@@ -147,5 +147,29 @@ export function useModbusWs() {
     });
   }, []);
 
-  return { connectDevice, disconnectDevice, readRegisters };
+  // 写入寄存器
+  const writeRegisters = useCallback((
+    connectionId: string,
+    tabId: string,
+    slaveId: number,
+    functionCode: number,
+    startAddress: number,
+    values: number[],
+    mode: 'ascii' | 'rtu',
+  ) => {
+    wsRef.current?.send({
+      type: 'write',
+      payload: {
+        connectionId,
+        tabId,
+        slaveId,
+        functionCode,
+        startAddress,
+        values,
+        mode,
+      },
+    });
+  }, []);
+
+  return { connectDevice, disconnectDevice, readRegisters, writeRegisters };
 }

@@ -459,6 +459,278 @@ export async function readSerialRegisters(
   }
 }
 
+// ── 写入操作 ──
+
+/** 构建写单个线圈 (FC05) 的 RTU 帧 */
+function buildWriteSingleCoilRtu(slaveId: number, address: number, value: boolean): Buffer {
+  const pdu = Buffer.alloc(6);
+  pdu[0] = slaveId;
+  pdu[1] = 0x05;
+  pdu.writeUInt16BE(address, 2);
+  pdu.writeUInt16BE(value ? 0xFF00 : 0x0000, 4);
+  const crc = crc16(pdu);
+  return Buffer.concat([pdu, crc]);
+}
+
+/** 构建写单个寄存器 (FC06) 的 RTU 帧 */
+function buildWriteSingleRegisterRtu(slaveId: number, address: number, value: number): Buffer {
+  const pdu = Buffer.alloc(6);
+  pdu[0] = slaveId;
+  pdu[1] = 0x06;
+  pdu.writeUInt16BE(address, 2);
+  pdu.writeUInt16BE(value, 4);
+  const crc = crc16(pdu);
+  return Buffer.concat([pdu, crc]);
+}
+
+/** 构建写多个线圈 (FC15) 的 RTU 帧 */
+function buildWriteMultipleCoilsRtu(slaveId: number, startAddress: number, values: boolean[]): Buffer {
+  const quantity = values.length;
+  const byteCount = Math.ceil(quantity / 8);
+  const pdu = Buffer.alloc(6 + byteCount);
+  pdu[0] = slaveId;
+  pdu[1] = 0x0F;
+  pdu.writeUInt16BE(startAddress, 2);
+  pdu.writeUInt16BE(quantity, 4);
+  pdu[6] = byteCount;
+  for (let i = 0; i < quantity; i++) {
+    if (values[i]) pdu[7 + Math.floor(i / 8)] |= (1 << (i % 8));
+  }
+  const crc = crc16(pdu);
+  return Buffer.concat([pdu, crc]);
+}
+
+/** 构建写多个寄存器 (FC16) 的 RTU 帧 */
+function buildWriteMultipleRegistersRtu(slaveId: number, startAddress: number, values: number[]): Buffer {
+  const quantity = values.length;
+  const byteCount = quantity * 2;
+  const pdu = Buffer.alloc(7 + byteCount);
+  pdu[0] = slaveId;
+  pdu[1] = 0x10;
+  pdu.writeUInt16BE(startAddress, 2);
+  pdu.writeUInt16BE(quantity, 4);
+  pdu[6] = byteCount;
+  for (let i = 0; i < quantity; i++) {
+    pdu.writeUInt16BE(values[i], 7 + i * 2);
+  }
+  const crc = crc16(pdu);
+  return Buffer.concat([pdu, crc]);
+}
+
+/** 构建 TCP 写帧 */
+function buildTcpWriteFrame(slaveId: number, functionCode: number, data: Buffer, transactionId: number): Buffer {
+  const mbap = Buffer.alloc(7);
+  mbap.writeUInt16BE(transactionId, 0);
+  mbap.writeUInt16BE(0, 2);
+  mbap.writeUInt16BE(data.length + 1, 4);
+  mbap[6] = slaveId;
+  return Buffer.concat([mbap, data]);
+}
+
+/** 写单个线圈 (FC05) */
+export async function writeSingleCoil(
+  protocol: 'tcp' | 'udp' | 'serial',
+  connectionId: string,
+  slaveId: number,
+  address: number,
+  value: boolean,
+  mode: 'ASCII' | 'RTU' = 'RTU',
+  host?: string,
+  port?: number,
+  timeoutMs = 2000,
+): Promise<ModbusResponse> {
+  if (protocol === 'serial') {
+    return writeSerial(connectionId, slaveId, buildWriteSingleCoilRtu(slaveId, address, value), mode, timeoutMs, 0x05);
+  }
+  const tid = globalTransactionId++;
+  const pdu = Buffer.alloc(5);
+  pdu[0] = 0x05;
+  pdu.writeUInt16BE(address, 1);
+  pdu.writeUInt16BE(value ? 0xFF00 : 0x0000, 3);
+  const frame = buildTcpWriteFrame(slaveId, 0x05, pdu, tid);
+  const rawTx = frame.toString('hex').toUpperCase();
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+}
+
+/** 写单个寄存器 (FC06) */
+export async function writeSingleRegister(
+  protocol: 'tcp' | 'udp' | 'serial',
+  connectionId: string,
+  slaveId: number,
+  address: number,
+  value: number,
+  mode: 'ASCII' | 'RTU' = 'RTU',
+  host?: string,
+  port?: number,
+  timeoutMs = 2000,
+): Promise<ModbusResponse> {
+  if (protocol === 'serial') {
+    return writeSerial(connectionId, slaveId, buildWriteSingleRegisterRtu(slaveId, address, value), mode, timeoutMs, 0x06);
+  }
+  const tid = globalTransactionId++;
+  const pdu = Buffer.alloc(5);
+  pdu[0] = 0x06;
+  pdu.writeUInt16BE(address, 1);
+  pdu.writeUInt16BE(value, 3);
+  const frame = buildTcpWriteFrame(slaveId, 0x06, pdu, tid);
+  const rawTx = frame.toString('hex').toUpperCase();
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+}
+
+/** 写多个线圈 (FC15) */
+export async function writeMultipleCoils(
+  protocol: 'tcp' | 'udp' | 'serial',
+  connectionId: string,
+  slaveId: number,
+  startAddress: number,
+  values: boolean[],
+  mode: 'ASCII' | 'RTU' = 'RTU',
+  host?: string,
+  port?: number,
+  timeoutMs = 2000,
+): Promise<ModbusResponse> {
+  if (protocol === 'serial') {
+    return writeSerial(connectionId, slaveId, buildWriteMultipleCoilsRtu(slaveId, startAddress, values), mode, timeoutMs, 0x0F);
+  }
+  const tid = globalTransactionId++;
+  const quantity = values.length;
+  const byteCount = Math.ceil(quantity / 8);
+  const pdu = Buffer.alloc(6 + byteCount);
+  pdu[0] = 0x0F;
+  pdu.writeUInt16BE(startAddress, 1);
+  pdu.writeUInt16BE(quantity, 3);
+  pdu[5] = byteCount;
+  for (let i = 0; i < quantity; i++) {
+    if (values[i]) pdu[6 + Math.floor(i / 8)] |= (1 << (i % 8));
+  }
+  const frame = buildTcpWriteFrame(slaveId, 0x0F, pdu, tid);
+  const rawTx = frame.toString('hex').toUpperCase();
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+}
+
+/** 写多个寄存器 (FC16) */
+export async function writeMultipleRegisters(
+  protocol: 'tcp' | 'udp' | 'serial',
+  connectionId: string,
+  slaveId: number,
+  startAddress: number,
+  values: number[],
+  mode: 'ASCII' | 'RTU' = 'RTU',
+  host?: string,
+  port?: number,
+  timeoutMs = 2000,
+): Promise<ModbusResponse> {
+  if (protocol === 'serial') {
+    return writeSerial(connectionId, slaveId, buildWriteMultipleRegistersRtu(slaveId, startAddress, values), mode, timeoutMs, 0x10);
+  }
+  const tid = globalTransactionId++;
+  const quantity = values.length;
+  const byteCount = quantity * 2;
+  const pdu = Buffer.alloc(5 + byteCount);
+  pdu[0] = 0x10;
+  pdu.writeUInt16BE(startAddress, 1);
+  pdu.writeUInt16BE(quantity, 3);
+  pdu[5] = byteCount;
+  for (let i = 0; i < quantity; i++) {
+    pdu.writeUInt16BE(values[i], 6 + i * 2);
+  }
+  const frame = buildTcpWriteFrame(slaveId, 0x10, pdu, tid);
+  const rawTx = frame.toString('hex').toUpperCase();
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+}
+
+/** 发送写帧并等待响应 */
+async function sendWriteFrame(
+  protocol: 'tcp' | 'udp',
+  connectionId: string,
+  frame: Buffer,
+  transactionId: number,
+  timeoutMs: number,
+  rawTx: string,
+  host?: string,
+  port?: number,
+): Promise<ModbusResponse> {
+  if (protocol === 'tcp') {
+    const conn = tcpConnections.get(connectionId);
+    if (!conn) return { success: false, error: 'Connection not found', rawTx };
+    return new Promise((resolve, reject) => {
+      conn.buffer = Buffer.alloc(0);
+      const timer = setTimeout(() => reject(new Error('Write response timeout')), timeoutMs);
+      const startTime = Date.now();
+      conn.socket.write(frame, (err) => {
+        if (err) { clearTimeout(timer); reject(err); }
+      });
+      const checkResponse = () => {
+        if (conn.buffer.length >= 9) {
+          try {
+            const rawRx = conn.buffer.toString('hex').toUpperCase();
+            clearTimeout(timer);
+            conn.buffer = Buffer.alloc(0);
+            resolve({ success: true, rawTx, rawRx, timing: Date.now() - startTime });
+          } catch (e) {
+            clearTimeout(timer);
+            reject(e);
+          }
+        } else {
+          setTimeout(checkResponse, 50);
+        }
+      };
+      checkResponse();
+    });
+  } else {
+    // UDP
+    const socket = udpConnections.get(connectionId);
+    if (!socket) return { success: false, error: 'UDP connection not found', rawTx };
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('UDP write response timeout')), timeoutMs);
+      const startTime = Date.now();
+      socket.send(frame, port!, host!, (err) => {
+        if (err) { clearTimeout(timer); reject(err); }
+      });
+      socket.once('message', (msg) => {
+        clearTimeout(timer);
+        const rawRx = msg.toString('hex').toUpperCase();
+        resolve({ success: true, rawTx, rawRx, timing: Date.now() - startTime });
+      });
+    });
+  }
+}
+
+/** 串口写操作（通用） */
+async function writeSerial(
+  connectionId: string,
+  slaveId: number,
+  frame: Buffer,
+  mode: 'ASCII' | 'RTU',
+  timeoutMs: number,
+  expectedFc: number,
+): Promise<ModbusResponse> {
+  const port = serialConnections.get(connectionId);
+  if (!port || !port.isOpen) return { success: false, error: 'Serial port not open' };
+
+  const rawTx = frame.toString('hex').toUpperCase();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve({ success: false, error: 'Serial write response timeout', rawTx, rawRx: '' });
+    }, timeoutMs);
+    const startTime = Date.now();
+    let rxBuffer = Buffer.alloc(0);
+
+    port.on('data', (data: Buffer) => {
+      rxBuffer = Buffer.concat([rxBuffer, data]);
+      if (rxBuffer.length >= 4) {
+        clearTimeout(timer);
+        const rawRx = rxBuffer.toString('hex').toUpperCase();
+        resolve({ success: true, rawTx, rawRx, timing: Date.now() - startTime });
+      }
+    });
+
+    port.write(frame, (err: Error | null) => {
+      if (err) { clearTimeout(timer); resolve({ success: false, error: err.message, rawTx, rawRx: '' }); }
+    });
+  });
+}
+
 // ── 断开所有连接 ──
 
 export function disconnectAll() {

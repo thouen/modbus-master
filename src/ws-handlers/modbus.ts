@@ -9,6 +9,10 @@ import {
   connectSerial,
   disconnectSerial,
   readSerialRegisters,
+  writeSingleCoil,
+  writeSingleRegister,
+  writeMultipleCoils,
+  writeMultipleRegisters,
   disconnectAll,
 } from '../lib/modbus-tcp';
 import type { ConnectionConfig, ModbusConnectionStatus } from '../lib/modbus-types';
@@ -242,6 +246,83 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
             message: `Read error: ${result.error}`,
             rawData: result.rawTx || '',
             timestamp: Date.now(),
+          },
+        }));
+      }
+      break;
+    }
+
+    // ── 写入操作 ──
+    case 'write': {
+      const { connectionId, slaveId, functionCode, address, values, tabId, mode } = payload as {
+        connectionId: string;
+        slaveId: number;
+        functionCode: number;
+        address: number;
+        values: number[] | boolean[];
+        tabId: string;
+        mode: 'ascii' | 'rtu';
+      };
+
+      const conn = connectionConfigs.get(connectionId);
+      if (!conn) {
+        ws.send(JSON.stringify({ type: 'error', payload: { connectionId, message: 'Connection not configured' } }));
+        return;
+      }
+
+      const { config } = conn;
+      const protocol = config.protocol;
+      const fcName = `FC${String(functionCode).padStart(2, '0')}`;
+      const actualMode = mode || config.mode || 'rtu';
+
+      // 发送 TX 日志
+      ws.send(JSON.stringify({
+        type: 'log',
+        payload: {
+          connectionId, tabId, direction: 'tx',
+          message: `${fcName} Write Addr:${address}` + (Array.isArray(values) ? ` Qty:${values.length}` : ''),
+          rawData: '', timestamp: Date.now(),
+        },
+      }));
+
+      let result;
+      try {
+        if (functionCode === 5) {
+          result = await writeSingleCoil(protocol, connectionId, slaveId, address, values[0] as boolean, actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+        } else if (functionCode === 6) {
+          result = await writeSingleRegister(protocol, connectionId, slaveId, address, values[0] as number, actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+        } else if (functionCode === 15) {
+          result = await writeMultipleCoils(protocol, connectionId, slaveId, address, values as boolean[], actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+        } else if (functionCode === 16) {
+          result = await writeMultipleRegisters(protocol, connectionId, slaveId, address, values as number[], actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+        } else {
+          result = { success: false, error: `Unsupported write function code: ${functionCode}` };
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        result = { success: false, error: errMsg };
+      }
+
+      if (result.success) {
+        ws.send(JSON.stringify({
+          type: 'log',
+          payload: {
+            connectionId, tabId, direction: 'rx',
+            message: `${fcName} Write success (${result.timing || '0'}ms)`,
+            rawData: result.rawRx || '', timestamp: Date.now(),
+          },
+        }));
+        ws.send(JSON.stringify({
+          type: 'write_ack',
+          payload: { connectionId, tabId, functionCode, address, rawTx: result.rawTx, rawRx: result.rawRx },
+        }));
+      } else {
+        ws.send(JSON.stringify({ type: 'error', payload: { connectionId, tabId, message: result.error || 'Write failed' } }));
+        ws.send(JSON.stringify({
+          type: 'log',
+          payload: {
+            connectionId, tabId, direction: 'sys',
+            message: `Write error: ${result.error}`, rawData: result.rawTx || '', timestamp: Date.now(),
           },
         }));
       }
