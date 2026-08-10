@@ -9,7 +9,6 @@ import { RegisterTabManager } from '@/components/register-tab-manager';
 import { LogViewer } from '@/components/log-viewer';
 import { ProfileManager } from '@/components/profile-manager';
 import { Button } from '@/components/ui/button';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 type SidePanel = 'connections' | 'profiles' | null;
 
@@ -85,19 +84,17 @@ function AppContent() {
 
         {/* Center + bottom log */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <ResizablePanelGroup orientation="vertical">
-            <ResizablePanel defaultSize={showLogPanel ? 50 : 100} minSize={30}>
-              <RegisterTabManager />
-            </ResizablePanel>
-            {showLogPanel && (
-              <>
-                <ResizableHandle className="h-1.5 bg-border hover:bg-primary/50 transition-colors cursor-row-resize" />
-                <ResizablePanel defaultSize={50} minSize={25} maxSize={70}>
-                  <LogViewer />
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <RegisterTabManager />
+          </div>
+          {showLogPanel && (
+            <>
+              <div className="h-1.5 bg-border hover:bg-primary/50 transition-colors cursor-row-resize shrink-0" />
+              <div className="h-[250px] min-h-[150px] max-h-[50vh] border-t border-border overflow-hidden shrink-0">
+                <LogViewer />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
