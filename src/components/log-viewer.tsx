@@ -79,49 +79,55 @@ export function LogViewer() {
   };
 
   const formatHexDump = (rawData: string): string => {
-    // Format raw hex data into groups of bytes
-    const bytes = rawData.split(' ');
+    if (!rawData) return '';
+    const bytes = rawData.split(' ').filter(Boolean);
     if (bytes.length <= 8) return rawData;
-    // Join with compact spacing
-    return bytes.join(' ');
+    // Group into 8-byte chunks for readability
+    const groups: string[] = [];
+    for (let i = 0; i < bytes.length; i += 8) {
+      groups.push(bytes.slice(i, i + 8).join(' '));
+    }
+    return groups.join('  │  ');
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-[#0f1319] shrink-0">
         <div className="flex items-center gap-2">
-          <h3 className="text-xs font-semibold text-foreground">{t('logTitle')}</h3>
+          <h3 className="text-xs font-semibold text-foreground/90">{t('logTitle')}</h3>
           {effectiveConnectionId && (
-            <span className="text-[10px] text-muted-foreground">
-              ({state.connections.find(c => c.id === effectiveConnectionId)?.name ?? '-'})
+            <span className="text-[11px] text-muted-foreground/70">
+              {state.connections.find(c => c.id === effectiveConnectionId)?.name ?? '-'}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground/60">{t('autoScroll')}</span>
             <Switch
               checked={autoScroll}
               onCheckedChange={setAutoScroll}
-              className="scale-75"
+              className="scale-75 origin-right"
             />
-            <span className="text-[10px] text-muted-foreground">{t('autoScroll')}</span>
           </div>
-          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={handleClear}>
+          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground" onClick={handleClear}>
             {t('clearLog')}
           </Button>
-          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={handleExport}>
+          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground" onClick={handleExport}>
             {t('exportLog')}
           </Button>
         </div>
       </div>
+
       {/* Connection selector */}
-      {state.connections.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-border/50">
+      {state.connections.length > 1 && (
+        <div className="px-3 py-1 border-b border-border/30 bg-[#0f1319]/50">
           <Select
             value={effectiveConnectionId ?? ''}
             onValueChange={v => setSelectedConnectionId(v === '__auto__' ? null : v)}
           >
-            <SelectTrigger className="h-6 text-[10px] bg-background border-border">
+            <SelectTrigger className="h-6 text-[11px] bg-background/50 border-border/50 w-[200px]">
               <SelectValue placeholder="Select connection" />
             </SelectTrigger>
             <SelectContent>
@@ -130,60 +136,86 @@ export function LogViewer() {
               </SelectItem>
               {state.connections.map(c => (
                 <SelectItem key={c.id} value={c.id}>
-                  {c.name} ({state.logs[c.id]?.length ?? 0} entries)
+                  {c.name} ({state.logs[c.id]?.length ?? 0})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       )}
-      <ScrollArea className="flex-1">
-        <div ref={scrollRef} className="font-mono text-[11px] p-1">
-          {logs.length === 0 && (
-            <p className="text-muted-foreground text-center py-4 text-xs">{t('noData')}</p>
+
+      {/* Log entries */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div ref={scrollRef} className="font-mono">
+          {logs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground/50">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-xs">{t('noData')}</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/10">
+              {logs.map(log => {
+                const isSys = log.direction === 'sys';
+                const isTx = log.direction === 'tx';
+                const isError = log.type === 'error';
+                const isInfo = log.type === 'info';
+                return (
+                  <div
+                    key={log.id}
+                    className={`flex items-start gap-2 px-3 py-1.5 transition-colors hover:bg-white/[0.02] ${
+                      isError ? 'bg-red-500/[0.04] border-l-2 border-l-red-500/40' :
+                      isSys ? 'bg-amber-500/[0.03]' :
+                      isTx ? 'bg-blue-500/[0.02]' : ''
+                    }`}
+                  >
+                    {/* Timestamp */}
+                    <span className="text-muted-foreground/40 shrink-0 w-[80px] text-[11px] leading-5 pt-0.5 select-none">
+                      {formatTime(log.timestamp)}
+                    </span>
+
+                    {/* Direction badge */}
+                    <span className={`shrink-0 w-[30px] text-center text-[10px] font-bold leading-5 rounded-sm select-none ${
+                      isSys ? 'bg-amber-500/15 text-amber-400' :
+                      isTx ? 'bg-blue-500/15 text-blue-400' :
+                      'bg-green-500/15 text-green-400'
+                    }`}>
+                      {isSys ? 'SYS' : isTx ? 'TX' : 'RX'}
+                    </span>
+
+                    {/* Tab name */}
+                    {log.tabId && (
+                      <span className="shrink-0 text-purple-400/60 text-[10px] leading-5 w-[48px] truncate select-none" title={tabNameMap[log.tabId]}>
+                        {tabNameMap[log.tabId] ?? '?'}
+                      </span>
+                    )}
+
+                    {/* Type badge */}
+                    <span className={`shrink-0 w-[28px] text-center text-[10px] leading-5 rounded-sm select-none ${
+                      isError ? 'bg-red-500/15 text-red-400' :
+                      isInfo ? 'bg-amber-500/15 text-amber-400' :
+                      'text-foreground/40'
+                    }`}>
+                      {isError ? 'ERR' : isInfo ? 'INF' : 'DAT'}
+                    </span>
+
+                    {/* Message content - no truncation */}
+                    <span className="text-foreground/85 text-[12px] leading-5 flex-1 break-all min-w-0">
+                      {log.message}
+                    </span>
+
+                    {/* Raw hex data */}
+                    {log.rawData && (
+                      <span className="text-cyan-400/80 text-[11px] leading-5 max-w-[280px] shrink-0 font-mono select-all cursor-pointer hover:text-cyan-300 transition-colors truncate" title={log.rawData}>
+                        {formatHexDump(log.rawData)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
-          {logs.map(log => {
-            const isSys = log.direction === 'sys';
-            const isTx = log.direction === 'tx';
-            return (
-              <div
-                key={log.id}
-                className={`flex items-start gap-2 px-2 py-0.5 border-b border-border/20 ${
-                  log.type === 'error' ? 'bg-red-500/5' :
-                  isSys ? 'bg-amber-500/[0.04]' :
-                  isTx ? 'bg-blue-500/[0.03]' : 'bg-green-500/[0.03]'
-                }`}
-              >
-                <span className="text-muted-foreground/50 shrink-0 w-[85px] text-[10px]">
-                  {formatTime(log.timestamp)}
-                </span>
-                <span className={`shrink-0 w-7 text-center text-[10px] font-bold rounded-sm px-0.5 ${
-                  isSys ? 'bg-amber-500/20 text-amber-400' :
-                  isTx ? 'bg-blue-500/20 text-blue-400' :
-                  'bg-green-500/20 text-green-400'
-                }`}>
-                  {isSys ? 'SYS' : isTx ? 'TX' : 'RX'}
-                </span>
-                {log.tabId && (
-                  <span className="shrink-0 text-purple-400/70 text-[9px] w-[50px] truncate" title={tabNameMap[log.tabId]}>
-                    {tabNameMap[log.tabId] ?? '?'}
-                  </span>
-                )}
-                <span className={`shrink-0 w-8 text-[10px] ${
-                  log.type === 'error' ? 'text-red-400 bg-red-500/10 rounded-sm px-1' :
-                  log.type === 'info' ? 'text-amber-400 bg-amber-500/10 rounded-sm px-1' : 'text-foreground/70'
-                }`}>
-                  {log.type === 'error' ? 'ERR' : log.type === 'info' ? 'INF' : 'DAT'}
-                </span>
-                <span className="text-foreground flex-1 truncate">{log.message}</span>
-                {log.rawData && (
-                  <span className="text-cyan-400/70 text-[10px] max-w-[220px] truncate shrink-0 font-mono" title={log.rawData}>
-                    {formatHexDump(log.rawData)}
-                  </span>
-                )}
-              </div>
-            );
-          })}
         </div>
       </ScrollArea>
     </div>
