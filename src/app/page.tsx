@@ -1,35 +1,143 @@
-import type { Metadata } from 'next';
-import Image from 'next/image';
+'use client';
 
-export const metadata: Metadata = {
-  title: '扣子编程 - AI 开发伙伴',
-  description: '扣子编程，你的 AI 开发伙伴已就位',
-};
+import { useState } from 'react';
+import { I18nProvider, useI18n } from '@/hooks/use-i18n';
+import { AppProvider, useAppState } from '@/hooks/use-app-state';
+import { usePolling } from '@/components/register-tab-manager';
+import { ConnectionPanel } from '@/components/connection-panel';
+import { RegisterTabManager } from '@/components/register-tab-manager';
+import { LogViewer } from '@/components/log-viewer';
+import { ProfileManager } from '@/components/profile-manager';
+import { Button } from '@/components/ui/button';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+
+type SidePanel = 'connections' | 'profiles' | 'logs' | null;
+
+function AppContent() {
+  const { t, locale, setLocale } = useI18n();
+  const [sidePanel, setSidePanel] = useState<SidePanel>('connections');
+  usePolling();
+
+  const togglePanel = (panel: SidePanel) => {
+    setSidePanel(prev => prev === panel ? null : panel);
+  };
+
+  return (
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-[#0f1319] shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
+            <h1 className="text-sm font-bold text-foreground tracking-wide">{t('appTitle')}</h1>
+          </div>
+          <span className="text-[10px] text-muted-foreground hidden sm:inline">{t('appSubtitle')}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant={sidePanel === 'connections' ? 'secondary' : 'ghost'}
+            className="h-7 text-[10px] px-2"
+            onClick={() => togglePanel('connections')}
+          >
+            {t('connections')}
+          </Button>
+          <Button
+            size="sm"
+            variant={sidePanel === 'profiles' ? 'secondary' : 'ghost'}
+            className="h-7 text-[10px] px-2"
+            onClick={() => togglePanel('profiles')}
+          >
+            {t('profiles')}
+          </Button>
+          <Button
+            size="sm"
+            variant={sidePanel === 'logs' ? 'secondary' : 'ghost'}
+            className="h-7 text-[10px] px-2"
+            onClick={() => togglePanel('logs')}
+          >
+            {t('logs')}
+          </Button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[10px] px-2"
+            onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
+          >
+            {locale === 'zh' ? 'EN' : '中'}
+          </Button>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden">
+        {sidePanel && (
+          <ResizablePanelGroup orientation="horizontal">
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="bg-[#0f1319] border-r border-border overflow-hidden">
+              {sidePanel === 'connections' && <ConnectionPanel />}
+              {sidePanel === 'profiles' && <ProfileManager />}
+              {sidePanel === 'logs' && <LogViewer />}
+            </ResizablePanel>
+            <ResizableHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
+            <ResizablePanel defaultSize={80}>
+              <MainArea />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
+        {!sidePanel && <MainArea />}
+      </div>
+
+      {/* Status bar */}
+      <StatusBar />
+    </div>
+  );
+}
+
+function MainArea() {
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <RegisterTabManager />
+    </div>
+  );
+}
+
+function StatusBar() {
+  const { state } = useAppState();
+  const connectedCount = Object.values(state.connectionStatus).filter(s => s === 'connected').length;
+  const pollingCount = state.tabs.filter(t => t.isPolling).length;
+
+  return (
+    <footer className="flex items-center justify-between px-4 py-1 border-t border-border bg-[#0f1319] text-[10px] text-muted-foreground shrink-0">
+      <div className="flex items-center gap-4">
+        <span>
+          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${
+            connectedCount > 0 ? 'bg-green-500' : 'bg-zinc-600'
+          }`} />
+          {connectedCount} connected
+        </span>
+        <span>{state.connections.length} connections</span>
+        <span>{state.tabs.length} tabs</span>
+        {pollingCount > 0 && (
+          <span className="text-amber-400">
+            {pollingCount} polling
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <span>ModBus TCP/UDP/Serial</span>
+        <span>ASCII/RTU</span>
+      </div>
+    </footer>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex h-full items-center justify-center bg-background text-foreground transition-colors duration-300 dark:bg-background dark:text-foreground overflow-hidden min-h-screen">
-      {/* 主容器 */}
-      <main className="flex w-full h-full max-w-3xl flex-col items-center justify-center px-16 py-32 sm:items-center">
-        <div className="flex flex-col items-center justify-between gap-4">
-           <Image
-            src="https://lf-coze-web-cdn.coze.cn/obj/eden-cn/lm-lgvj/ljhwZthlaukjlkulzlp/coze-coding/icon/coze-coding.gif"
-            alt="扣子编程 Logo"
-            width={156}
-            height={130}
-          />
-          <div>
-            <div className="flex flex-col items-center gap-2 text-center sm:items-center sm:text-center">
-              <h1 className="max-w-xl text-base font-semibold leading-tight tracking-tight text-foreground dark:text-foreground">
-                应用开发中
-              </h1>
-              <p className="max-w-2xl text-sm leading-8 text-muted-foreground dark:text-muted-foreground">
-                请稍后，页面即将呈现
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+    <I18nProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </I18nProvider>
   );
 }

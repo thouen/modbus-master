@@ -1,65 +1,76 @@
-# 项目上下文
+# AGENTS.md - ModBus Master Web Application
 
-### 版本技术栈
+## 项目概览
+ModBus 主站网页应用，支持多协议（Serial/TCP/UDP）、多模式（ASCII/RTU）通信，提供多格式寄存器数据展示、实时日志、标签页管理和配置持久化功能。
 
+## 技术栈
 - **Framework**: Next.js 16 (App Router)
 - **Core**: React 19
 - **Language**: TypeScript 5
-- **UI 组件**: shadcn/ui (基于 Radix UI)
-- **Styling**: Tailwind CSS 4
+- **UI**: shadcn/ui + Tailwind CSS 4
+- **State**: React Context + useReducer
 
 ## 目录结构
-
 ```
-├── public/                 # 静态资源
-├── scripts/                # 构建与启动脚本
-│   ├── build.sh            # 构建脚本
-│   ├── dev.sh              # 开发环境启动脚本
-│   ├── prepare.sh          # 预处理脚本
-│   └── start.sh            # 生产环境启动脚本
-├── src/
-│   ├── app/                # 页面路由与布局
-│   ├── components/ui/      # Shadcn UI 组件库
-│   ├── hooks/              # 自定义 Hooks
-│   ├── lib/                # 工具库
-│   │   └── utils.ts        # 通用工具函数 (cn)
-│   └── server.ts           # 自定义服务端入口
-├── next.config.ts          # Next.js 配置
-├── package.json            # 项目依赖管理
-└── tsconfig.json           # TypeScript 配置
+src/
+├── app/
+│   ├── layout.tsx              # 根布局（dark theme）
+│   ├── page.tsx                # 主页面（AppContent 组合）
+│   └── globals.css             # 全局样式（工业暗色主题）
+├── components/
+│   ├── ui/                     # shadcn/ui 组件库
+│   ├── connection-panel.tsx    # 连接管理面板
+│   ├── register-tab-manager.tsx # 标签页管理 + 数据展示
+│   ├── log-viewer.tsx          # 实时日志查看器
+│   └── profile-manager.tsx     # 配置文件保存/加载
+├── hooks/
+│   ├── use-i18n.tsx            # 国际化 Context
+│   └── use-app-state.tsx       # 全局状态管理
+└── lib/
+    ├── i18n.ts                 # 中英文翻译字典
+    ├── modbus-types.ts         # ModBus 协议类型定义
+    ├── modbus-utils.ts         # 协议工具函数（CRC16/LRC/帧构建/数据转换）
+    └── utils.ts                # 通用工具（cn）
 ```
 
-- 项目文件（如 app 目录、pages 目录、components 等）默认初始化到 `src/` 目录下。
+## 核心功能模块
 
-## 包管理规范
+### 1. 连接管理 (`connection-panel.tsx`)
+- 支持 Serial/TCP/UDP 三种协议
+- 支持 ASCII/RTU 两种模式
+- 串口配置：端口、波特率、数据位、停止位、校验位
+- TCP/UDP 配置：主机、端口
+- 连接状态指示（连接/断开/连接中）
 
-**仅允许使用 pnpm** 作为包管理器，**严禁使用 npm 或 yarn**。
-**常用命令**：
-- 安装依赖：`pnpm add <package>`
-- 安装开发依赖：`pnpm add -D <package>`
-- 安装所有依赖：`pnpm install`
-- 移除依赖：`pnpm remove <package>`
+### 2. 标签页管理 (`register-tab-manager.tsx`)
+- 每个标签独立配置：起始地址、寄存器数量（最大125）、功能码、轮询间隔
+- 支持自动轮询和单次读取
+- 数据展示格式：LED(1位)、Short/UShort/Hex/Binary(16位)、Long/ULong/Float(32位)、Double(64位)
+- 32位字节序：ABCD(DCBA)、BADC、CDAB
+- 64位字节序：ABCDEFGH、HGFEDCBA、BADCFEHG、GHEFCDAB
 
-## 开发规范
+### 3. 日志系统 (`log-viewer.tsx`)
+- 每个标签独立日志
+- 显示发送/接收方向、时间戳、原始数据
+- 支持自动滚动、清除、导出
 
-### 编码规范
+### 4. 配置管理 (`profile-manager.tsx`)
+- 保存/加载连接和标签配置
+- 支持 JSON 导入/导出
 
-- 默认按 TypeScript `strict` 心智写代码；优先复用当前作用域已声明的变量、函数、类型和导入，禁止引用未声明标识符或拼错变量名。
-- 禁止隐式 `any` 和 `as any`；函数参数、返回值、解构项、事件对象、`catch` 错误在使用前应有明确类型或先完成类型收窄，并清理未使用的变量和导入。
+### 5. 国际化 (`use-i18n.tsx` + `i18n.ts`)
+- 中文/英文双语支持
+- 通过 Context 全局共享
 
-### next.config 配置规范
+## 构建与运行
+```bash
+pnpm install        # 安装依赖
+pnpm run dev        # 开发模式
+pnpm run build      # 生产构建
+pnpm run start      # 生产启动
+pnpm ts-check       # TypeScript 检查
+pnpm lint           # ESLint 检查
+```
 
-- 配置的路径不要写死绝对路径，必须使用 path.resolve(__dirname, ...)、import.meta.dirname 或 process.cwd() 动态拼接。
-
-### Hydration 问题防范
-
-1. 严禁在 JSX 渲染逻辑中直接使用 typeof window、Date.now()、Math.random() 等动态数据。**必须使用 'use client' 并配合 useEffect + useState 确保动态内容仅在客户端挂载后渲染**；同时严禁非法 HTML 嵌套（如 <p> 嵌套 <div>）。
-2. **禁止使用 head 标签**，优先使用 metadata，详见文档：https://nextjs.org/docs/app/api-reference/functions/generate-metadata
-   1. 三方 CSS、字体等资源可在 `globals.css` 中顶部通过 `@import` 引入或使用 next/font
-   2. preload, preconnect, dns-prefetch 通过 ReactDOM 的 preload、preconnect、dns-prefetch 方法引入
-   3. json-ld 可阅读 https://nextjs.org/docs/app/guides/json-ld
-
-## UI 设计与组件规范 (UI & Styling Standards)
-
-- 模板默认预装核心组件库 `shadcn/ui`，位于`src/components/ui/`目录下
-- Next.js 项目**必须默认**采用 shadcn/ui 组件、风格和规范，**除非用户指定用其他的组件和规范。**
+## 设计规范
+参考 `DESIGN.md`：工业暗色主题，SCADA 监控终端风格。
