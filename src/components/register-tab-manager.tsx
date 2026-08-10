@@ -265,42 +265,35 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {/* Always show byte order selectors - they apply to any format that uses multiple registers */}
+        {/* 32-bit byte order dropdown */}
         <div className="space-y-1">
           <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (32-bit)</label>
-          <div className="flex flex-wrap gap-1">
-            {(['ABCD', 'DCBA', 'BADC', 'CDAB'] as const).map(bo => (
-              <button
-                key={bo}
-                onClick={() => updateTab({ byteOrder32: bo })}
-                className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
-                  tab.byteOrder32 === bo
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm'
-                    : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
-                }`}
-              >
-                {bo}
-              </button>
-            ))}
-          </div>
+          <Select value={tab.byteOrder32} onValueChange={v => updateTab({ byteOrder32: v as ByteOrder32 })}>
+            <SelectTrigger className="h-8 text-xs bg-background border-border font-mono">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ABCD" className="font-mono text-xs">ABCD</SelectItem>
+              <SelectItem value="DCBA" className="font-mono text-xs">DCBA</SelectItem>
+              <SelectItem value="BADC" className="font-mono text-xs">BADC</SelectItem>
+              <SelectItem value="CDAB" className="font-mono text-xs">CDAB</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+        {/* 64-bit byte order dropdown */}
         <div className="space-y-1">
           <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (64-bit)</label>
-          <div className="flex flex-wrap gap-1">
-            {(['ABCDEFGH', 'HGFEDCBA', 'BADCFEHG', 'GHEFCDAB'] as const).map(bo => (
-              <button
-                key={bo}
-                onClick={() => updateTab({ byteOrder64: bo })}
-                className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
-                  tab.byteOrder64 === bo
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm'
-                    : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
-                }`}
-              >
-                {bo}
-              </button>
-            ))}
-          </div>
+          <Select value={tab.byteOrder64} onValueChange={v => updateTab({ byteOrder64: v as ByteOrder64 })}>
+            <SelectTrigger className="h-8 text-xs bg-background border-border font-mono">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ABCDEFGH" className="font-mono text-xs">ABCDEFGH</SelectItem>
+              <SelectItem value="HGFEDCBA" className="font-mono text-xs">HGFEDCBA</SelectItem>
+              <SelectItem value="BADCFEHG" className="font-mono text-xs">BADCFEHG</SelectItem>
+              <SelectItem value="GHEFCDAB" className="font-mono text-xs">GHEFCDAB</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('pollInterval')}</label>
