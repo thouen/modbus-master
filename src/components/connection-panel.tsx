@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAppState } from '@/hooks/use-app-state';
-import type { ConnectionConfig, Protocol, Mode, ByteOrder32, ByteOrder64, LogEntry } from '@/lib/modbus-types';
+import { useModbusWs } from '@/hooks/use-modbus-ws';
+import type { ConnectionConfig, Protocol, Mode, ByteOrder32, ByteOrder64 } from '@/lib/modbus-types';
 import { generateId } from '@/lib/modbus-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,21 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-/** Helper to create a system log entry */
-function createSysLog(conn: ConnectionConfig, message: string): LogEntry {
-  return {
-    id: generateId(),
-    timestamp: new Date().getTime(),
-    connectionId: conn.id,
-    direction: 'sys',
-    type: 'info',
-    message,
-  };
-}
-
 export function ConnectionPanel() {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
+  const { connectDevice, disconnectDevice } = useModbusWs();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const handleNew = () => {
@@ -47,35 +37,9 @@ export function ConnectionPanel() {
     const currentStatus = state.connectionStatus[conn.id];
 
     if (currentStatus === 'connected') {
-      // Disconnect: just change status, keep tabs and logs
-      dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id: conn.id, status: 'disconnected' } });
-      dispatch({
-        type: 'ADD_LOG',
-        payload: {
-          connectionId: conn.id,
-          log: createSysLog(conn, `[${conn.name}] Disconnected (${conn.protocol.toUpperCase()}/${conn.mode.toUpperCase()})`),
-        },
-      });
+      disconnectDevice(conn.id);
     } else {
-      dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id: conn.id, status: 'connecting' } });
-      dispatch({
-        type: 'ADD_LOG',
-        payload: {
-          connectionId: conn.id,
-          log: createSysLog(conn, `[${conn.name}] Connecting... (${conn.protocol.toUpperCase()}/${conn.mode.toUpperCase()} Slave:${conn.slaveId})`),
-        },
-      });
-
-      setTimeout(() => {
-        dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id: conn.id, status: 'connected' } });
-        dispatch({
-          type: 'ADD_LOG',
-          payload: {
-            connectionId: conn.id,
-            log: createSysLog(conn, `[${conn.name}] Connected successfully`),
-          },
-        });
-      }, 1000);
+      connectDevice(conn.id, conn);
     }
   };
 

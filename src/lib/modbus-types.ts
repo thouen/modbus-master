@@ -4,6 +4,8 @@ export type Protocol = 'serial' | 'tcp' | 'udp';
 export type Mode = 'ascii' | 'rtu';
 export type FunctionCode = '01' | '02' | '03' | '04' | '05' | '06' | '15' | '16';
 
+export type ModbusConnectionStatus = 'connected' | 'disconnected' | 'connecting';
+
 export type ByteOrder32 = 'ABCD' | 'DCBA' | 'BADC' | 'CDAB';
 export type ByteOrder64 = 'ABCDEFGH' | 'HGFEDCBA' | 'BADCFEHG' | 'GHEFCDAB';
 

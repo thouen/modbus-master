@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAppState, type Action } from '@/hooks/use-app-state';
+import { useModbusWs } from '@/hooks/use-modbus-ws';
 import type { RegisterTab, RegisterData, FunctionCode, DataDisplayFormat, ByteOrder32, ByteOrder64, LogEntry, ConnectionConfig } from '@/lib/modbus-types';
 import { generateId, formatRegisterValue, getRegistersPerValue, buildRTUFrame, toHexString } from '@/lib/modbus-utils';
 import { Button } from '@/components/ui/button';
@@ -143,6 +144,7 @@ export function RegisterTabManager() {
 function TabConfigPanel({ tab }: { tab: RegisterTab }) {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
+  const { readRegisters } = useModbusWs();
 
   const connection = state.connections.find(c => c.id === tab.connectionId);
 
@@ -309,7 +311,15 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           className="h-7 text-xs"
           onClick={() => {
             if (connection) {
-              simulateRead(tab, connection, dispatch);
+              readRegisters(
+                connection.id,
+                tab.id,
+                connection.slaveId,
+                parseInt(tab.functionCode),
+                tab.startAddress,
+                tab.registerCount,
+                connection.mode,
+              );
             }
           }}
         >
@@ -321,111 +331,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
       </div>
     </div>
   );
-}
-
-function simulateRead(tab: RegisterTab, connection: ConnectionConfig, dispatch: React.Dispatch<Action>) {
-  const slaveId = connection.slaveId;
-  const fc = parseInt(tab.functionCode);
-  const isWrite = fc === 5 || fc === 6 || fc === 15 || fc === 16;
-
-  // For write functions, simulate writing data
-  if (isWrite) {
-    const txFrame = buildRTUFrame(slaveId, fc, tab.startAddress, tab.registerCount);
-
-    const txLog: LogEntry = {
-      id: generateId(),
-      timestamp: Date.now(),
-      connectionId: connection.id,
-      tabId: tab.id,
-      direction: 'tx',
-      type: 'data',
-      message: `[${tab.name}] FC${tab.functionCode} Write Addr:${tab.startAddress} Qty:${tab.registerCount}`,
-      rawData: toHexString(txFrame),
-    };
-
-    dispatch({
-      type: 'ADD_LOG',
-      payload: { connectionId: connection.id, log: txLog },
-    });
-
-    // Simulate write response (echo back)
-    setTimeout(() => {
-      const rxLog: LogEntry = {
-        id: generateId(),
-        timestamp: Date.now(),
-        connectionId: connection.id,
-        tabId: tab.id,
-        direction: 'rx',
-        type: 'data',
-        message: `[${tab.name}] Write OK Addr:${tab.startAddress} Qty:${tab.registerCount}`,
-        rawData: toHexString(txFrame),
-      };
-
-      dispatch({
-        type: 'ADD_LOG',
-        payload: { connectionId: connection.id, log: rxLog },
-      });
-    }, 50);
-
-    return;
-  }
-
-  // Read functions (FC01-FC04)
-  const data: RegisterData[] = [];
-  for (let i = 0; i < tab.registerCount; i++) {
-    data.push({
-      address: tab.startAddress + i,
-      rawValue: Math.floor(Math.random() * 0xffff),
-    });
-  }
-
-  dispatch({
-    type: 'SET_REGISTER_DATA',
-    payload: { tabId: tab.id, data },
-  });
-
-  const txFrame = buildRTUFrame(slaveId, fc, tab.startAddress, tab.registerCount);
-
-  const txLog: LogEntry = {
-    id: generateId(),
-    timestamp: Date.now(),
-    connectionId: connection.id,
-    tabId: tab.id,
-    direction: 'tx',
-    type: 'data',
-    message: `[${tab.name}] FC${tab.functionCode} Start:${tab.startAddress} Qty:${tab.registerCount}`,
-    rawData: toHexString(txFrame),
-  };
-
-  dispatch({
-    type: 'ADD_LOG',
-    payload: { connectionId: connection.id, log: txLog },
-  });
-
-  // Simulate response with delay
-  setTimeout(() => {
-    const responseData = data.map(d => d.rawValue);
-    const rxBytes: number[] = [slaveId, fc, tab.registerCount * 2];
-    for (const val of responseData) {
-      rxBytes.push((val >> 8) & 0xff, val & 0xff);
-    }
-
-    const rxLog: LogEntry = {
-      id: generateId(),
-      timestamp: Date.now(),
-      connectionId: connection.id,
-      tabId: tab.id,
-      direction: 'rx',
-      type: 'data',
-      message: `[${tab.name}] Response ${tab.registerCount} regs | ${tab.registerCount * 2} bytes`,
-      rawData: toHexString(rxBytes),
-    };
-
-    dispatch({
-      type: 'ADD_LOG',
-      payload: { connectionId: connection.id, log: rxLog },
-    });
-  }, 50);
 }
 
 function DataDisplayArea({ tab }: { tab: RegisterTab }) {
@@ -566,6 +471,7 @@ function LedDisplay({ data }: { data: RegisterData[] }) {
 // Polling effect - each tab independently polls its register range
 export function usePolling() {
   const { state, dispatch } = useAppState();
+  const { readRegisters } = useModbusWs();
   const intervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   useEffect(() => {
@@ -587,18 +493,22 @@ export function usePolling() {
         // Only poll if connection exists and is connected
         if (conn && state.connectionStatus[conn.id] === 'connected') {
           intervalsRef.current[tab.id] = setInterval(() => {
-            // Re-check connection status each poll tick
-            const currentConn = state.connections.find(c => c.id === tab.connectionId);
-            if (currentConn && state.connectionStatus[currentConn.id] === 'connected') {
-              simulateRead(tab, currentConn, dispatch);
-            }
+            readRegisters(
+              conn.id,
+              tab.id,
+              conn.slaveId,
+              parseInt(tab.functionCode),
+              tab.startAddress,
+              tab.registerCount,
+              conn.mode,
+            );
           }, tab.pollInterval);
         }
       }
     }
 
     // Cleanup on unmount
-  }, [state.tabs, state.connections, state.connectionStatus, dispatch]);
+  }, [state.tabs, state.connections, state.connectionStatus, dispatch, readRegisters]);
 
   // Cleanup on unmount
   useEffect(() => {
