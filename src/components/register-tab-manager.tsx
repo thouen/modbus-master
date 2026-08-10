@@ -156,7 +156,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('tabName')}</label>
           <Input
-            className="h-7 text-xs bg-background border-border"
+            className="h-9 text-xs bg-background border-border"
             value={tab.name}
             onChange={e => updateTab({ name: e.target.value })}
           />
@@ -171,7 +171,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
               byteOrder64: newConn?.byteOrder64 ?? tab.byteOrder64,
             });
           }}>
-            <SelectTrigger className="h-7 text-xs bg-background border-border">
+            <SelectTrigger className="h-9 text-xs bg-background border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -181,6 +181,27 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1 col-span-2">
+          <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
+          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start flex-wrap gap-0.5">
+            {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => {
+              const fcKey = `fc${fc}` as const;
+              return (
+                <ToggleGroupItem key={fc} value={fc} size="sm" className="h-9 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50 group" title={t(fcKey)}>
+                  <span className="flex flex-col items-center leading-tight">
+                    <span className="font-mono">FC{fc}</span>
+                    <span className="text-[7px] text-muted-foreground/50 group-data-[state=on]:text-blue-400/60 hidden sm:inline whitespace-nowrap">
+                      {t(fcKey).replace(/^\d+ - /, '')}
+                    </span>
+                  </span>
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        </div>
+        
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('startAddress')}</label>
           <Input
@@ -203,58 +224,38 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             onChange={e => updateTab({ registerCount: Math.min(125, Number(e.target.value)) })}
           />
         </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
-          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start flex-wrap gap-0.5">
-            {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => {
-              const fcKey = `fc${fc}` as const;
-              return (
-                <ToggleGroupItem key={fc} value={fc} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50 group" title={t(fcKey)}>
-                  <span className="flex flex-col items-center leading-tight">
-                    <span className="font-mono">FC{fc}</span>
-                    <span className="text-[7px] text-muted-foreground/50 group-data-[state=on]:text-blue-400/60 hidden sm:inline whitespace-nowrap">
-                      {t(fcKey).replace(/^\d+ - /, '')}
-                    </span>
-                  </span>
-                </ToggleGroupItem>
-              );
-            })}
-          </ToggleGroup>
-        </div>
-        <div className="space-y-1">
+        <div className="space-y-1 col-span-2">
           <label className="text-[10px] text-muted-foreground">{t('displayFormat')}</label>
           <div className="flex flex-wrap gap-1">
             <ToggleGroup type="single" value={tab.displayFormat} onValueChange={v => v && updateTab({ displayFormat: v as DataDisplayFormat })} className="justify-start flex-wrap gap-0.5">
-              <ToggleGroupItem value="led" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
+              <ToggleGroupItem value="led" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
                 LED
               </ToggleGroupItem>
               <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="short" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="short" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 Short
               </ToggleGroupItem>
-              <ToggleGroupItem value="ushort" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="ushort" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 UShort
               </ToggleGroupItem>
-              <ToggleGroupItem value="hex" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="hex" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 Hex
               </ToggleGroupItem>
-              <ToggleGroupItem value="binary" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="binary" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 Binary
               </ToggleGroupItem>
               <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="long" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+              <ToggleGroupItem value="long" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
                 Long
               </ToggleGroupItem>
-              <ToggleGroupItem value="ulong" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+              <ToggleGroupItem value="ulong" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
                 ULong
               </ToggleGroupItem>
-              <ToggleGroupItem value="float" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+              <ToggleGroupItem value="float" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
                 Float
               </ToggleGroupItem>
               <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="double" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-400 data-[state=on]:border-purple-500/30 border border-border/50">
+              <ToggleGroupItem value="double" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-400 data-[state=on]:border-purple-500/30 border border-border/50">
                 Double
               </ToggleGroupItem>
             </ToggleGroup>
@@ -266,19 +267,19 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (32-bit)</label>
           <ToggleGroup type="single" value={tab.byteOrder32} onValueChange={v => v && updateTab({ byteOrder32: v as ByteOrder32 })} className="justify-start flex-wrap gap-0.5">
-            <ToggleGroupItem value="ABCD" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCD</ToggleGroupItem>
-            <ToggleGroupItem value="DCBA" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">DCBA</ToggleGroupItem>
-            <ToggleGroupItem value="BADC" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADC</ToggleGroupItem>
-            <ToggleGroupItem value="CDAB" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">CDAB</ToggleGroupItem>
+            <ToggleGroupItem value="ABCD" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCD</ToggleGroupItem>
+            <ToggleGroupItem value="DCBA" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">DCBA</ToggleGroupItem>
+            <ToggleGroupItem value="BADC" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADC</ToggleGroupItem>
+            <ToggleGroupItem value="CDAB" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">CDAB</ToggleGroupItem>
           </ToggleGroup>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('byteOrder')} (64-bit)</label>
           <ToggleGroup type="single" value={tab.byteOrder64} onValueChange={v => v && updateTab({ byteOrder64: v as ByteOrder64 })} className="justify-start flex-wrap gap-0.5">
-            <ToggleGroupItem value="ABCDEFGH" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCDEFGH</ToggleGroupItem>
-            <ToggleGroupItem value="HGFEDCBA" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">HGFEDCBA</ToggleGroupItem>
-            <ToggleGroupItem value="BADCFEHG" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADCFEHG</ToggleGroupItem>
-            <ToggleGroupItem value="GHEFCDAB" size="sm" className="h-6 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">GHEFCDAB</ToggleGroupItem>
+            <ToggleGroupItem value="ABCDEFGH" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">ABCDEFGH</ToggleGroupItem>
+            <ToggleGroupItem value="HGFEDCBA" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">HGFEDCBA</ToggleGroupItem>
+            <ToggleGroupItem value="BADCFEHG" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">BADCFEHG</ToggleGroupItem>
+            <ToggleGroupItem value="GHEFCDAB" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 border border-border/50">GHEFCDAB</ToggleGroupItem>
           </ToggleGroup>
         </div>
         <div className="space-y-1">
