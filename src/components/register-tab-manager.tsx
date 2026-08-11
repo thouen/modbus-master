@@ -186,27 +186,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1 col-span-2">
-          <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
-          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start flex-wrap gap-0.5">
-            {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => {
-              const fcKey = `fc${fc}` as const;
-              return (
-                <ToggleGroupItem key={fc} value={fc} size="sm" className="h-9 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50 group" title={t(fcKey)}>
-                  <span className="flex flex-col items-center leading-tight">
-                    <span className="font-mono">FC{fc}</span>
-                    <span className="text-[7px] text-muted-foreground/50 group-data-[state=on]:text-blue-400/60 hidden sm:inline whitespace-nowrap">
-                      {t(fcKey).replace(/^\d+ - /, '')}
-                    </span>
-                  </span>
-                </ToggleGroupItem>
-              );
-            })}
-          </ToggleGroup>
-        </div>
-        
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
         {/* 32-bit byte order dropdown */}
         <div className="space-y-1">
           <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (32-bit)</label>
@@ -237,6 +216,60 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             </SelectContent>
           </Select>
         </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+        <div className="space-y-1 col-span-2">
+          <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
+          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start flex-wrap gap-0.5">
+            {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => {
+              const fcKey = `fc${fc}` as const;
+              return (
+                <ToggleGroupItem key={fc} value={fc} size="sm" className="h-9 text-[10px] px-1.5 data-[state=on]:bg-blue-500/20 data-[state=on]:text-blue-400 data-[state=on]:border-blue-500/30 border border-border/50 group" title={t(fcKey)}>
+                  <span className="flex flex-col items-center leading-tight">
+                    <span className="font-mono">FC{fc}</span>
+                    <span className="text-[7px] text-muted-foreground/50 group-data-[state=on]:text-blue-400/60 hidden sm:inline whitespace-nowrap">
+                      {t(fcKey).replace(/^\d+ - /, '')}
+                    </span>
+                  </span>
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">{t('startAddress')}</label>
+          <Input
+            type="number"
+            className="h-9 text-xs bg-background border-border"
+            value={tab.startAddress}
+            min={0}
+            max={65535}
+            onChange={e => updateTab({ startAddress: Number(e.target.value) })}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">{t(isBitFC ? 'coilCount' : 'registerCount')}</label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              className="flex-1 h-9 text-xs bg-background border-border"
+              value={isBitFC ? tab.registerCount * 16 : tab.registerCount}
+              min={1}
+              max={maxCount}
+              onChange={e => {
+                const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
+                updateTab({ registerCount: isBitFC ? Math.floor(val / 16) : val });
+              }}
+            />
+            <span className="w-24 text-[9px] text-muted-foreground">
+              {isBitFC
+                ? `${t('registerCount')}: ${tab.registerCount}`
+                : `位: ${tab.registerCount * 16}`}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div className="space-y-1 col-span-2">
           <label className="text-[10px] text-muted-foreground">{t('displayFormat')}</label>
           <div className="flex flex-wrap gap-1">
@@ -273,38 +306,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('startAddress')}</label>
-          <Input
-            type="number"
-            className="h-9 text-xs bg-background border-border"
-            value={tab.startAddress}
-            min={0}
-            max={65535}
-            onChange={e => updateTab({ startAddress: Number(e.target.value) })}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t(isBitFC ? 'coilCount' : 'registerCount')}</label>
-          <Input
-            type="number"
-            className="h-9 text-xs bg-background border-border"
-            value={isBitFC ? tab.registerCount * 16 : tab.registerCount}
-            min={1}
-            max={maxCount}
-            onChange={e => {
-              const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
-              updateTab({ registerCount: isBitFC ? Math.floor(val / 16) : val });
-            }}
-          />
-          <span className="text-[9px] text-muted-foreground">
-            {isBitFC
-              ? `${t('registerCount')}: ${tab.registerCount} (${tab.registerCount * 16} bits)`
-              : `位: ${tab.registerCount * 16}`}
-          </span>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('pollInterval')}</label>
