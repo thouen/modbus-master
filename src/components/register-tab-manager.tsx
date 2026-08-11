@@ -226,10 +226,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         <div className="space-y-1 col-span-2">
           <label className="text-[10px] text-muted-foreground">{t('displayFormat')}</label>
           <div className="flex flex-wrap gap-1">
-            {isBitFC ? (
-              <div className="inline-flex items-center h-7 px-2.5 rounded-md text-[10px] font-medium bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">Bit</div>
-            ) : (
-              <ToggleGroup type="single" value={tab.displayFormat} onValueChange={v => v && updateTab({ displayFormat: v as DataDisplayFormat })} className="justify-start flex-wrap gap-0.5">
+            <ToggleGroup type="single" value={tab.displayFormat} onValueChange={v => v && updateTab({ displayFormat: v as DataDisplayFormat })} className="justify-start flex-wrap gap-0.5">
                 <ToggleGroupItem value="led" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
                   Bit
                 </ToggleGroupItem>
@@ -261,7 +258,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
                   Double
                 </ToggleGroupItem>
               </ToggleGroup>
-            )}
           </div>
         </div>
         {/* 32-bit byte order dropdown */}
@@ -451,6 +447,15 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
                     values,
                     connection.mode,
                   );
+                  // Update register data to show written values in the display area
+                  const newRegisterData: import('@/lib/modbus-types').RegisterData[] = values.map((v, i) => ({
+                    address: tab.startAddress + i,
+                    rawValue: v,
+                  }));
+                  dispatch({
+                    type: 'SET_REGISTER_DATA',
+                    payload: { tabId: tab.id, data: newRegisterData },
+                  });
                   setWriteStatus('success');
                   setTimeout(() => setWriteStatus(null), 2000);
                 } catch {
