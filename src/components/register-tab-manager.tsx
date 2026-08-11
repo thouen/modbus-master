@@ -85,7 +85,7 @@ export function RegisterTabManager() {
                 >
                   <span className="max-w-[70px] truncate">{tab.name}</span>
                   <span className="text-[9px] text-muted-foreground/60 hidden group-hover:inline">
-                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.registerCount * 8 - 1 : tab.registerCount - 1)}
+                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.registerCount * 16 - 1 : tab.registerCount - 1)}
                   </span>
                   {tab.isPolling && status === 'connected' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -292,18 +292,18 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           <Input
             type="number"
             className="h-9 text-xs bg-background border-border"
-            value={isBitFC ? tab.registerCount * 8 : tab.registerCount}
+            value={isBitFC ? tab.registerCount * 16 : tab.registerCount}
             min={1}
             max={maxCount}
             onChange={e => {
               const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
-              updateTab({ registerCount: isBitFC ? Math.floor(val / 8) : val });
+              updateTab({ registerCount: isBitFC ? Math.floor(val / 16) : val });
             }}
           />
           <span className="text-[9px] text-muted-foreground">
             {isBitFC
-              ? `${t('registerCount')}: ${tab.registerCount} (≈${Math.floor(tab.registerCount * 8 / 16)} × 16-bit)`
-              : `位: ${tab.registerCount * 8}`}
+              ? `${t('registerCount')}: ${tab.registerCount} (${tab.registerCount * 16} bits)`
+              : `位: ${tab.registerCount * 16}`}
           </span>
         </div>
         <div className="space-y-1">
@@ -339,7 +339,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
                 connection.slaveId,
                 parseInt(tab.functionCode),
                 tab.startAddress,
-                isBitFC ? tab.registerCount : tab.registerCount * 8,
+                isBitFC ? tab.registerCount : tab.registerCount * 16,
                 connection.mode,
               );
             }
@@ -366,7 +366,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
   const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
   const [editingValues, setEditingValues] = useState<Record<number, string>>({});
-  const dataCount = isBitFC ? tab.registerCount * 8 : tab.registerCount;
+  const dataCount = isBitFC ? tab.registerCount : tab.registerCount * 16;
 
   const handleWrite = useCallback(async () => {
     if (!conn) return;
@@ -511,7 +511,7 @@ function LedDisplay({ data, isWrite, editingValues, onSetValue }: {
   onSetValue: (addr: number, val: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-3 p-2">
+    <div className="flex flex-col gap-2 p-2">
       {data.map(reg => {
         const bits = isWrite
           ? (Array.from({ length: 16 }, (_, i) => {
@@ -531,11 +531,12 @@ function LedDisplay({ data, isWrite, editingValues, onSetValue }: {
         };
 
         return (
-          <div key={reg.address} className="flex flex-col items-center gap-1">
-            <span className="text-[9px] text-muted-foreground font-mono">
+          <div key={reg.address} className="flex items-center gap-2">
+            <span className="text-[9px] text-muted-foreground font-mono w-12 shrink-0 text-right">
               {reg.address.toString().padStart(5, '0')}
             </span>
-            <div className="grid grid-cols-4 gap-0.5">
+            <span className="text-[9px] text-muted-foreground/40">|</span>
+            <div className="flex gap-0.5">
               {bits.map((bit, i) => (
                 <div
                   key={i}
@@ -544,11 +545,14 @@ function LedDisplay({ data, isWrite, editingValues, onSetValue }: {
                     bit
                       ? 'bg-green-500 border-green-400 shadow-[0_0_3px_rgba(34,197,94,0.6)]'
                       : 'bg-zinc-800 border-zinc-700'
-                  } ${isWrite ? 'cursor-pointer hover:ring-1 hover:ring-amber-500' : ''}`}
+                  } ${isWrite ? 'cursor-pointer hover:ring-1 hover:ring-amber-500' : ''} ${i % 4 === 3 ? 'mr-1' : ''}`}
                   title={`Bit ${15 - i}: ${bit}${isWrite ? ' (click to toggle)' : ''}`}
                 />
               ))}
             </div>
+            <span className="text-[9px] text-muted-foreground/40 font-mono ml-1">
+              {bits.map(b => b).join('')}
+            </span>
           </div>
         );
       })}
@@ -588,7 +592,7 @@ export function usePolling() {
               conn.slaveId,
               parseInt(tab.functionCode),
               tab.startAddress,
-              isBitFC ? tab.registerCount : tab.registerCount * 8,
+              isBitFC ? tab.registerCount : tab.registerCount * 16,
               conn.mode,
             );
           }, tab.pollInterval);
