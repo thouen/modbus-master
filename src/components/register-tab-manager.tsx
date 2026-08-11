@@ -207,28 +207,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-        <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('startAddress')}</label>
-          <Input
-            type="number"
-            className="h-7 text-xs bg-background border-border"
-            value={tab.startAddress}
-            min={0}
-            max={65535}
-            onChange={e => updateTab({ startAddress: Number(e.target.value) })}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('registerCount')}</label>
-          <Input
-            type="number"
-            className="h-7 text-xs bg-background border-border"
-            value={tab.registerCount}
-            min={1}
-            max={125}
-            onChange={e => updateTab({ registerCount: Math.min(125, Number(e.target.value)) })}
-          />
-        </div>
         <div className="space-y-1 col-span-2">
           <label className="text-[10px] text-muted-foreground">{t('displayFormat')}</label>
           <div className="flex flex-wrap gap-1">
@@ -266,13 +244,11 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             </ToggleGroup>
           </div>
         </div>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {/* 32-bit byte order dropdown */}
         <div className="space-y-1">
           <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (32-bit)</label>
           <Select value={tab.byteOrder32} onValueChange={v => updateTab({ byteOrder32: v as ByteOrder32 })}>
-            <SelectTrigger className="h-8 text-xs bg-background border-border font-mono">
+            <SelectTrigger className="h-9 text-xs bg-background border-border font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -287,7 +263,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         <div className="space-y-1">
           <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (64-bit)</label>
           <Select value={tab.byteOrder64} onValueChange={v => updateTab({ byteOrder64: v as ByteOrder64 })}>
-            <SelectTrigger className="h-8 text-xs bg-background border-border font-mono">
+            <SelectTrigger className="h-9 text-xs bg-background border-border font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -297,6 +273,30 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
               <SelectItem value="GHEFCDAB" className="font-mono text-xs">GHEFCDAB</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">{t('startAddress')}</label>
+          <Input
+            type="number"
+            className="h-7 text-xs bg-background border-border"
+            value={tab.startAddress}
+            min={0}
+            max={65535}
+            onChange={e => updateTab({ startAddress: Number(e.target.value) })}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">{t('registerCount')}</label>
+          <Input
+            type="number"
+            className="h-7 text-xs bg-background border-border"
+            value={tab.registerCount}
+            min={1}
+            max={125}
+            onChange={e => updateTab({ registerCount: Math.min(125, Number(e.target.value)) })}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('pollInterval')}</label>
