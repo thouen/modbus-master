@@ -144,8 +144,9 @@ export function RegisterTabManager() {
 function TabConfigPanel({ tab }: { tab: RegisterTab }) {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
-  const { readRegisters } = useModbusWs();
+  const { readRegisters, writeRegisters } = useModbusWs();
   const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
+  const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
   const registersPerValue = getRegistersPerValue(tab.displayFormat);
   const maxCount = isBitFC ? 2000 : 125;
 
@@ -194,10 +195,10 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ABCD" className="font-mono text-xs">ABCD</SelectItem>
-              <SelectItem value="DCBA" className="font-mono text-xs">DCBA</SelectItem>
-              <SelectItem value="BADC" className="font-mono text-xs">BADC</SelectItem>
-              <SelectItem value="CDAB" className="font-mono text-xs">CDAB</SelectItem>
+              <SelectItem value="ABCD" className="font-mono text-xs">ABCD ({t('bigEndian')})</SelectItem>
+              <SelectItem value="DCBA" className="font-mono text-xs">DCBA ({t('littleEndian')})</SelectItem>
+              <SelectItem value="BADC" className="font-mono text-xs">BADC ({t('bigEndianSwap')})</SelectItem>
+              <SelectItem value="CDAB" className="font-mono text-xs">CDAB ({t('littleEndianSwap')})</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -209,10 +210,10 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ABCDEFGH" className="font-mono text-xs">ABCDEFGH</SelectItem>
-              <SelectItem value="HGFEDCBA" className="font-mono text-xs">HGFEDCBA</SelectItem>
-              <SelectItem value="BADCFEHG" className="font-mono text-xs">BADCFEHG</SelectItem>
-              <SelectItem value="GHEFCDAB" className="font-mono text-xs">GHEFCDAB</SelectItem>
+              <SelectItem value="ABCDEFGH" className="font-mono text-xs">ABCDEFGH ({t('bigEndian')})</SelectItem>
+              <SelectItem value="HGFEDCBA" className="font-mono text-xs">HGFEDCBA ({t('littleEndian')})</SelectItem>
+              <SelectItem value="BADCFEHG" className="font-mono text-xs">BADCFEHG ({t('bigEndianSwap')})</SelectItem>
+              <SelectItem value="GHEFCDAB" className="font-mono text-xs">GHEFCDAB ({t('littleEndianSwap')})</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -328,26 +329,55 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         >
           {tab.isPolling ? t('stopPolling') : t('startPolling')}
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-9 text-xs"
-          onClick={() => {
-            if (connection) {
-              readRegisters(
-                connection.id,
-                tab.id,
-                connection.slaveId,
-                parseInt(tab.functionCode),
-                tab.startAddress,
-                isBitFC ? tab.registerCount : tab.registerCount * 16,
-                connection.mode,
-              );
-            }
-          }}
-        >
-          {t('readOnce')}
-        </Button>
+        {isWriteFC ? (
+          <Button
+            size="sm"
+            variant="default"
+            className="h-9 text-xs bg-amber-600 hover:bg-amber-700"
+            onClick={() => {
+              if (connection) {
+                const data = state.registerData[tab.id] ?? [];
+                const values: number[] = [];
+                const count = isBitFC ? tab.registerCount : tab.registerCount * 16;
+                for (let i = 0; i < count; i++) {
+                  values.push(data[i]?.rawValue ?? 0);
+                }
+                writeRegisters(
+                  connection.id,
+                  tab.id,
+                  connection.slaveId,
+                  parseInt(tab.functionCode),
+                  tab.startAddress,
+                  values,
+                  connection.mode,
+                );
+              }
+            }}
+          >
+            {t('write')}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 text-xs"
+            onClick={() => {
+              if (connection) {
+                readRegisters(
+                  connection.id,
+                  tab.id,
+                  connection.slaveId,
+                  parseInt(tab.functionCode),
+                  tab.startAddress,
+                  isBitFC ? tab.registerCount : tab.registerCount * 16,
+                  connection.mode,
+                );
+              }
+            }}
+          >
+            {t('readOnce')}
+          </Button>
+        )}
         <span className="text-[10px] text-muted-foreground ml-auto">
           {connection ? `${connection.byteOrder32} / ${connection.byteOrder64}` : ''}
         </span>
@@ -405,7 +435,8 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         rawValue: 0,
       }));
 
-  const displayRows = displayData.length / regsPerValue;
+  const bitCount = tab.registerCount * 16;
+  const displayRows = bitCount / regsPerValue;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -422,9 +453,6 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         <span>Addr: {tab.startAddress} ~ {tab.startAddress + dataCount - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
-        {regsPerValue > 1 && (
-          <span className="text-cyan-400/70">32:{tab.byteOrder32} / 64:{tab.byteOrder64}</span>
-        )}
         <span className="ml-auto">{Math.floor(displayRows)} values</span>
         {isWriteFC && Object.keys(editingValues).length > 0 && (
           <button
@@ -446,17 +474,18 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           {tab.displayFormat === 'led' ? (
             <LedDisplay data={displayData} isWrite={isWriteFC} editingValues={editingValues} onSetValue={setValue} />
           ) : (
-            <table className="w-full text-xs font-mono">
-              <thead>
-                <tr className="text-muted-foreground border-b border-border">
-                  <th className="text-left py-1 px-2 w-12">#</th>
-                  <th className="text-left py-1 px-2 w-16">{t('address')}</th>
-                  <th className="text-left py-1 px-2 w-20">{t('raw')}</th>
-                  <th className="text-left py-1 px-2">{t('value')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayData.map((reg, idx) => {
+            <div className="overflow-auto max-h-full">
+              <table className="w-full text-xs font-mono">
+                <thead>
+                  <tr className="text-muted-foreground border-b border-border sticky top-0 bg-[#0a0e14] z-10">
+                    <th className="text-left py-1 px-2 w-12">{t('offset')}</th>
+                    <th className="text-left py-1 px-2 w-20">{t('address')}</th>
+                    <th className="text-left py-1 px-2 w-20">{t('raw')}</th>
+                    <th className="text-left py-1 px-2">{t('value')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayData.map((reg, idx) => {
                   const isGroupStart = idx % regsPerValue === 0;
                   const groupIndex = Math.floor(idx / regsPerValue);
                   const displayValue = isGroupStart
@@ -473,8 +502,11 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                       <td className="py-0.5 px-2 text-muted-foreground/50 text-[10px]">
                         {isGroupStart && regsPerValue > 1 ? groupIndex + 1 : ''}
                       </td>
-                      <td className="py-0.5 px-2 text-cyan-400">
-                        {reg.address.toString().padStart(5, '0')}
+                      <td className="py-0.5 px-2 text-muted-foreground/40 text-[10px]">
+                        {idx + 1}
+                      </td>
+                      <td className="py-0.5 px-2 text-cyan-400 font-mono">
+                        0x{reg.address.toString(16).toUpperCase().padStart(4, '0')}
                       </td>
                       <td className="py-0.5 px-2 text-amber-400">
                         {reg.rawValue.toString(16).toUpperCase().padStart(4, '0')}
@@ -498,6 +530,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </ScrollArea>
@@ -552,7 +585,7 @@ function LedDisplay({ data, isWrite, editingValues, onSetValue }: {
               ))}
             </div>
             <span className="text-[9px] text-muted-foreground/40 font-mono ml-1">
-              {bits.map(b => b).join('')}
+              {bits.map(b => b).join('').replace(/(.{4})/g, '$1 ').trim()}
             </span>
           </div>
         );

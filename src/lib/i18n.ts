@@ -109,6 +109,7 @@ export const translations = {
 
     // Common
     address: 'Address',
+    offset: 'Offset',
     value: 'Value',
     raw: 'Raw',
     save: 'Save',
@@ -260,6 +261,7 @@ export const translations = {
 
     // Common
     address: '地址',
+    offset: '偏移',
     value: '值',
     raw: '原始值',
     save: '保存',
