@@ -148,6 +148,14 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
   const [writeValue, setWriteValue] = useState('');
   const [writeStatus, setWriteStatus] = useState<string | null>(null);
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
+  const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
+  const maxCount = isBitFC ? 2000 : (() => {
+    switch (tab.displayFormat) {
+      case 'double': return 31;
+      case 'long': case 'ulong': case 'float': return 62;
+      default: return 125;
+    }
+  })();
 
   const connection = state.connections.find(c => c.id === tab.connectionId);
 
@@ -188,7 +196,15 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </div>
         <div className="space-y-1 col-span-2">
           <label className="text-[10px] text-muted-foreground">{t('functionCode')}</label>
-          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => v && updateTab({ functionCode: v as FunctionCode })} className="justify-start flex-wrap gap-0.5">
+          <ToggleGroup type="single" value={tab.functionCode} onValueChange={v => {
+            if (!v) return;
+            const bitFCs = ['01', '02', '05', '15'];
+            const isBit = bitFCs.includes(v);
+            updateTab({
+              functionCode: v as FunctionCode,
+              ...(isBit ? { displayFormat: 'led' as DataDisplayFormat } : {}),
+            });
+          }} className="justify-start flex-wrap gap-0.5">
             {(['01', '02', '03', '04', '05', '06', '15', '16'] as const).map(fc => {
               const fcKey = `fc${fc}` as const;
               return (
@@ -210,38 +226,42 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         <div className="space-y-1 col-span-2">
           <label className="text-[10px] text-muted-foreground">{t('displayFormat')}</label>
           <div className="flex flex-wrap gap-1">
-            <ToggleGroup type="single" value={tab.displayFormat} onValueChange={v => v && updateTab({ displayFormat: v as DataDisplayFormat })} className="justify-start flex-wrap gap-0.5">
-              <ToggleGroupItem value="led" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
-                LED
-              </ToggleGroupItem>
-              <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="short" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
-                Short
-              </ToggleGroupItem>
-              <ToggleGroupItem value="ushort" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
-                UShort
-              </ToggleGroupItem>
-              <ToggleGroupItem value="hex" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
-                Hex
-              </ToggleGroupItem>
-              <ToggleGroupItem value="binary" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
-                Binary
-              </ToggleGroupItem>
-              <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="long" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
-                Long
-              </ToggleGroupItem>
-              <ToggleGroupItem value="ulong" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
-                ULong
-              </ToggleGroupItem>
-              <ToggleGroupItem value="float" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
-                Float
-              </ToggleGroupItem>
-              <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="double" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-400 data-[state=on]:border-purple-500/30 border border-border/50">
-                Double
-              </ToggleGroupItem>
-            </ToggleGroup>
+            {isBitFC ? (
+              <div className="inline-flex items-center h-7 px-2.5 rounded-md text-[10px] font-medium bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">Bit</div>
+            ) : (
+              <ToggleGroup type="single" value={tab.displayFormat} onValueChange={v => v && updateTab({ displayFormat: v as DataDisplayFormat })} className="justify-start flex-wrap gap-0.5">
+                <ToggleGroupItem value="led" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
+                  Bit
+                </ToggleGroupItem>
+                <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
+                <ToggleGroupItem value="short" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                  Short
+                </ToggleGroupItem>
+                <ToggleGroupItem value="ushort" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                  UShort
+                </ToggleGroupItem>
+                <ToggleGroupItem value="hex" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                  Hex
+                </ToggleGroupItem>
+                <ToggleGroupItem value="binary" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+                  Binary
+                </ToggleGroupItem>
+                <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
+                <ToggleGroupItem value="long" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+                  Long
+                </ToggleGroupItem>
+                <ToggleGroupItem value="ulong" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+                  ULong
+                </ToggleGroupItem>
+                <ToggleGroupItem value="float" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+                  Float
+                </ToggleGroupItem>
+                <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
+                <ToggleGroupItem value="double" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-400 data-[state=on]:border-purple-500/30 border border-border/50">
+                  Double
+                </ToggleGroupItem>
+              </ToggleGroup>
+            )}
           </div>
         </div>
         {/* 32-bit byte order dropdown */}
@@ -288,14 +308,17 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('registerCount')}</label>
+          <label className="text-[10px] text-muted-foreground">{t('count')}</label>
           <Input
             type="number"
             className="h-7 text-xs bg-background border-border"
             value={tab.registerCount}
             min={1}
-            max={125}
-            onChange={e => updateTab({ registerCount: Math.min(125, Number(e.target.value)) })}
+            max={isBitFC ? 2000 : tab.displayFormat === 'double' ? 31 : tab.displayFormat === 'long' || tab.displayFormat === 'ulong' || tab.displayFormat === 'float' ? 62 : 125}
+            onChange={e => {
+              const max = isBitFC ? 2000 : tab.displayFormat === 'double' ? 31 : tab.displayFormat === 'long' || tab.displayFormat === 'ulong' || tab.displayFormat === 'float' ? 62 : 125;
+              updateTab({ registerCount: Math.min(max, Number(e.target.value)) });
+            }}
           />
         </div>
         <div className="space-y-1">
