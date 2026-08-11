@@ -339,7 +339,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
                 connection.slaveId,
                 parseInt(tab.functionCode),
                 tab.startAddress,
-                isBitFC ? tab.registerCount * 8 : tab.registerCount,
+                isBitFC ? tab.registerCount : tab.registerCount * 8,
                 connection.mode,
               );
             }
@@ -588,7 +588,7 @@ export function usePolling() {
               conn.slaveId,
               parseInt(tab.functionCode),
               tab.startAddress,
-              isBitFC ? tab.registerCount * 8 : tab.registerCount,
+              isBitFC ? tab.registerCount : tab.registerCount * 8,
               conn.mode,
             );
           }, tab.pollInterval);
