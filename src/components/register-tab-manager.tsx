@@ -148,6 +148,9 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
   const [writeValue, setWriteValue] = useState('');
   const [writeStatus, setWriteStatus] = useState<string | null>(null);
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
+  const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
+  const registersPerValue = getRegistersPerValue(tab.displayFormat);
+  const maxCount = isBitFC ? 2000 : Math.floor(125 / registersPerValue) * registersPerValue;
 
   const connection = state.connections.find(c => c.id === tab.connectionId);
 
@@ -288,14 +291,14 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">{t('registerCount')}</label>
+          <label className="text-[10px] text-muted-foreground">{t(isBitFC ? 'coilCount' : 'registerCount')}</label>
           <Input
             type="number"
             className="h-9 text-xs bg-background border-border"
             value={tab.registerCount}
             min={1}
-            max={125}
-            onChange={e => updateTab({ registerCount: Math.min(125, Number(e.target.value)) })}
+            max={maxCount}
+            onChange={e => updateTab({ registerCount: Math.min(maxCount, Math.max(1, Number(e.target.value))) })}
           />
         </div>
         <div className="space-y-1">
