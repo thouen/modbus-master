@@ -363,13 +363,13 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
     const entries = Object.entries(editingValues);
     if (entries.length === 0) return;
     const values: number[] = [];
-    for (let i = 0; i < data.length; i++) {
-      const addr = data[i].address;
+    for (let i = 0; i < tab.registerCount; i++) {
+      const addr = tab.startAddress + i;
       const val = editingValues[addr];
       if (val !== undefined) {
         values.push(parseInt(val, 10) || 0);
       } else {
-        values.push(data[i].rawValue);
+        values.push(0);
       }
     }
     writeRegisters(conn.id, tab.id, conn.slaveId, parseInt(tab.functionCode), tab.startAddress, values, conn.mode);
@@ -386,20 +386,15 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
     setEditingValues(prev => ({ ...prev, [addr]: val }));
   }, []);
 
-  if (data.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
-        <span>{t('noData')}</span>
-        {conn && (
-          <span className="text-[10px] text-muted-foreground/60">
-            {conn.name} | {conn.protocol.toUpperCase()}/{conn.mode.toUpperCase()} | Slave:{conn.slaveId}
-          </span>
-        )}
-      </div>
-    );
-  }
+  // If no data, generate placeholder data based on tab config
+  const displayData = data.length > 0
+    ? data
+    : Array.from({ length: tab.registerCount }, (_, i) => ({
+        address: tab.startAddress + i,
+        rawValue: 0,
+      }));
 
-  const displayRows = data.length / regsPerValue;
+  const displayRows = displayData.length / regsPerValue;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -438,7 +433,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
       <ScrollArea className="flex-1">
         <div className="p-2">
           {tab.displayFormat === 'led' ? (
-            <LedDisplay data={data} isWrite={isWriteFC} editingValues={editingValues} onSetValue={setValue} />
+            <LedDisplay data={displayData} isWrite={isWriteFC} editingValues={editingValues} onSetValue={setValue} />
           ) : (
             <table className="w-full text-xs font-mono">
               <thead>
@@ -450,11 +445,11 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                 </tr>
               </thead>
               <tbody>
-                {data.map((reg, idx) => {
+                {displayData.map((reg, idx) => {
                   const isGroupStart = idx % regsPerValue === 0;
                   const groupIndex = Math.floor(idx / regsPerValue);
                   const displayValue = isGroupStart
-                    ? formatRegisterValue(data, idx, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)
+                    ? formatRegisterValue(displayData, idx, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)
                     : '';
 
                   return (
