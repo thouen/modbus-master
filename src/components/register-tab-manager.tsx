@@ -85,7 +85,7 @@ export function RegisterTabManager() {
                 >
                   <span className="max-w-[70px] truncate">{tab.name}</span>
                   <span className="text-[9px] text-muted-foreground/60 hidden group-hover:inline">
-                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + tab.registerCount - 1}
+                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.registerCount * 8 - 1 : tab.registerCount - 1)}
                   </span>
                   {tab.isPolling && status === 'connected' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -292,11 +292,19 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           <Input
             type="number"
             className="h-9 text-xs bg-background border-border"
-            value={tab.registerCount}
+            value={isBitFC ? tab.registerCount * 8 : tab.registerCount}
             min={1}
             max={maxCount}
-            onChange={e => updateTab({ registerCount: Math.min(maxCount, Math.max(1, Number(e.target.value))) })}
+            onChange={e => {
+              const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
+              updateTab({ registerCount: isBitFC ? Math.floor(val / 8) : val });
+            }}
           />
+          <span className="text-[9px] text-muted-foreground">
+            {isBitFC
+              ? `${t('registerCount')}: ${tab.registerCount} (≈${Math.floor(tab.registerCount * 8 / 16)} × 16-bit)`
+              : `位: ${tab.registerCount * 8}`}
+          </span>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t('pollInterval')}</label>
@@ -331,7 +339,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
                 connection.slaveId,
                 parseInt(tab.functionCode),
                 tab.startAddress,
-                tab.registerCount,
+                isBitFC ? tab.registerCount * 8 : tab.registerCount,
                 connection.mode,
               );
             }
@@ -356,14 +364,16 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   const regsPerValue = getRegistersPerValue(tab.displayFormat);
   const conn = state.connections.find(c => c.id === tab.connectionId);
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
+  const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
   const [editingValues, setEditingValues] = useState<Record<number, string>>({});
+  const dataCount = isBitFC ? tab.registerCount * 8 : tab.registerCount;
 
   const handleWrite = useCallback(async () => {
     if (!conn) return;
     const entries = Object.entries(editingValues);
     if (entries.length === 0) return;
     const values: number[] = [];
-    for (let i = 0; i < tab.registerCount; i++) {
+    for (let i = 0; i < dataCount; i++) {
       const addr = tab.startAddress + i;
       const val = editingValues[addr];
       if (val !== undefined) {
@@ -380,7 +390,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
     }));
     dispatch({ type: 'SET_REGISTER_DATA', payload: { tabId: tab.id, data: updatedData } });
     setEditingValues({});
-  }, [conn, data, editingValues, tab, writeRegisters, dispatch]);
+  }, [conn, data, editingValues, tab, writeRegisters, dispatch, dataCount]);
 
   const setValue = useCallback((addr: number, val: string) => {
     setEditingValues(prev => ({ ...prev, [addr]: val }));
@@ -389,7 +399,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   // If no data, generate placeholder data based on tab config
   const displayData = data.length > 0
     ? data
-    : Array.from({ length: tab.registerCount }, (_, i) => ({
+    : Array.from({ length: dataCount }, (_, i) => ({
         address: tab.startAddress + i,
         rawValue: 0,
       }));
@@ -408,7 +418,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
             {conn.name}
           </span>
         )}
-        <span>Addr: {tab.startAddress} ~ {tab.startAddress + tab.registerCount - 1}</span>
+        <span>Addr: {tab.startAddress} ~ {tab.startAddress + dataCount - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
         {regsPerValue > 1 && (
@@ -571,13 +581,14 @@ export function usePolling() {
         // Only poll if connection exists and is connected
         if (conn && state.connectionStatus[conn.id] === 'connected') {
           intervalsRef.current[tab.id] = setInterval(() => {
+            const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
             readRegisters(
               conn.id,
               tab.id,
               conn.slaveId,
               parseInt(tab.functionCode),
               tab.startAddress,
-              tab.registerCount,
+              isBitFC ? tab.registerCount * 8 : tab.registerCount,
               conn.mode,
             );
           }, tab.pollInterval);
