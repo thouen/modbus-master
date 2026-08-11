@@ -55,7 +55,7 @@ export const translations = {
     readOnce: 'Read Once',
 
     // Data Display Formats
-    formatLed: 'LED (1-bit)',
+    formatLed: 'Bit (1-bit)',
     formatShort: 'Short (16-bit)',
     formatUShort: 'UShort (16-bit)',
     formatHex: 'Hexadecimal (16-bit)',
@@ -206,7 +206,7 @@ export const translations = {
     readOnce: '读取一次',
 
     // Data Display Formats
-    formatLed: 'LED (1位)',
+    formatLed: 'Bit (1位)',
     formatShort: '短整型 (16位)',
     formatUShort: '无符号短整型 (16位)',
     formatHex: '十六进制 (16位)',

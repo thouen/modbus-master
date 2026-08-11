@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAppState, type Action } from '@/hooks/use-app-state';
 import { useModbusWs } from '@/hooks/use-modbus-ws';
@@ -144,13 +144,10 @@ export function RegisterTabManager() {
 function TabConfigPanel({ tab }: { tab: RegisterTab }) {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
-  const { readRegisters, writeRegisters } = useModbusWs();
-  const [writeValue, setWriteValue] = useState('');
-  const [writeStatus, setWriteStatus] = useState<string | null>(null);
-  const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
+  const { readRegisters } = useModbusWs();
   const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
   const registersPerValue = getRegistersPerValue(tab.displayFormat);
-  const maxCount = isBitFC ? 2000 : Math.floor(125 / registersPerValue) * registersPerValue;
+  const maxCount = isBitFC ? 2000 : 125;
 
   const connection = state.connections.find(c => c.id === tab.connectionId);
 
@@ -244,34 +241,34 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           <label className="text-[10px] text-muted-foreground">{t('displayFormat')}</label>
           <div className="flex flex-wrap gap-1">
             <ToggleGroup type="single" value={tab.displayFormat} onValueChange={v => v && updateTab({ displayFormat: v as DataDisplayFormat })} className="justify-start flex-wrap gap-0.5">
-              <ToggleGroupItem value="led" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
-                LED
+              <ToggleGroupItem value="led" title={t('formatLed')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-cyan-500/20 data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/30 border border-border/50">
+                Bit
               </ToggleGroupItem>
               <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="binary" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="binary" title={t('formatBinary')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 Binary
               </ToggleGroupItem>
-              <ToggleGroupItem value="short" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="short" title={t('formatShort')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 Short
               </ToggleGroupItem>
-              <ToggleGroupItem value="ushort" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="ushort" title={t('formatUShort')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 UShort
               </ToggleGroupItem>
-              <ToggleGroupItem value="hex" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
+              <ToggleGroupItem value="hex" title={t('formatHex')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 border border-border/50">
                 Hex
               </ToggleGroupItem>
               <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="long" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+              <ToggleGroupItem value="long" title={t('formatLong')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
                 Long
               </ToggleGroupItem>
-              <ToggleGroupItem value="ulong" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+              <ToggleGroupItem value="ulong" title={t('formatULong')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
                 ULong
               </ToggleGroupItem>
-              <ToggleGroupItem value="float" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
+              <ToggleGroupItem value="float" title={t('formatFloat')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500/30 border border-border/50">
                 Float
               </ToggleGroupItem>
               <span className="text-[8px] text-muted-foreground/40 mx-0.5 self-center">|</span>
-              <ToggleGroupItem value="double" size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-400 data-[state=on]:border-purple-500/30 border border-border/50">
+              <ToggleGroupItem value="double" title={t('formatDouble')} size="sm" className="h-7 text-[10px] px-1.5 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-400 data-[state=on]:border-purple-500/30 border border-border/50">
                 Double
               </ToggleGroupItem>
             </ToggleGroup>
@@ -347,119 +344,47 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </span>
       </div>
 
-      {isWriteFC && (
-        <div className="border-t border-border/50 pt-2 mt-2 space-y-2">
-          <div className="text-[11px] font-medium text-amber-400/80">
-            {t('writeOperation')}
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-[10px] text-muted-foreground shrink-0">{t('address')}:</label>
-            <Input
-              type="number"
-              min={0}
-              max={65535}
-              value={tab.startAddress}
-              className="h-6 w-20 text-[11px] font-mono"
-              onChange={(e) => updateTab({ startAddress: parseInt(e.target.value) || 0 })}
-            />
-            {tab.functionCode === '05' && (
-              <div className="flex items-center gap-2 flex-1">
-                <label className="text-[10px] text-muted-foreground">{t('value')}:</label>
-                <select
-                  value={writeValue}
-                  onChange={(e) => setWriteValue(e.target.value)}
-                  className="h-6 text-[11px] font-mono bg-background border border-border/50 rounded px-1"
-                >
-                  <option value="FF00">{t('on')} (0xFF00)</option>
-                  <option value="0000">{t('off')} (0x0000)</option>
-                </select>
-              </div>
-            )}
-            {tab.functionCode === '06' && (
-              <div className="flex items-center gap-2 flex-1">
-                <label className="text-[10px] text-muted-foreground">{t('value')}:</label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={65535}
-                  placeholder="0-65535"
-                  value={writeValue}
-                  onChange={(e) => setWriteValue(e.target.value)}
-                  className="h-6 w-28 text-[11px] font-mono"
-                />
-              </div>
-            )}
-            {tab.functionCode === '15' && (
-              <div className="flex items-center gap-2 flex-1">
-                <label className="text-[10px] text-muted-foreground">{t('values')}:</label>
-                <Input
-                  placeholder="e.g. 101010"
-                  value={writeValue}
-                  onChange={(e) => setWriteValue(e.target.value)}
-                  className="h-6 w-28 text-[11px] font-mono"
-                />
-              </div>
-            )}
-            {tab.functionCode === '16' && (
-              <div className="flex items-center gap-2 flex-1">
-                <label className="text-[10px] text-muted-foreground">{t('values')}:</label>
-                <Input
-                  placeholder="e.g. 100,200,300"
-                  value={writeValue}
-                  onChange={(e) => setWriteValue(e.target.value)}
-                  className="h-6 w-36 text-[11px] font-mono"
-                />
-              </div>
-            )}
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-6 text-[10px] shrink-0"
-              onClick={async () => {
-                if (!connection) return;
-                setWriteStatus(null);
-                try {
-                  const values = tab.functionCode === '05' || tab.functionCode === '15'
-                    ? (writeValue || '').split('').map(c => c === '1' ? 1 : 0)
-                    : (writeValue || '').split(',').map(v => parseInt(v.trim()) || 0);
-                  await writeRegisters(
-                    connection.id,
-                    tab.id,
-                    connection.slaveId,
-                    parseInt(tab.functionCode),
-                    tab.startAddress,
-                    values,
-                    connection.mode,
-                  );
-                  setWriteStatus('success');
-                  setTimeout(() => setWriteStatus(null), 2000);
-                } catch {
-                  setWriteStatus('error');
-                  setTimeout(() => setWriteStatus(null), 2000);
-                }
-              }}
-            >
-              {t('write')}
-            </Button>
-            {writeStatus === 'success' && (
-              <span className="text-[10px] text-green-400 shrink-0">{t('writeSuccess')}</span>
-            )}
-            {writeStatus === 'error' && (
-              <span className="text-[10px] text-red-400 shrink-0">{t('writeFailed')}</span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
   );
 }
 
 function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   const { t } = useI18n();
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
+  const { readRegisters, writeRegisters } = useModbusWs();
   const data = state.registerData[tab.id] ?? [];
   const regsPerValue = getRegistersPerValue(tab.displayFormat);
   const conn = state.connections.find(c => c.id === tab.connectionId);
+  const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
+  const [editingValues, setEditingValues] = useState<Record<number, string>>({});
+
+  const handleWrite = useCallback(async () => {
+    if (!conn) return;
+    const entries = Object.entries(editingValues);
+    if (entries.length === 0) return;
+    const values: number[] = [];
+    for (let i = 0; i < data.length; i++) {
+      const addr = data[i].address;
+      const val = editingValues[addr];
+      if (val !== undefined) {
+        values.push(parseInt(val, 10) || 0);
+      } else {
+        values.push(data[i].rawValue);
+      }
+    }
+    writeRegisters(conn.id, tab.id, conn.slaveId, parseInt(tab.functionCode), tab.startAddress, values, conn.mode);
+    // Update register data in state
+    const updatedData = values.map((v, i) => ({
+      address: tab.startAddress + i,
+      rawValue: v,
+    }));
+    dispatch({ type: 'SET_REGISTER_DATA', payload: { tabId: tab.id, data: updatedData } });
+    setEditingValues({});
+  }, [conn, data, editingValues, tab, writeRegisters, dispatch]);
+
+  const setValue = useCallback((addr: number, val: string) => {
+    setEditingValues(prev => ({ ...prev, [addr]: val }));
+  }, []);
 
   if (data.length === 0) {
     return (
@@ -495,6 +420,14 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           <span className="text-cyan-400/70">32:{tab.byteOrder32} / 64:{tab.byteOrder64}</span>
         )}
         <span className="ml-auto">{Math.floor(displayRows)} values</span>
+        {isWriteFC && Object.keys(editingValues).length > 0 && (
+          <button
+            onClick={handleWrite}
+            className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-colors"
+          >
+            {t('write')} ({Object.keys(editingValues).length})
+          </button>
+        )}
         {tab.isPolling && (
           <span className="text-green-400 flex items-center gap-1">
             <span className="w-1 h-1 rounded-full bg-green-400 animate-pulse" />
@@ -505,7 +438,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
       <ScrollArea className="flex-1">
         <div className="p-2">
           {tab.displayFormat === 'led' ? (
-            <LedDisplay data={data} />
+            <LedDisplay data={data} isWrite={isWriteFC} editingValues={editingValues} onSetValue={setValue} />
           ) : (
             <table className="w-full text-xs font-mono">
               <thead>
@@ -540,12 +473,19 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                       <td className="py-0.5 px-2 text-amber-400">
                         {reg.rawValue.toString(16).toUpperCase().padStart(4, '0')}
                       </td>
-                      <td className={`py-0.5 px-2 ${
-                        tab.displayFormat === 'float' || tab.displayFormat === 'double'
-                          ? 'text-cyan-300'
-                          : 'text-green-400'
-                      }`}>
-                        {displayValue}
+                      <td className={`py-0.5 px-2 ${isWriteFC && isGroupStart ? '' : ''}`}>
+                        {isWriteFC && isGroupStart ? (
+                          <input
+                            type="text"
+                            value={editingValues[reg.address] ?? displayValue}
+                            onChange={e => setValue(reg.address, e.target.value)}
+                            className="w-full bg-transparent border border-amber-500/30 rounded px-1 py-0.5 text-green-400 focus:outline-none focus:border-amber-500"
+                          />
+                        ) : (
+                          <span className={tab.displayFormat === 'float' || tab.displayFormat === 'double' ? 'text-cyan-300' : 'text-green-400'}>
+                            {displayValue}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -559,32 +499,54 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   );
 }
 
-function LedDisplay({ data }: { data: RegisterData[] }) {
+function LedDisplay({ data, isWrite, editingValues, onSetValue }: {
+  data: RegisterData[];
+  isWrite: boolean;
+  editingValues: Record<number, string>;
+  onSetValue: (addr: number, val: string) => void;
+}) {
   return (
     <div className="flex flex-wrap gap-3 p-2">
-      {data.map(reg => (
-        <div key={reg.address} className="flex flex-col items-center gap-1">
-          <span className="text-[9px] text-muted-foreground font-mono">
-            {reg.address.toString().padStart(5, '0')}
-          </span>
-          <div className="grid grid-cols-4 gap-0.5">
-            {Array.from({ length: 16 }, (_, i) => {
-              const bit = (reg.rawValue >> (15 - i)) & 1;
-              return (
+      {data.map(reg => {
+        const bits = isWrite
+          ? (Array.from({ length: 16 }, (_, i) => {
+              const val = editingValues[reg.address];
+              const rawVal = val !== undefined ? parseInt(val, 10) : reg.rawValue;
+              return (rawVal >> (15 - i)) & 1;
+            }))
+          : (Array.from({ length: 16 }, (_, i) => (reg.rawValue >> (15 - i)) & 1));
+
+        const toggleBit = (bitPos: number) => {
+          if (!isWrite) return;
+          const currentVal = editingValues[reg.address] !== undefined
+            ? parseInt(editingValues[reg.address], 10)
+            : reg.rawValue;
+          const newVal = currentVal ^ (1 << bitPos);
+          onSetValue(reg.address, newVal.toString());
+        };
+
+        return (
+          <div key={reg.address} className="flex flex-col items-center gap-1">
+            <span className="text-[9px] text-muted-foreground font-mono">
+              {reg.address.toString().padStart(5, '0')}
+            </span>
+            <div className="grid grid-cols-4 gap-0.5">
+              {bits.map((bit, i) => (
                 <div
                   key={i}
+                  onClick={() => toggleBit(15 - i)}
                   className={`w-3 h-3 rounded-sm border ${
                     bit
                       ? 'bg-green-500 border-green-400 shadow-[0_0_3px_rgba(34,197,94,0.6)]'
                       : 'bg-zinc-800 border-zinc-700'
-                  }`}
-                  title={`Bit ${15 - i}: ${bit}`}
+                  } ${isWrite ? 'cursor-pointer hover:ring-1 hover:ring-amber-500' : ''}`}
+                  title={`Bit ${15 - i}: ${bit}${isWrite ? ' (click to toggle)' : ''}`}
                 />
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
