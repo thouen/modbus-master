@@ -411,7 +411,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Info bar */}
-      <div className="flex items-center gap-3 px-3 py-1 border-b border-border/50 bg-muted/10 text-[10px] text-muted-foreground shrink-0">
+      <div className="flex h-7 items-center gap-3 px-3 py-1 border-b border-border/50 bg-muted/10 text-[10px] text-muted-foreground shrink-0">
         {conn && (
           <span className="flex items-center gap-1">
             <span className={`w-1.5 h-1.5 rounded-full ${
@@ -447,10 +447,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                     <th className="text-left py-1 px-2 w-12">#</th>
                     <th className="text-left py-1 px-2 w-12">{t('offset')}</th>
                     <th className="text-left py-1 px-2 w-20">{t('address')}</th>
-                    {
-                      (bitsPerValue === 32 || bitsPerValue === 64) && 
-                      <th className="text-left py-1 px-2 w-20">{t('raw')}</th>
-                    }
+                    <th className="text-left py-1 px-2 w-20">{t('raw')}</th>
                     <th className="text-left py-1 px-2">{t('value')}</th>
                   </tr>
                 </thead>
@@ -470,7 +467,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                       }`}
                     >
                       <td className="py-0.5 px-2 text-muted-foreground/50 text-[10px]">
-                        {isGroupStart && regsPerValue > 1 ? groupIndex + 1 : ''}
+                        {isGroupStart ? groupIndex + 1 : ''}
                       </td>
                       <td className="py-0.5 px-2 text-muted-foreground/40 text-[10px]">
                         {idx}
@@ -478,12 +475,9 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                       <td className="py-0.5 px-2 text-cyan-400 font-mono">
                         0x{reg.address.toString(16).toUpperCase().padStart(4, '0')}
                       </td>
-                      {
-                        (bitsPerValue === 32 || bitsPerValue === 64) && 
-                        <td className="py-0.5 px-2 text-amber-400">
-                          {reg.rawValue.toString(16).toUpperCase().padStart(4, '0')}
-                        </td>
-                      }
+                      <td className="py-0.5 px-2 text-amber-400">
+                        0x{reg.rawValue.toString(16).toUpperCase().padStart(4, '0')}
+                      </td>
                       <td className="py-0.5 px-2">
                         {tab.displayFormat === 'led' ? (
                           <div className="flex gap-0.5 items-center h-7">
