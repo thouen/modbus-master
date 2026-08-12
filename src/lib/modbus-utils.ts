@@ -168,24 +168,26 @@ export function formatRegisterValue(
 }
 
 /**
- * Get registers per value for a given format
+ * Get bits per value for a given display format
+ * led: 1 bit, 16-bit formats: 16 bits, 32-bit formats: 32 bits, 64-bit: 64 bits
  */
-export function getRegistersPerValue(format: DataDisplayFormat): number {
+export function getBitsPerValue(format: DataDisplayFormat): number {
   switch (format) {
     case 'led':
+      return 1;
+    case 'binary':
     case 'short':
     case 'ushort':
     case 'hex':
-    case 'binary':
-      return 1;
+      return 16;
     case 'long':
     case 'ulong':
     case 'float':
-      return 2;
+      return 32;
     case 'double':
-      return 4;
+      return 64;
     default:
-      return 1;
+      return 16;
   }
 }
 

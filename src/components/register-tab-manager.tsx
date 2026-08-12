@@ -5,7 +5,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useAppState, type Action } from '@/hooks/use-app-state';
 import { useModbusWs } from '@/hooks/use-modbus-ws';
 import type { RegisterTab, RegisterData, FunctionCode, DataDisplayFormat, ByteOrder32, ByteOrder64, LogEntry, ConnectionConfig } from '@/lib/modbus-types';
-import { generateId, formatRegisterValue, getRegistersPerValue, buildRTUFrame, toHexString } from '@/lib/modbus-utils';
+import { generateId, formatRegisterValue, getBitsPerValue, buildRTUFrame, toHexString } from '@/lib/modbus-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -147,7 +147,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
   const { readRegisters, writeRegisters } = useModbusWs();
   const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
-  const registersPerValue = getRegistersPerValue(tab.displayFormat);
   const maxCount = isBitFC ? 2000 : 125;
 
   const connection = state.connections.find(c => c.id === tab.connectionId);
@@ -329,35 +328,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         >
           {tab.isPolling ? t('stopPolling') : t('startPolling')}
         </Button>
-        {isWriteFC ? (
-          <Button
-            size="sm"
-            variant="default"
-            className="h-9 text-xs bg-amber-600 hover:bg-amber-700"
-            onClick={() => {
-              if (connection) {
-                const data = state.registerData[tab.id] ?? [];
-                const values: number[] = [];
-                const count = isBitFC ? tab.registerCount : tab.registerCount * 16;
-                for (let i = 0; i < count; i++) {
-                  values.push(data[i]?.rawValue ?? 0);
-                }
-                writeRegisters(
-                  connection.id,
-                  tab.id,
-                  connection.slaveId,
-                  parseInt(tab.functionCode),
-                  tab.startAddress,
-                  values,
-                  connection.mode,
-                );
-              }
-            }}
-          >
-            {t('write')}
-          </Button>
-        ) : (
-          <Button
+        <Button
             size="sm"
             variant="outline"
             className="h-9 text-xs"
@@ -377,7 +348,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           >
             {t('readOnce')}
           </Button>
-        )}
         <span className="text-[10px] text-muted-foreground ml-auto">
           {connection ? `${connection.byteOrder32} / ${connection.byteOrder64}` : ''}
         </span>
@@ -392,7 +362,8 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   const { state, dispatch } = useAppState();
   const { readRegisters, writeRegisters } = useModbusWs();
   const data = state.registerData[tab.id] ?? [];
-  const regsPerValue = getRegistersPerValue(tab.displayFormat);
+  const bitsPerValue = getBitsPerValue(tab.displayFormat);
+  const regsPerValue = tab.displayFormat === 'led' ? 1 : bitsPerValue / 16;
   const conn = state.connections.find(c => c.id === tab.connectionId);
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
   const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
