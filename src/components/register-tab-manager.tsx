@@ -137,6 +137,9 @@ export function RegisterTabManager() {
           {t('noData')}
         </div>
       )}
+
+      {/* Action panel */}
+      {activeTab && <ActionPanel tab={activeTab} />}
     </div>
   );
 }
@@ -320,37 +323,6 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
           />
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant={tab.isPolling ? 'destructive' : 'default'}
-          className="h-9 text-xs"
-          onClick={() => updateTab({ isPolling: !tab.isPolling })}
-        >
-          {tab.isPolling ? t('stopPolling') : t('startPolling')}
-        </Button>
-        <Button
-            size="sm"
-            variant="outline"
-            className="h-9 text-xs"
-            onClick={() => {
-              if (connection) {
-                readRegisters(
-                  connection.id,
-                  tab.id,
-                  connection.slaveId,
-                  parseInt(tab.functionCode),
-                  tab.startAddress,
-                  isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
-                  connection.mode,
-                );
-              }
-            }}
-          >
-            {t('readOnce')}
-          </Button>
-      </div>
-
       </div>
   );
 }
@@ -407,7 +379,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   const values = Math.floor(tab.bitCount / bitsPerValue);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Info bar */}
       <div className="flex h-7 items-center gap-3 px-3 py-1 border-b border-border/50 bg-muted/10 text-[10px] text-muted-foreground shrink-0">
         {conn && (
@@ -536,6 +508,79 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   );
 }
 
+function ActionPanel({ tab }: { tab: RegisterTab }) {
+  const { t } = useI18n();
+  const { state, dispatch } = useAppState();
+  const { readRegisters, writeRegisters } = useModbusWs();
+  const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
+  const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
+  const conn = state.connections.find(c => c.id === tab.connectionId);
+
+  const handleReadOnce = () => {
+    if (conn) {
+      const quantity = isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16);
+      readRegisters(
+        conn.id,
+        tab.id,
+        conn.slaveId,
+        parseInt(tab.functionCode),
+        tab.startAddress,
+        quantity,
+        conn.mode,
+      );
+    }
+  };
+
+  const handleWriteOnce = () => {
+    if (!conn) return;
+    const dataCount = Math.ceil(tab.bitCount / 16);
+    const existingData = state.registerData[tab.id] ?? [];
+    const values: number[] = [];
+    for (let i = 0; i < dataCount; i++) {
+      const addr = tab.startAddress + i;
+      const existing = existingData.find(d => d.address === addr);
+      values.push(existing?.rawValue ?? 0);
+    }
+    writeRegisters(conn.id, tab.id, conn.slaveId, parseInt(tab.functionCode), tab.startAddress, values, conn.mode);
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-muted/10 shrink-0">
+      <Button
+        size="sm"
+        variant={tab.isPolling ? 'destructive' : 'default'}
+        className="h-8 text-xs"
+        disabled={!conn || state.connectionStatus[conn?.id ?? ''] !== 'connected'}
+        onClick={() => dispatch({ type: 'UPDATE_TAB', payload: { ...tab, isPolling: !tab.isPolling } })}
+      >
+        {tab.isPolling ? t('stopPolling') : t('startPolling')}
+      </Button>
+      {!isWriteFC && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs"
+          disabled={!conn || state.connectionStatus[conn?.id ?? ''] !== 'connected'}
+          onClick={handleReadOnce}
+        >
+          {t('readOnce')}
+        </Button>
+      )}
+      {isWriteFC && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+          disabled={!conn || state.connectionStatus[conn?.id ?? ''] !== 'connected'}
+          onClick={handleWriteOnce}
+        >
+          {t('writeOnce')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // Polling effect - each tab independently polls its register range
 export function usePolling() {
   const { state, dispatch } = useAppState();
@@ -562,13 +607,14 @@ export function usePolling() {
         if (conn && state.connectionStatus[conn.id] === 'connected') {
           intervalsRef.current[tab.id] = setInterval(() => {
             const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
+            const quantity = isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16);
             readRegisters(
               conn.id,
               tab.id,
               conn.slaveId,
               parseInt(tab.functionCode),
               tab.startAddress,
-              isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
+              quantity,
               conn.mode,
             );
           }, tab.pollInterval);
