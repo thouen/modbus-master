@@ -43,7 +43,7 @@ export function RegisterTabManager() {
       name: `Reg ${state.tabs.length + 1}`,
       connectionId,
       startAddress: 0,
-      registerCount: 10,
+      bitCount: 160,
       functionCode: '03',
       pollInterval: 1000,
       displayFormat: 'hex',
@@ -85,7 +85,7 @@ export function RegisterTabManager() {
                 >
                   <span className="max-w-[70px] truncate">{tab.name}</span>
                   <span className="text-[9px] text-muted-foreground/60 hidden group-hover:inline">
-                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.registerCount * 16 - 1 : tab.registerCount - 1)}
+                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.bitCount - 1 : Math.floor(tab.bitCount / 16) - 1)}
                   </span>
                   {tab.isPolling && status === 'connected' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -253,18 +253,18 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             <Input
               type="number"
               className="flex-1 h-9 text-xs bg-background border-border"
-              value={isBitFC ? tab.registerCount * 16 : tab.registerCount}
+              value={isBitFC ? tab.bitCount : Math.floor(tab.bitCount / 16)}
               min={1}
               max={maxCount}
               onChange={e => {
                 const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
-                updateTab({ registerCount: isBitFC ? Math.floor(val / 16) : val });
+                updateTab({ bitCount: isBitFC ? val : Math.floor(val * 16) });
               }}
             />
             <span className="w-24 text-[9px] text-muted-foreground">
               {isBitFC
-                ? `${t('registerCount')}: ${tab.registerCount}`
-                : `位: ${tab.registerCount * 16}`}
+                ? `${t('registerCount')}: ${Math.floor(tab.bitCount / 16)}`
+                : `位: ${tab.bitCount}`}
             </span>
           </div>
         </div>
@@ -340,7 +340,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
                   connection.slaveId,
                   parseInt(tab.functionCode),
                   tab.startAddress,
-                  isBitFC ? tab.registerCount : tab.registerCount * 16,
+                  isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
                   connection.mode,
                 );
               }
@@ -368,7 +368,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
   const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
   const [editingValues, setEditingValues] = useState<Record<number, string>>({});
-  const dataCount = isBitFC ? tab.registerCount : tab.registerCount * 16;
+  const dataCount = isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount;
 
   const handleWrite = useCallback(async () => {
     if (!conn) return;
@@ -406,8 +406,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         rawValue: 0,
       }));
 
-  const bitCount = tab.registerCount * 16;
-  const displayRows = bitCount / regsPerValue;
+  const values = Math.floor(tab.bitCount / bitsPerValue);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -424,7 +423,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         <span>Addr: {tab.startAddress} ~ {tab.startAddress + dataCount - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
-        <span className="ml-auto">{Math.floor(displayRows)} values</span>
+        <span className="ml-auto">{values} values</span>
         {isWriteFC && Object.keys(editingValues).length > 0 && (
           <button
             onClick={handleWrite}
@@ -597,7 +596,7 @@ export function usePolling() {
               conn.slaveId,
               parseInt(tab.functionCode),
               tab.startAddress,
-              isBitFC ? tab.registerCount : tab.registerCount * 16,
+              isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
               conn.mode,
             );
           }, tab.pollInterval);

@@ -59,7 +59,7 @@ export interface RegisterTab {
   name: string;
   connectionId: string;
   startAddress: number;
-  registerCount: number;
+  bitCount: number;
   functionCode: FunctionCode;
   pollInterval: number; // ms
   displayFormat: DataDisplayFormat;

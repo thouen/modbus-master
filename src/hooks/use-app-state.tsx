@@ -68,7 +68,7 @@ function createDefaultTab(connectionId: string, tabIndex: number, conn: Connecti
     name: `Reg ${tabIndex}`,
     connectionId,
     startAddress: 0,
-    registerCount: 10,
+    bitCount: 160,
     functionCode: '03' as FunctionCode,
     pollInterval: 1000,
     displayFormat: 'hex',
