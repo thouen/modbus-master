@@ -513,7 +513,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                           />
                         ) : (
                           <span className={`inline-flex items-center h-7 ${tab.displayFormat === 'float' || tab.displayFormat === 'double' ? 'text-cyan-300' : 'text-green-400'}`}>
-                            {displayValue}
+                            {displayValue || '\u00A0'}
                           </span>
                         )}
                       </td>
