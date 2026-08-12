@@ -68,7 +68,7 @@ export function RegisterTabManager() {
     <div className="flex flex-col h-full">
       {/* Tab bar */}
       <div className="flex items-center gap-1 px-2 pt-2 border-b border-border bg-muted/20">
-        <ScrollArea className="flex-1 min-h-0">
+        <ScrollArea className="flex-1">
           <div className="flex items-center gap-1">
             {state.tabs.map(tab => {
               const conn = state.connections.find(c => c.id === tab.connectionId);
@@ -85,7 +85,7 @@ export function RegisterTabManager() {
                 >
                   <span className="max-w-[70px] truncate">{tab.name}</span>
                   <span className="text-[9px] text-muted-foreground/60 hidden group-hover:inline">
-                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.bitCount - 1 : Math.ceil(tab.bitCount / 16) - 1)}
+                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.bitCount - 1 : Math.floor(tab.bitCount / 16) - 1)}
                   </span>
                   {tab.isPolling && status === 'connected' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -176,7 +176,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
               byteOrder64: newConn?.byteOrder64 ?? tab.byteOrder64,
             });
           }}>
-            <SelectTrigger className="h-9 text-xs bg-background border-border">
+            <SelectTrigger className="w-full h-9 text-xs bg-background border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -188,9 +188,13 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </div>
         {/* 32-bit byte order dropdown */}
         <div className="space-y-1">
-          <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (32-bit)</label>
+          <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (32-bit)
+            <span className="text-[10px] text-muted-foreground">
+              {connection ? `(默认值: ${connection.byteOrder32})` : ''}
+            </span>
+          </label>
           <Select value={tab.byteOrder32} onValueChange={v => updateTab({ byteOrder32: v as ByteOrder32 })}>
-            <SelectTrigger className="h-9 text-xs bg-background border-border font-mono">
+            <SelectTrigger className="w-full h-9 text-xs bg-background border-border font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -203,9 +207,13 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </div>
         {/* 64-bit byte order dropdown */}
         <div className="space-y-1">
-          <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (64-bit)</label>
+          <label className="text-[11px] text-muted-foreground font-medium">{t('byteOrder')} (64-bit)
+            <span className="text-[10px] text-muted-foreground">
+              {connection ? `(默认值: ${connection.byteOrder64})` : ''}
+            </span>
+          </label>
           <Select value={tab.byteOrder64} onValueChange={v => updateTab({ byteOrder64: v as ByteOrder64 })}>
-            <SelectTrigger className="h-9 text-xs bg-background border-border font-mono">
+            <SelectTrigger className="w-full h-9 text-xs bg-background border-border font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -249,24 +257,17 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">{t(isBitFC ? 'coilCount' : 'registerCount')}</label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              className="flex-1 h-9 text-xs bg-background border-border"
-              value={isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16)}
-              min={1}
-              max={maxCount}
-              onChange={e => {
-                const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
-                updateTab({ bitCount: isBitFC ? val : Math.ceil(val * 16) });
-              }}
-            />
-            <span className="w-24 text-[9px] text-muted-foreground">
-              {isBitFC
-                ? `${t('registerCount')}: ${Math.ceil(tab.bitCount / 16)}`
-                : `位: ${tab.bitCount}`}
-            </span>
-          </div>
+          <Input
+            type="number"
+            className="flex-1 h-9 text-xs bg-background border-border"
+            value={isBitFC ? tab.bitCount : Math.floor(tab.bitCount / 16)}
+            min={1}
+            max={maxCount}
+            onChange={e => {
+              const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
+              updateTab({ bitCount: isBitFC ? val : Math.floor(val * 16) });
+            }}
+          />
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -332,42 +333,22 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             size="sm"
             variant="outline"
             className="h-9 text-xs"
-            onClick={async () => {
-              if (!connection) return;
-              if (isWriteFC) {
-                const data = state.registerData[tab.id] || [];
-                const values: number[] = [];
-                const count = Math.ceil(tab.bitCount / 16);
-                for (let i = 0; i < count; i++) {
-                  values.push(data[i]?.rawValue ?? 0);
-                }
-                await writeRegisters(
-                  connection.id,
-                  tab.id,
-                  connection.slaveId,
-                  parseInt(tab.functionCode),
-                  tab.startAddress,
-                  values,
-                  connection.mode,
-                );
-              } else {
+            onClick={() => {
+              if (connection) {
                 readRegisters(
                   connection.id,
                   tab.id,
                   connection.slaveId,
                   parseInt(tab.functionCode),
                   tab.startAddress,
-                  isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16),
+                  isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
                   connection.mode,
                 );
               }
             }}
           >
-            {isWriteFC ? t('writeOnce') : t('readOnce')}
+            {t('readOnce')}
           </Button>
-        <span className="text-[10px] text-muted-foreground ml-auto">
-          {connection ? `${connection.byteOrder32} / ${connection.byteOrder64}` : ''}
-        </span>
       </div>
 
       </div>
@@ -441,6 +422,14 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
         <span className="ml-auto">{values} values</span>
+        {isWriteFC && Object.keys(editingValues).length > 0 && (
+          <button
+            onClick={handleWrite}
+            className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-colors"
+          >
+            {t('write')} ({Object.keys(editingValues).length})
+          </button>
+        )}
         {tab.isPolling && (
           <span className="text-green-400 flex items-center gap-1">
             <span className="w-1 h-1 rounded-full bg-green-400 animate-pulse" />
@@ -448,7 +437,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           </span>
         )}
       </div>
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="flex-1">
         <div className="p-2">
           <table className="w-full text-xs font-mono">
                 <thead>
@@ -579,7 +568,7 @@ export function usePolling() {
               conn.slaveId,
               parseInt(tab.functionCode),
               tab.startAddress,
-              isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16),
+              isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
               conn.mode,
             );
           }, tab.pollInterval);
