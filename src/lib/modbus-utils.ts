@@ -133,12 +133,12 @@ export function formatRegisterValue(
       return String(reg.rawValue);
     }
     case 'hex': {
-      return '0x"' + reg.rawValue.toString(16).toUpperCase().padStart(4, '0') + '"';
+      return reg.rawValue.toString(16).toUpperCase().padStart(4, '0');
     }
     case 'binary': {
       const bits = reg.rawValue.toString(2).padStart(16, '0');
       const grouped = bits.match(/.{4}/g)?.join(' ') || bits;
-      return '0b"' + grouped + '"';
+      return grouped;
     }
     case 'long':
     case 'ulong':
