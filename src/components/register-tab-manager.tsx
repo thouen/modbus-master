@@ -85,7 +85,7 @@ export function RegisterTabManager() {
                 >
                   <span className="max-w-[70px] truncate">{tab.name}</span>
                   <span className="text-[9px] text-muted-foreground/60 hidden group-hover:inline">
-                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.bitCount - 1 : Math.floor(tab.bitCount / 16) - 1)}
+                    {conn?.name ? `${conn.name}:` : ''}{tab.startAddress}~{tab.startAddress + (['01', '02', '05', '15'].includes(tab.functionCode) ? tab.bitCount - 1 : Math.ceil(tab.bitCount / 16) - 1)}
                   </span>
                   {tab.isPolling && status === 'connected' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -253,17 +253,17 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             <Input
               type="number"
               className="flex-1 h-9 text-xs bg-background border-border"
-              value={isBitFC ? tab.bitCount : Math.floor(tab.bitCount / 16)}
+              value={isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16)}
               min={1}
               max={maxCount}
               onChange={e => {
                 const val = Math.min(maxCount, Math.max(1, Number(e.target.value)));
-                updateTab({ bitCount: isBitFC ? val : Math.floor(val * 16) });
+                updateTab({ bitCount: isBitFC ? val : Math.ceil(val * 16) });
               }}
             />
             <span className="w-24 text-[9px] text-muted-foreground">
               {isBitFC
-                ? `${t('registerCount')}: ${Math.floor(tab.bitCount / 16)}`
+                ? `${t('registerCount')}: ${Math.ceil(tab.bitCount / 16)}`
                 : `位: ${tab.bitCount}`}
             </span>
           </div>
@@ -357,7 +357,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
                   connection.slaveId,
                   parseInt(tab.functionCode),
                   tab.startAddress,
-                  isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
+                  isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16),
                   connection.mode,
                 );
               }
@@ -579,7 +579,7 @@ export function usePolling() {
               conn.slaveId,
               parseInt(tab.functionCode),
               tab.startAddress,
-              isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount,
+              isBitFC ? tab.bitCount : Math.ceil(tab.bitCount / 16),
               conn.mode,
             );
           }, tab.pollInterval);
