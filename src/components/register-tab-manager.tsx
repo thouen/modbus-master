@@ -507,12 +507,20 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                             })}
                           </div>
                         ) : isWriteFC && isGroupStart ? (
-                          <input
-                            type="text"
-                            value={editingValues[reg.address] ?? displayValue}
-                            onChange={e => setValue(reg.address, e.target.value)}
-                            className="w-full bg-transparent border border-amber-500/30 rounded px-1 text-green-400 h-7 focus:outline-none focus:border-amber-500"
-                          />
+                          <div className="flex items-center gap-0.5 h-7">
+                            {tab.displayFormat === 'hex' && (
+                              <span className="text-amber-400 font-mono text-xs shrink-0">0x</span>
+                            )}
+                            {tab.displayFormat === 'binary' && (
+                              <span className="text-amber-400 font-mono text-xs shrink-0">0b</span>
+                            )}
+                            <input
+                              type="text"
+                              value={editingValues[reg.address] ?? displayValue}
+                              onChange={e => setValue(reg.address, e.target.value)}
+                              className="flex-1 min-w-0 bg-transparent border border-amber-500/30 rounded px-1 text-green-400 h-7 focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
                         ) : (
                           <span className={`inline-flex items-center h-7 ${tab.displayFormat === 'float' || tab.displayFormat === 'double' ? 'text-cyan-300' : 'text-green-400'}`}>
                             {tab.displayFormat === 'hex' ? '0x' : (tab.displayFormat === 'binary' ? '0b' : '')}{displayValue || '\u00A0'}
