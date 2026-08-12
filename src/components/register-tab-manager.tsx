@@ -368,7 +368,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
   const isWriteFC = ['05', '06', '15', '16'].includes(tab.functionCode);
   const isBitFC = ['01', '02', '05', '15'].includes(tab.functionCode);
   const [editingValues, setEditingValues] = useState<Record<number, string>>({});
-  const dataCount = isBitFC ? Math.floor(tab.bitCount / 16) : tab.bitCount;
+  const dataCount = Math.ceil(tab.bitCount / 16);
 
   const handleWrite = useCallback(async () => {
     if (!conn) return;
@@ -420,7 +420,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
             {conn.name}
           </span>
         )}
-        <span>Addr: {tab.startAddress} ~ {tab.startAddress + Math.ceil(tab.bitCount / 16) - 1}</span>
+        <span>Addr: {tab.startAddress} ~ {tab.startAddress + dataCount - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
         <span className="ml-auto">{values} values</span>
@@ -439,12 +439,13 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           </span>
         )}
       </div>
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="flex-1">
         <div className="p-2">
           {tab.displayFormat === 'led' ? (
             <LedDisplay data={displayData} isWrite={isWriteFC} editingValues={editingValues} onSetValue={setValue} />
           ) : (
-            <table className="w-full text-xs font-mono">
+            <div className="overflow-auto max-h-full">
+              <table className="w-full text-xs font-mono">
                 <thead>
                   <tr className="text-muted-foreground border-b border-border sticky top-0 bg-[#0a0e14] z-10">
                     <th className="text-left py-1 px-2 w-12">#</th>
@@ -476,7 +477,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                         {isGroupStart && regsPerValue > 1 ? groupIndex + 1 : ''}
                       </td>
                       <td className="py-0.5 px-2 text-muted-foreground/40 text-[10px]">
-                        {idx + 1}
+                        {idx}
                       </td>
                       <td className="py-0.5 px-2 text-cyan-400 font-mono">
                         0x{reg.address.toString(16).toUpperCase().padStart(4, '0')}
@@ -493,10 +494,10 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                             type="text"
                             value={editingValues[reg.address] ?? displayValue}
                             onChange={e => setValue(reg.address, e.target.value)}
-                            className="w-full bg-transparent border border-amber-500/30 rounded px-1 py-0.5 text-green-400 focus:outline-none focus:border-amber-500"
+                            className="w-full bg-transparent border border-amber-500/30 rounded px-1 text-green-400 h-7 focus:outline-none focus:border-amber-500"
                           />
                         ) : (
-                          <span className={tab.displayFormat === 'float' || tab.displayFormat === 'double' ? 'text-cyan-300' : 'text-green-400'}>
+                          <span className={`inline-flex items-center h-7 ${tab.displayFormat === 'float' || tab.displayFormat === 'double' ? 'text-cyan-300' : 'text-green-400'}`}>
                             {displayValue}
                           </span>
                         )}
@@ -506,6 +507,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </ScrollArea>
