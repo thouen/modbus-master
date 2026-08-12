@@ -409,7 +409,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           </span>
         )}
       </div>
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-auto min-h-0">
         <div className="p-2">
           <table className="w-full text-xs font-mono">
                 <thead>
@@ -503,7 +503,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
               </tbody>
             </table>
           </div>
-        </ScrollArea>
+        </div>
     </div>
   );
 }

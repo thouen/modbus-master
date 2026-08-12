@@ -487,7 +487,7 @@ function buildWriteSingleRegisterRtu(slaveId: number, address: number, value: nu
 function buildWriteMultipleCoilsRtu(slaveId: number, startAddress: number, values: boolean[]): Buffer {
   const quantity = values.length;
   const byteCount = Math.ceil(quantity / 8);
-  const pdu = Buffer.alloc(6 + byteCount);
+  const pdu = Buffer.alloc(7 + byteCount);
   pdu[0] = slaveId;
   pdu[1] = 0x0F;
   pdu.writeUInt16BE(startAddress, 2);
@@ -626,7 +626,7 @@ export async function writeMultipleRegisters(
   const tid = globalTransactionId++;
   const quantity = values.length;
   const byteCount = quantity * 2;
-  const pdu = Buffer.alloc(5 + byteCount);
+  const pdu = Buffer.alloc(6 + byteCount);
   pdu[0] = 0x10;
   pdu.writeUInt16BE(startAddress, 1);
   pdu.writeUInt16BE(quantity, 3);
