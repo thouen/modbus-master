@@ -119,7 +119,7 @@ export function RegisterTabManager() {
             className={`h-7 px-2 text-xs shrink-0 ${showConfig ? 'text-blue-400' : ''}`}
             onClick={() => setShowConfig(!showConfig)}
           >
-            CFG
+            {t('cfg')}
           </Button>
         )}
       </div>
@@ -423,7 +423,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         <span>Addr: {tab.startAddress} ~ {tab.startAddress + dataCount - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
-        <span className="ml-auto">{values} values</span>
+        <span className="ml-auto">{values} {t('values')}</span>
         {isWriteFC && Object.keys(editingValues).length > 0 && (
           <button
             onClick={handleWrite}

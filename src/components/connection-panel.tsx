@@ -99,7 +99,7 @@ export function ConnectionPanel() {
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground pl-4">
                   <span>{conn.protocol.toUpperCase()}/{conn.mode.toUpperCase()}</span>
-                  <span>Slave:{conn.slaveId}</span>
+                  <span>{t('slave')}:{conn.slaveId}</span>
                   <span className="truncate">{configDetail}</span>
                 </div>
                 <div className="flex items-center text-[10px] text-muted-foreground/50 pl-4 gap-2">
@@ -108,8 +108,8 @@ export function ConnectionPanel() {
                 </div>
                 <div className="flex items-center justify-between pl-4">
                   <div className="flex items-center gap-2 text-[9px] text-muted-foreground/60">
-                    <span>{tabCount} tabs</span>
-                    <span>{logCount} logs</span>
+                    <span>{tabCount} {t('tabs')}</span>
+                    <span>{logCount} {t('logs')}</span>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button

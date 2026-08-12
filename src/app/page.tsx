@@ -103,6 +103,7 @@ function AppContent() {
 
 function StatusBar() {
   const { state } = useAppState();
+  const { t } = useI18n();
   const connectedCount = Object.values(state.connectionStatus).filter(s => s === 'connected').length;
   const pollingCount = state.tabs.filter(t => t.isPolling).length;
 
@@ -113,13 +114,13 @@ function StatusBar() {
           <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${
             connectedCount > 0 ? 'bg-green-500' : 'bg-zinc-600'
           }`} />
-          {connectedCount} connected
+          {connectedCount} {t('connectedDevice')}
         </span>
-        <span>{state.connections.length} connections</span>
-        <span>{state.tabs.length} tabs</span>
+        <span>{state.connections.length} {t('connections')}</span>
+        <span>{state.tabs.length} {t('tabs')}</span>
         {pollingCount > 0 && (
           <span className="text-amber-400">
-            {pollingCount} polling
+            {pollingCount} {t('polling')}
           </span>
         )}
       </div>

@@ -149,7 +149,14 @@ export const translations = {
     writeOperation: 'Write Operation',
     on: 'ON',
     off: 'OFF',
-    values: 'Values',
+    values: 'values',
+    // Status bar
+    connectedDevice: 'connected',
+    tabs: 'tabs',
+    polling: 'polling',
+    slave: 'Slave',
+    cfg: 'CFG',
+    addTab: 'Add tab',
   },
   zh: {
     // App
@@ -301,7 +308,14 @@ export const translations = {
     writeOperation: '写操作',
     on: '开',
     off: '关',
-    values: '值',
+    values: '个值',
+    // Status bar
+    connectedDevice: '已连接',
+    tabs: '个标签',
+    polling: '个轮询中',
+    slave: '从站',
+    cfg: '配置',
+    addTab: '添加标签',
   },
 } as const;
 
