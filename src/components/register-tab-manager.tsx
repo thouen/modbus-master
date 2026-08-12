@@ -480,7 +480,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                       </td>
                       <td className="py-0.5 px-2">
                         {tab.displayFormat === 'led' ? (
-                          <div className="flex gap-0.5 items-center h-7">
+                          <div className="flex gap-0.5 items-center h-7 flex-nowrap">
                             {Array.from({ length: 16 }, (_, i) => {
                               const bit = isWriteFC
                                 ? ((parseInt(editingValues[reg.address] ?? '0', 10) || 0) >> (15 - i)) & 1
@@ -494,9 +494,9 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                                     const newVal = currentVal ^ (1 << (15 - i));
                                     setValue(reg.address, newVal.toString());
                                   }}
-                                  className={`w-3 h-3 rounded-sm border ${
+                                  className={`w-2.5 h-2.5 rounded-sm border ${
                                     bit
-                                      ? 'bg-green-500 border-green-400 shadow-[0_0_3px_rgba(34,197,94,0.6)]'
+                                      ? 'bg-green-500 border-green-400 shadow-[0_0_2px_rgba(34,197,94,0.6)]'
                                       : 'bg-zinc-800 border-zinc-700'
                                   } ${isWriteFC ? 'cursor-pointer hover:ring-1 hover:ring-amber-500' : ''} ${i % 4 === 3 ? 'mr-1' : ''}`}
                                   title={`Bit ${15 - i}: ${bit}${isWriteFC ? ' (click to toggle)' : ''}`}
