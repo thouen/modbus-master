@@ -441,11 +441,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {tab.displayFormat === 'led' ? (
-            <LedDisplay data={displayData} isWrite={isWriteFC} editingValues={editingValues} onSetValue={setValue} />
-          ) : (
-            <div className="overflow-auto max-h-full">
-              <table className="w-full text-xs font-mono">
+          <table className="w-full text-xs font-mono">
                 <thead>
                   <tr className="text-muted-foreground border-b border-border sticky top-0 bg-[#0a0e14] z-10">
                     <th className="text-left py-1 px-2 w-12">#</th>
@@ -488,8 +484,33 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                           {reg.rawValue.toString(16).toUpperCase().padStart(4, '0')}
                         </td>
                       }
-                      <td className={`py-0.5 px-2 ${isWriteFC && isGroupStart ? '' : ''}`}>
-                        {isWriteFC && isGroupStart ? (
+                      <td className="py-0.5 px-2">
+                        {tab.displayFormat === 'led' ? (
+                          <div className="flex gap-0.5 items-center h-7">
+                            {Array.from({ length: 16 }, (_, i) => {
+                              const bit = isWriteFC
+                                ? ((parseInt(editingValues[reg.address] ?? '0', 10) || 0) >> (15 - i)) & 1
+                                : (reg.rawValue >> (15 - i)) & 1;
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    if (!isWriteFC) return;
+                                    const currentVal = parseInt(editingValues[reg.address] ?? '0', 10) || reg.rawValue;
+                                    const newVal = currentVal ^ (1 << (15 - i));
+                                    setValue(reg.address, newVal.toString());
+                                  }}
+                                  className={`w-3 h-3 rounded-sm border ${
+                                    bit
+                                      ? 'bg-green-500 border-green-400 shadow-[0_0_3px_rgba(34,197,94,0.6)]'
+                                      : 'bg-zinc-800 border-zinc-700'
+                                  } ${isWriteFC ? 'cursor-pointer hover:ring-1 hover:ring-amber-500' : ''} ${i % 4 === 3 ? 'mr-1' : ''}`}
+                                  title={`Bit ${15 - i}: ${bit}${isWriteFC ? ' (click to toggle)' : ''}`}
+                                />
+                              );
+                            })}
+                          </div>
+                        ) : isWriteFC && isGroupStart ? (
                           <input
                             type="text"
                             value={editingValues[reg.address] ?? displayValue}
@@ -507,66 +528,8 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                 })}
               </tbody>
             </table>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  );
-}
-
-function LedDisplay({ data, isWrite, editingValues, onSetValue }: {
-  data: RegisterData[];
-  isWrite: boolean;
-  editingValues: Record<number, string>;
-  onSetValue: (addr: number, val: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-2 p-2">
-      {data.map(reg => {
-        const bits = isWrite
-          ? (Array.from({ length: 16 }, (_, i) => {
-              const val = editingValues[reg.address];
-              const rawVal = val !== undefined ? parseInt(val, 10) : reg.rawValue;
-              return (rawVal >> (15 - i)) & 1;
-            }))
-          : (Array.from({ length: 16 }, (_, i) => (reg.rawValue >> (15 - i)) & 1));
-
-        const toggleBit = (bitPos: number) => {
-          if (!isWrite) return;
-          const currentVal = editingValues[reg.address] !== undefined
-            ? parseInt(editingValues[reg.address], 10)
-            : reg.rawValue;
-          const newVal = currentVal ^ (1 << bitPos);
-          onSetValue(reg.address, newVal.toString());
-        };
-
-        return (
-          <div key={reg.address} className="flex items-center gap-2">
-            <span className="text-[9px] text-muted-foreground font-mono w-12 shrink-0 text-right">
-              {reg.address.toString().padStart(5, '0')}
-            </span>
-            <span className="text-[9px] text-muted-foreground/40">|</span>
-            <div className="flex gap-0.5">
-              {bits.map((bit, i) => (
-                <div
-                  key={i}
-                  onClick={() => toggleBit(15 - i)}
-                  className={`w-3 h-3 rounded-sm border ${
-                    bit
-                      ? 'bg-green-500 border-green-400 shadow-[0_0_3px_rgba(34,197,94,0.6)]'
-                      : 'bg-zinc-800 border-zinc-700'
-                  } ${isWrite ? 'cursor-pointer hover:ring-1 hover:ring-amber-500' : ''} ${i % 4 === 3 ? 'mr-1' : ''}`}
-                  title={`Bit ${15 - i}: ${bit}${isWrite ? ' (click to toggle)' : ''}`}
-                />
-              ))}
-            </div>
-            <span className="text-[9px] text-muted-foreground/40 font-mono ml-1">
-              {bits.map(b => b).join('').replace(/(.{4})/g, '$1 ').trim()}
-            </span>
           </div>
-        );
-      })}
+        </ScrollArea>
     </div>
   );
 }
