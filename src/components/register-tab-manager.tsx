@@ -448,9 +448,13 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
               <table className="w-full text-xs font-mono">
                 <thead>
                   <tr className="text-muted-foreground border-b border-border sticky top-0 bg-[#0a0e14] z-10">
+                    <th className="text-left py-1 px-2 w-12">#</th>
                     <th className="text-left py-1 px-2 w-12">{t('offset')}</th>
                     <th className="text-left py-1 px-2 w-20">{t('address')}</th>
-                    <th className="text-left py-1 px-2 w-20">{t('raw')}</th>
+                    {
+                      (bitsPerValue === 32 || bitsPerValue === 64) && 
+                      <th className="text-left py-1 px-2 w-20">{t('raw')}</th>
+                    }
                     <th className="text-left py-1 px-2">{t('value')}</th>
                   </tr>
                 </thead>
@@ -478,9 +482,12 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                       <td className="py-0.5 px-2 text-cyan-400 font-mono">
                         0x{reg.address.toString(16).toUpperCase().padStart(4, '0')}
                       </td>
-                      <td className="py-0.5 px-2 text-amber-400">
-                        {reg.rawValue.toString(16).toUpperCase().padStart(4, '0')}
-                      </td>
+                      {
+                        (bitsPerValue === 32 || bitsPerValue === 64) && 
+                        <td className="py-0.5 px-2 text-amber-400">
+                          {reg.rawValue.toString(16).toUpperCase().padStart(4, '0')}
+                        </td>
+                      }
                       <td className={`py-0.5 px-2 ${isWriteFC && isGroupStart ? '' : ''}`}>
                         {isWriteFC && isGroupStart ? (
                           <input
