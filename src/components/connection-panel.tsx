@@ -56,7 +56,7 @@ export function ConnectionPanel() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-3 border-b border-border">
-        <h2 className="text-sm font-semibold text-foreground">{t('connections')}</h2>
+        <h2 className="text-sm font-semibold text-foreground">{t('connections_management')}</h2>
         <Button size="sm" variant="outline" onClick={handleNew} className="h-7 text-xs">
           + {t('newConnection')}
         </Button>
@@ -109,7 +109,7 @@ export function ConnectionPanel() {
                 <div className="flex items-center justify-between pl-4">
                   <div className="flex items-center gap-2 text-[9px] text-muted-foreground/60">
                     <span>{tabCount} {t('tabs')}</span>
-                    <span>{logCount} {t('logs')}</span>
+                    <span>{logCount} {t('logs2')}</span>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button

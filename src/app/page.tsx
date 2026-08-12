@@ -40,7 +40,7 @@ function AppContent() {
             className="h-7 text-[10px] px-2"
             onClick={() => togglePanel('connections')}
           >
-            {t('connections')}
+            {t('connections_management')}
           </Button>
           <Button
             size="sm"

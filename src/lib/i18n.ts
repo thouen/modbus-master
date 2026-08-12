@@ -5,7 +5,7 @@ export const translations = {
     appSubtitle: 'Multi-Protocol Communication Tool',
 
     // Navigation
-    connections: 'Connections',
+    connections_management: 'Connections',
     registerTabs: 'Registers',
     logs: 'Logs',
     settings: 'Settings',
@@ -34,6 +34,7 @@ export const translations = {
     host: 'Host',
     localPort: 'Local Port',
     slaveId: 'Slave ID',
+    logs2: 'logs',
     connect: 'Connect',
     disconnect: 'Disconnect',
     connected: 'Connected',
@@ -152,6 +153,7 @@ export const translations = {
     values: 'values',
     // Status bar
     connectedDevice: 'connected',
+    connections: 'connections',
     tabs: 'tabs',
     polling: 'polling',
     slave: 'Slave',
@@ -164,7 +166,7 @@ export const translations = {
     appSubtitle: '多协议通信工具',
 
     // Navigation
-    connections: '连接管理',
+    connections_management: '连接管理',
     registerTabs: '寄存器',
     logs: '日志',
     settings: '设置',
@@ -193,6 +195,7 @@ export const translations = {
     host: '主机',
     localPort: '本地端口',
     slaveId: '从站地址',
+    logs2: '条日志',
     connect: '连接',
     disconnect: '断开',
     connected: '已连接',
@@ -311,6 +314,7 @@ export const translations = {
     values: '个值',
     // Status bar
     connectedDevice: '已连接',
+    connections: '个连接',
     tabs: '个标签',
     polling: '个轮询中',
     slave: '从站',
