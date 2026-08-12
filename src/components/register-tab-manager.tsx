@@ -5,7 +5,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useAppState, type Action } from '@/hooks/use-app-state';
 import { useModbusWs } from '@/hooks/use-modbus-ws';
 import type { RegisterTab, RegisterData, FunctionCode, DataDisplayFormat, ByteOrder32, ByteOrder64, LogEntry, ConnectionConfig } from '@/lib/modbus-types';
-import { generateId, formatRegisterValue, getBitsPerValue, buildRTUFrame, toHexString } from '@/lib/modbus-utils';
+import { generateId, formatRegisterValue, getBitsPerValue, buildRTUFrame, toHexString, parseDisplayValue } from '@/lib/modbus-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -379,7 +379,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
       const addr = tab.startAddress + i;
       const val = editingValues[addr];
       if (val !== undefined) {
-        values.push(parseInt(val, 10) || 0);
+        values.push(parseDisplayValue(val, tab.displayFormat));
       } else {
         values.push(0);
       }
@@ -444,8 +444,8 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           <table className="w-full text-xs font-mono">
                 <thead>
                   <tr className="text-muted-foreground border-b border-border sticky top-0 bg-[#0a0e14] z-10">
-                    <th className="text-left py-1 px-2 w-12">#</th>
-                    <th className="text-left py-1 px-2 w-12">{t('offset')}</th>
+                    <th className="text-left py-1 px-2 w-20">#</th>
+                    <th className="text-left py-1 px-2 w-20">{t('offset')}</th>
                     <th className="text-left py-1 px-2 w-20">{t('address')}</th>
                     <th className="text-left py-1 px-2 w-20">{t('raw')}</th>
                     <th className="text-left py-1 px-2">{t('value')}</th>

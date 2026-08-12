@@ -133,10 +133,12 @@ export function formatRegisterValue(
       return String(reg.rawValue);
     }
     case 'hex': {
-      return '0x' + reg.rawValue.toString(16).toUpperCase().padStart(4, '0');
+      return '0x"' + reg.rawValue.toString(16).toUpperCase().padStart(4, '0') + '"';
     }
     case 'binary': {
-      return reg.rawValue.toString(2).padStart(16, '0');
+      const bits = reg.rawValue.toString(2).padStart(16, '0');
+      const grouped = bits.match(/.{4}/g)?.join(' ') || bits;
+      return '0b"' + grouped + '"';
     }
     case 'long':
     case 'ulong':
@@ -188,6 +190,26 @@ export function getBitsPerValue(format: DataDisplayFormat): number {
       return 64;
     default:
       return 16;
+  }
+}
+
+export function parseDisplayValue(value: string, format: DataDisplayFormat): number {
+  const trimmed = value.trim();
+  switch (format) {
+    case 'hex':
+      // e.g. 0x"0123" or 0x0123 or 0123
+      const hexStr = trimmed.replace(/^0x"?|"?$/g, '');
+      return parseInt(hexStr, 16) || 0;
+    case 'binary':
+      // e.g. 0b"0000 0001 0010 0011" or 0b0000000000000000
+      const binStr = trimmed.replace(/^0b"?|"?\s*$/g, '').replace(/\s+/g, '');
+      return parseInt(binStr, 2) || 0;
+    case 'float':
+      return parseFloat(trimmed) || 0;
+    case 'double':
+      return parseFloat(trimmed) || 0;
+    default:
+      return parseInt(trimmed, 10) || 0;
   }
 }
 
