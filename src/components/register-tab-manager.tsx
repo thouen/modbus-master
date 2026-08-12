@@ -119,7 +119,7 @@ export function RegisterTabManager() {
             className={`h-7 px-2 text-xs shrink-0 ${showConfig ? 'text-blue-400' : ''}`}
             onClick={() => setShowConfig(!showConfig)}
           >
-            {t('cfg')}
+            CFG
           </Button>
         )}
       </div>
@@ -423,7 +423,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         <span>Addr: {tab.startAddress} ~ {tab.startAddress + dataCount - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
-        <span className="ml-auto">{values} {t('values')}</span>
+        <span className="ml-auto">{values} values</span>
         {isWriteFC && Object.keys(editingValues).length > 0 && (
           <button
             onClick={handleWrite}
@@ -467,10 +467,12 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                       }`}
                     >
                       <td className="py-0.5 px-2 text-muted-foreground/50 text-[10px]">
-                        {isGroupStart ? groupIndex + 1 : ''}
+                        {tab.displayFormat === 'led'
+                          ? `${idx * 16 + 1}~${idx * 16 + 16}`
+                          : isGroupStart ? groupIndex + 1 : ''}
                       </td>
                       <td className="py-0.5 px-2 text-muted-foreground/40 text-[10px]">
-                        {idx}
+                        {tab.displayFormat === 'led' ? `${idx}[15~0]` : idx}
                       </td>
                       <td className="py-0.5 px-2 text-cyan-400 font-mono">
                         0x{reg.address.toString(16).toUpperCase().padStart(4, '0')}
