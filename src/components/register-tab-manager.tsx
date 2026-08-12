@@ -420,7 +420,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
             {conn.name}
           </span>
         )}
-        <span>Addr: {tab.startAddress} ~ {tab.startAddress + dataCount - 1}</span>
+        <span>Addr: {tab.startAddress} ~ {tab.startAddress + Math.ceil(tab.bitCount / 16) - 1}</span>
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
         <span className="ml-auto">{values} values</span>
@@ -439,13 +439,12 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           </span>
         )}
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-2">
           {tab.displayFormat === 'led' ? (
             <LedDisplay data={displayData} isWrite={isWriteFC} editingValues={editingValues} onSetValue={setValue} />
           ) : (
-            <div className="overflow-auto max-h-full">
-              <table className="w-full text-xs font-mono">
+            <table className="w-full text-xs font-mono">
                 <thead>
                   <tr className="text-muted-foreground border-b border-border sticky top-0 bg-[#0a0e14] z-10">
                     <th className="text-left py-1 px-2 w-12">#</th>
@@ -507,7 +506,6 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
                 })}
               </tbody>
             </table>
-            </div>
           )}
         </div>
       </ScrollArea>
