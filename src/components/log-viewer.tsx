@@ -14,7 +14,7 @@ export function LogViewer() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const logViewerRef = useRef<HTMLDivElement>(null);
   const prevLogsLengthRef = useRef(0);
 
   const activeTab = state.tabs.find(tab => tab.id === state.activeTabId);
@@ -40,11 +40,8 @@ export function LogViewer() {
   useEffect(() => {
     if (!autoScroll) return;
 
-    // Find the scroll viewport element
-    if (!scrollContainerRef.current) {
-      scrollContainerRef.current = document.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
-    }
-    const viewport = scrollContainerRef.current;
+    // Find the scroll viewport within the log viewer container
+    const viewport = logViewerRef.current?.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
     if (!viewport) return;
 
     // Only auto-scroll when new logs are added (length increased)
@@ -59,9 +56,8 @@ export function LogViewer() {
   // Also scroll on first load
   useEffect(() => {
     if (!autoScroll || logs.length === 0) return;
-    const viewport = scrollContainerRef.current ?? document.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
+    const viewport = logViewerRef.current?.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
     if (viewport) {
-      scrollContainerRef.current = viewport;
       requestAnimationFrame(() => {
         viewport.scrollTop = viewport.scrollHeight;
       });
@@ -191,7 +187,7 @@ export function LogViewer() {
       )}
 
       {/* Log entries */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" ref={logViewerRef}>
         <ScrollArea className="h-full">
           {logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground/50">

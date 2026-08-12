@@ -54,6 +54,7 @@ export const translations = {
     startPolling: 'Start',
     stopPolling: 'Stop',
     readOnce: 'Read Once',
+    writeOnce: 'Write Once',
 
     // Data Display Formats
     formatLed: 'Bit (1-bit)',
@@ -215,6 +216,7 @@ export const translations = {
     startPolling: '开始',
     stopPolling: '停止',
     readOnce: '读取一次',
+    writeOnce: '写入一次',
 
     // Data Display Formats
     formatLed: 'Bit (1位)',

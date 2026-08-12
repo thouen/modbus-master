@@ -68,7 +68,7 @@ export function RegisterTabManager() {
     <div className="flex flex-col h-full">
       {/* Tab bar */}
       <div className="flex items-center gap-1 px-2 pt-2 border-b border-border bg-muted/20">
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="flex items-center gap-1">
             {state.tabs.map(tab => {
               const conn = state.connections.find(c => c.id === tab.connectionId);
@@ -332,8 +332,25 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
             size="sm"
             variant="outline"
             className="h-9 text-xs"
-            onClick={() => {
-              if (connection) {
+            onClick={async () => {
+              if (!connection) return;
+              if (isWriteFC) {
+                const data = state.registerData[tab.id] || [];
+                const values: number[] = [];
+                const count = Math.ceil(tab.bitCount / 16);
+                for (let i = 0; i < count; i++) {
+                  values.push(data[i]?.rawValue ?? 0);
+                }
+                await writeRegisters(
+                  connection.id,
+                  tab.id,
+                  connection.slaveId,
+                  parseInt(tab.functionCode),
+                  tab.startAddress,
+                  values,
+                  connection.mode,
+                );
+              } else {
                 readRegisters(
                   connection.id,
                   tab.id,
@@ -346,7 +363,7 @@ function TabConfigPanel({ tab }: { tab: RegisterTab }) {
               }
             }}
           >
-            {t('readOnce')}
+            {isWriteFC ? t('writeOnce') : t('readOnce')}
           </Button>
         <span className="text-[10px] text-muted-foreground ml-auto">
           {connection ? `${connection.byteOrder32} / ${connection.byteOrder64}` : ''}
@@ -424,14 +441,6 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
         <span>FC{tab.functionCode}</span>
         <span>{getFormatLabel(tab.displayFormat, t)}</span>
         <span className="ml-auto">{values} values</span>
-        {isWriteFC && Object.keys(editingValues).length > 0 && (
-          <button
-            onClick={handleWrite}
-            className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-colors"
-          >
-            {t('write')} ({Object.keys(editingValues).length})
-          </button>
-        )}
         {tab.isPolling && (
           <span className="text-green-400 flex items-center gap-1">
             <span className="w-1 h-1 rounded-full bg-green-400 animate-pulse" />
@@ -439,7 +448,7 @@ function DataDisplayArea({ tab }: { tab: RegisterTab }) {
           </span>
         )}
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-2">
           <table className="w-full text-xs font-mono">
                 <thead>
