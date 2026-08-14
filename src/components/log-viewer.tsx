@@ -114,8 +114,8 @@ export function LogViewer() {
 
   const formatHexDump = (rawData: string): string => {
     if (!rawData) return '';
-    const bytes = rawData.split(' ').filter(Boolean);
-    if (bytes.length <= 8) return rawData;
+    const bytes = (rawData.match(/.{1,2}/g) || []);
+    if (bytes.length <= 8) return bytes.join(' ');
     const groups: string[] = [];
     for (let i = 0; i < bytes.length; i += 8) {
       groups.push(bytes.slice(i, i + 8).join(' '));
@@ -291,7 +291,7 @@ export function LogViewer() {
                               </div>
                               {/* Hex dump with line numbers */}
                               {(() => {
-                                const bytes = log.rawData!.split(' ').filter(Boolean);
+                                const bytes = (log.rawData!.match(/.{1,2}/g) || []);
                                 const lines: { offset: string; hex: string; ascii: string }[] = [];
                                 const lineLen = 8;
                                 for (let i = 0; i < bytes.length; i += lineLen) {

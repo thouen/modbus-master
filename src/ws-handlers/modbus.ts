@@ -179,19 +179,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
       const protocol = config.protocol;
       const fcName = `FC${String(functionCode).padStart(2, '0')}`;
 
-      // 发送 TX 日志
-      ws.send(JSON.stringify({
-        type: 'log',
-        payload: {
-          connectionId,
-          tabId,
-          direction: 'tx',
-          message: `${fcName} Read Addr:${startAddress} Qty:${quantity}`,
-          rawData: '',
-          timestamp: Date.now(),
-        },
-      }));
-
+      // 发送 TX 日志（在操作完成后发送，以包含 rawTx）
       let result;
       const actualMode = mode || config.mode || 'rtu';
 
@@ -205,6 +193,19 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
       } else {
         result = { success: false, error: 'Unsupported protocol' };
       }
+
+      // 现在发送 TX 日志（包含 rawTx）
+      ws.send(JSON.stringify({
+        type: 'log',
+        payload: {
+          connectionId,
+          tabId,
+          direction: 'tx',
+          message: `${fcName} Read Addr:${startAddress} Qty:${quantity}`,
+          rawData: result.rawTx || '',
+          timestamp: Date.now(),
+        },
+      }));
 
       if (result.success && result.data) {
         // 发送 RX 日志
@@ -275,16 +276,6 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
       const fcName = `FC${String(functionCode).padStart(2, '0')}`;
       const actualMode = mode || config.mode || 'rtu';
 
-      // 发送 TX 日志
-      ws.send(JSON.stringify({
-        type: 'log',
-        payload: {
-          connectionId, tabId, direction: 'tx',
-          message: `${fcName} Write Addr:${address}` + (Array.isArray(values) ? ` Qty:${values.length}` : ''),
-          rawData: '', timestamp: Date.now(),
-        },
-      }));
-
       let result;
       try {
         if (functionCode === 5) {
@@ -302,6 +293,16 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         const errMsg = err instanceof Error ? err.message : String(err);
         result = { success: false, error: errMsg };
       }
+
+      // 发送 TX 日志（操作完成后，包含 rawTx）
+      ws.send(JSON.stringify({
+        type: 'log',
+        payload: {
+          connectionId, tabId, direction: 'tx',
+          message: `${fcName} Write Addr:${address}` + (Array.isArray(values) ? ` Qty:${values.length}` : ''),
+          rawData: result.rawTx || '', timestamp: Date.now(),
+        },
+      }));
 
       if (result.success) {
         ws.send(JSON.stringify({
