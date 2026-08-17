@@ -265,7 +265,7 @@ export function buildASCIIFrame(
 /**
  * CRC16 calculation for RTU mode
  */
-function crc16(data: Uint8Array): number {
+export function crc16(data: Uint8Array): number {
   let crc = 0xffff;
   for (const byte of data) {
     crc ^= byte;

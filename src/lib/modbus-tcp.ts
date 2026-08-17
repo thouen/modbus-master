@@ -1,9 +1,14 @@
 /**
  * ModBus 协议底层实现（TCP/UDP/Serial RTU/ASCII）
  * 用于后端服务进行真实 ModBus 设备通信
+ * Reference: libmodbus (https://github.com/stephane/libmodbus)
+ *            Modicon Modbus Protocol Reference Guide (www.modbus.org)
  */
 import * as net from 'net';
 import * as dgram from 'dgram';
+import { MODBUS_FC, MODBUS_MAX, getExceptionMessage } from './modbus-types';
+import type { ModbusResponse } from './modbus-types';
+// crc16 在本地实现（返回 Buffer），不使用 modbus-utils 中的版本
 // 动态导入 serialport（仅在需要时加载）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let SerialPort: any;
@@ -16,16 +21,6 @@ try {
   SerialPort = null;
 }
 import type { ConnectionConfig, ModbusConnectionStatus } from './modbus-types';
-
-// ── 响应类型 ──
-export interface ModbusResponse {
-  success: boolean;
-  data?: number[];          // 寄存器值
-  rawTx?: string;           // 发送的十六进制数据
-  rawRx?: string;           // 接收的十六进制数据
-  error?: string;
-  timing?: number;          // 响应时间 ms
-}
 
 // ── CRC16 (RTU) ──
 const crc16Table = new Uint16Array(256);
@@ -94,37 +89,235 @@ function buildTcpFrame(slaveId: number, functionCode: number, startAddress: numb
   return Buffer.concat([mbap, pdu]);
 }
 
-// ── 解析响应 ──
+// ── 解析响应（参考 libmodbus check_confirmation） ──
 
-/** 解析 03 功能码的 RTU 响应 */
-function parseRtuResponse(data: Buffer, expectedSlaveId: number, expectedFc: number): { registers: number[]; rawRx: string } {
+/**
+ * 解析 RTU 响应（通用，支持 FC01~FC06, FC15, FC16）
+ * 参考 libmodbus: compute_response_length_from_request + check_confirmation
+ */
+function parseRtuResponse(
+  data: Buffer,
+  expectedSlaveId: number,
+  expectedFc: number,
+  quantity: number,
+): { registers: number[]; rawRx: string } {
   const rawRx = data.toString('hex').toUpperCase();
-  if (data.length < 5) throw new Error('Response too short');
-  if (data[0] !== expectedSlaveId) throw new Error(`Slave ID mismatch: expected ${expectedSlaveId}, got ${data[0]}`);
-  if (data[1] === expectedFc + 0x80) throw new Error(`ModBus exception: ${data[2]}`);
-  if (data[1] !== expectedFc) throw new Error(`Function code mismatch: expected ${expectedFc}, got ${data[1]}`);
-  const byteCount = data[2];
-  if (data.length < 3 + byteCount + 2) throw new Error('Response truncated');
-  const registers: number[] = [];
-  for (let i = 0; i < byteCount; i += 2) {
-    registers.push(data.readUInt16BE(3 + i));
+
+  // 最小长度: slaveId(1) + fc(1) + data(1) + crc(2) = 5
+  if (data.length < 5) {
+    throw new Error(`Response too short (${data.length} bytes, minimum 5)`);
   }
+
+  // 校验从站地址
+  if (data[0] !== expectedSlaveId) {
+    throw new Error(`Slave ID mismatch: expected ${expectedSlaveId}, got ${data[0]}`);
+  }
+
+  const fc = data[1];
+
+  // 异常响应: FC >= 0x80
+  if (fc >= 0x80) {
+    const exCode = data[2];
+    throw new Error(`ModBus exception: ${getExceptionMessage(exCode)}`);
+  }
+
+  // 校验功能码
+  if (fc !== expectedFc) {
+    throw new Error(`Function code mismatch: expected 0x${expectedFc.toString(16).toUpperCase().padStart(2, '0')}, got 0x${fc.toString(16).toUpperCase().padStart(2, '0')}`);
+  }
+
+  // 校验 CRC
+  const receivedCrc = (data[data.length - 1] << 8) | data[data.length - 2];
+  const crcBuf = crc16(data.subarray(0, data.length - 2));
+  const calculatedCrc = (crcBuf[1] << 8) | crcBuf[0];
+  if (receivedCrc !== calculatedCrc) {
+    throw new Error(`CRC error: received 0x${receivedCrc.toString(16).toUpperCase().padStart(4, '0')}, calculated 0x${calculatedCrc.toString(16).toUpperCase().padStart(4, '0')}`);
+  }
+
+  // 根据功能码解析数据
+  const registers: number[] = [];
+
+  switch (fc) {
+    case MODBUS_FC.READ_COILS:
+    case MODBUS_FC.READ_DISCRETE_INPUTS: {
+      // Response: slaveId(1) + fc(1) + byteCount(1) + data(N) + crc(2)
+      const byteCount = data[2];
+      if (data.length < 3 + byteCount + 2) {
+        throw new Error('Response truncated (coil data)');
+      }
+      // 每个字节包含 8 个线圈位，低位在前
+      for (let i = 0; i < byteCount; i++) {
+        registers.push(data[3 + i]);
+      }
+      break;
+    }
+
+    case MODBUS_FC.READ_HOLDING_REGISTERS:
+    case MODBUS_FC.READ_INPUT_REGISTERS: {
+      // Response: slaveId(1) + fc(1) + byteCount(1) + data(N*2) + crc(2)
+      const byteCount = data[2];
+      if (data.length < 3 + byteCount + 2) {
+        throw new Error('Response truncated (register data)');
+      }
+      if (byteCount !== quantity * 2) {
+        throw new Error(`Byte count mismatch: expected ${quantity * 2}, got ${byteCount}`);
+      }
+      for (let i = 0; i < byteCount; i += 2) {
+        registers.push(data.readUInt16BE(3 + i));
+      }
+      break;
+    }
+
+    case MODBUS_FC.WRITE_SINGLE_COIL:
+    case MODBUS_FC.WRITE_SINGLE_REGISTER: {
+      // Response echoes request: slaveId(1) + fc(1) + address(2) + value(2) + crc(2)
+      if (data.length < 8) {
+        throw new Error('Response truncated (write single)');
+      }
+      // 返回写入的值（单个寄存器）
+      registers.push(data.readUInt16BE(4));
+      break;
+    }
+
+    case MODBUS_FC.WRITE_MULTIPLE_COILS:
+    case MODBUS_FC.WRITE_MULTIPLE_REGISTERS: {
+      // Response: slaveId(1) + fc(1) + address(2) + quantity(2) + crc(2)
+      if (data.length < 8) {
+        throw new Error('Response truncated (write multiple)');
+      }
+      // 返回写入数量
+      registers.push(data.readUInt16BE(4));
+      break;
+    }
+
+    default:
+      throw new Error(`Unsupported function code: 0x${fc.toString(16).toUpperCase().padStart(2, '0')}`);
+  }
+
   return { registers, rawRx };
 }
 
-/** 解析 TCP 响应 */
-function parseTcpResponse(data: Buffer, expectedFc: number): { registers: number[]; rawRx: string } {
+/**
+ * 解析 TCP 响应（通用，支持 FC01~FC06, FC15, FC16）
+ * 参考 libmodbus: _modbus_tcp_pre_check_confirmation + check_confirmation
+ */
+function parseTcpResponse(
+  data: Buffer,
+  expectedFc: number,
+  expectedTid?: number,
+  expectedSlaveId?: number,
+  quantity?: number,
+): { registers: number[]; rawRx: string } {
   const rawRx = data.toString('hex').toUpperCase();
-  if (data.length < 9) throw new Error('Response too short');
-  const fc = data[7];
-  if (fc === expectedFc + 0x80) throw new Error(`ModBus exception: ${data[8]}`);
-  if (fc !== expectedFc) throw new Error(`Function code mismatch: expected ${expectedFc}, got ${fc}`);
-  const byteCount = data[8];
-  if (data.length < 9 + byteCount) throw new Error('Response truncated');
-  const registers: number[] = [];
-  for (let i = 0; i < byteCount; i += 2) {
-    registers.push(data.readUInt16BE(9 + i));
+
+  // MBAP 头最小长度: tid(2) + pid(2) + len(2) + uid(1) + fc(1) = 8
+  if (data.length < 8) {
+    throw new Error(`Response too short (${data.length} bytes, minimum 8 for MBAP header)`);
   }
+
+  // 校验 Transaction ID
+  const tid = data.readUInt16BE(0);
+  if (expectedTid !== undefined && tid !== expectedTid) {
+    throw new Error(`Transaction ID mismatch: expected 0x${expectedTid.toString(16).toUpperCase().padStart(4, '0')}, got 0x${tid.toString(16).toUpperCase().padStart(4, '0')}`);
+  }
+
+  // 校验 Protocol ID (必须为 0 = ModBus)
+  const pid = data.readUInt16BE(2);
+  if (pid !== 0) {
+    throw new Error(`Invalid protocol ID: expected 0x0000, got 0x${pid.toString(16).toUpperCase().padStart(4, '0')}`);
+  }
+
+  // MBAP Length 字段
+  const mbapLength = data.readUInt16BE(4);
+  if (data.length < 6 + mbapLength) {
+    throw new Error(`Response truncated: MBAP length=${mbapLength}, actual=${data.length - 6}`);
+  }
+
+  // Unit ID (slave)
+  const unitId = data[6];
+  if (expectedSlaveId !== undefined && unitId !== expectedSlaveId) {
+    throw new Error(`Unit ID mismatch: expected ${expectedSlaveId}, got ${unitId}`);
+  }
+
+  const fc = data[7];
+
+  // 异常响应: FC >= 0x80
+  if (fc >= 0x80) {
+    if (data.length < 9) {
+      throw new Error('Exception response too short');
+    }
+    const exCode = data[8];
+    throw new Error(`ModBus exception: ${getExceptionMessage(exCode)}`);
+  }
+
+  // 校验功能码
+  if (fc !== expectedFc) {
+    throw new Error(`Function code mismatch: expected 0x${expectedFc.toString(16).toUpperCase().padStart(2, '0')}, got 0x${fc.toString(16).toUpperCase().padStart(2, '0')}`);
+  }
+
+  // 根据功能码解析数据
+  const registers: number[] = [];
+
+  switch (fc) {
+    case MODBUS_FC.READ_COILS:
+    case MODBUS_FC.READ_DISCRETE_INPUTS: {
+      // Response: MBAP(7) + fc(1) + byteCount(1) + data(N)
+      if (data.length < 10) {
+        throw new Error('Response truncated (coil header)');
+      }
+      const byteCount = data[8];
+      if (data.length < 9 + byteCount) {
+        throw new Error('Response truncated (coil data)');
+      }
+      for (let i = 0; i < byteCount; i++) {
+        registers.push(data[9 + i]);
+      }
+      break;
+    }
+
+    case MODBUS_FC.READ_HOLDING_REGISTERS:
+    case MODBUS_FC.READ_INPUT_REGISTERS: {
+      // Response: MBAP(7) + fc(1) + byteCount(1) + data(N*2)
+      if (data.length < 10) {
+        throw new Error('Response truncated (register header)');
+      }
+      const byteCount = data[8];
+      if (data.length < 9 + byteCount) {
+        throw new Error('Response truncated (register data)');
+      }
+      if (quantity !== undefined && byteCount !== quantity * 2) {
+        throw new Error(`Byte count mismatch: expected ${quantity * 2}, got ${byteCount}`);
+      }
+      for (let i = 0; i < byteCount; i += 2) {
+        registers.push(data.readUInt16BE(9 + i));
+      }
+      break;
+    }
+
+    case MODBUS_FC.WRITE_SINGLE_COIL:
+    case MODBUS_FC.WRITE_SINGLE_REGISTER: {
+      // Response echoes: MBAP(7) + fc(1) + address(2) + value(2)
+      if (data.length < 12) {
+        throw new Error('Response truncated (write single)');
+      }
+      registers.push(data.readUInt16BE(10));
+      break;
+    }
+
+    case MODBUS_FC.WRITE_MULTIPLE_COILS:
+    case MODBUS_FC.WRITE_MULTIPLE_REGISTERS: {
+      // Response: MBAP(7) + fc(1) + address(2) + quantity(2)
+      if (data.length < 12) {
+        throw new Error('Response truncated (write multiple)');
+      }
+      registers.push(data.readUInt16BE(10));
+      break;
+    }
+
+    default:
+      throw new Error(`Unsupported function code: 0x${fc.toString(16).toUpperCase().padStart(2, '0')}`);
+  }
+
   return { registers, rawRx };
 }
 
@@ -195,7 +388,7 @@ export async function readTcpRegisters(
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
   const conn = tcpConnections.get(connectionId);
-  if (!conn) return { success: false, error: 'Connection not found' };
+  if (!conn) return { success: false, error: 'Connection not found', rawTx: '', rawRx: '' };
 
   const tid = globalTransactionId++;
   const frame = buildTcpFrame(slaveId, functionCode, startAddress, quantity, tid);
@@ -213,21 +406,41 @@ export async function readTcpRegisters(
 
       const startTime = Date.now();
       const checkResponse = () => {
-        if (conn.buffer.length >= 9) {
-          try {
-            const { registers, rawRx } = parseTcpResponse(conn.buffer, functionCode);
-            clearTimeout(timer);
-            conn.buffer = Buffer.alloc(0);
-            resolve({
-              success: true,
-              data: registers,
-              rawTx,
-              rawRx,
-              timing: Date.now() - startTime,
-            });
-          } catch (e) {
-            clearTimeout(timer);
-            reject(e);
+        // MBAP header minimum: tid(2) + pid(2) + len(2) + uid(1) = 7 bytes
+        if (conn.buffer.length >= 7) {
+          // MBAP Length field = PDU + Unit ID length
+          const mbapLength = conn.buffer.readUInt16BE(4);
+          const expectedTotal = 6 + mbapLength; // 6 bytes header before length field + mbapLength
+          if (conn.buffer.length >= expectedTotal) {
+            try {
+              const { registers, rawRx } = parseTcpResponse(conn.buffer, functionCode, tid, slaveId, quantity);
+              clearTimeout(timer);
+              conn.buffer = Buffer.alloc(0);
+              resolve({
+                success: true,
+                data: registers,
+                rawTx,
+                rawRx,
+                timing: Date.now() - startTime,
+              });
+            } catch (e) {
+              clearTimeout(timer);
+              // Extract exception code if available
+              const errorMsg = e instanceof Error ? e.message : String(e);
+              const exMatch = errorMsg.match(/ModBus exception: (\d+)/);
+              const exceptionCode = exMatch ? parseInt(exMatch[1]) : undefined;
+              resolve({
+                success: false,
+                error: errorMsg,
+                rawTx,
+                rawRx: conn.buffer.toString('hex').toUpperCase(),
+                timing: Date.now() - startTime,
+                exceptionCode,
+              });
+              conn.buffer = Buffer.alloc(0);
+            }
+          } else {
+            setTimeout(checkResponse, 50);
           }
         } else {
           setTimeout(checkResponse, 50);
@@ -271,7 +484,7 @@ export async function readUdpRegisters(
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
   const socket = udpConnections.get(connectionId);
-  if (!socket) return { success: false, error: 'UDP connection not found' };
+  if (!socket) return { success: false, error: 'UDP connection not found', rawTx: '', rawRx: '' };
 
   const tid = globalTransactionId++;
   const frame = buildTcpFrame(slaveId, functionCode, startAddress, quantity, tid);
@@ -289,7 +502,7 @@ export async function readUdpRegisters(
       socket.once('message', (msg) => {
         clearTimeout(timer);
         try {
-          const { registers, rawRx } = parseTcpResponse(msg, functionCode);
+          const { registers, rawRx } = parseTcpResponse(msg, functionCode, tid, slaveId, quantity);
           resolve({
             success: true,
             data: registers,
@@ -298,7 +511,17 @@ export async function readUdpRegisters(
             timing: Date.now() - startTime,
           });
         } catch (e: unknown) {
-          reject(e);
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          const exMatch = errorMsg.match(/ModBus exception: (\d+)/);
+          const exceptionCode = exMatch ? parseInt(exMatch[1]) : undefined;
+          resolve({
+            success: false,
+            error: errorMsg,
+            rawTx,
+            rawRx: msg.toString('hex').toUpperCase(),
+            timing: Date.now() - startTime,
+            exceptionCode,
+          });
         }
       });
     });
@@ -362,7 +585,7 @@ export async function readSerialRegisters(
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
   const port = serialConnections.get(connectionId);
-  if (!port || !port.isOpen) return { success: false, error: 'Serial port not open' };
+  if (!port || !port.isOpen) return { success: false, error: 'Serial port not open', rawTx: '', rawRx: '' };
 
   let rawTx = '';
   let rawRx = '';
@@ -384,7 +607,7 @@ export async function readSerialRegisters(
           if (rxBuffer.length >= minLen) {
             clearTimeout(timer);
             try {
-              const { registers, rawRx: rxHex } = parseRtuResponse(rxBuffer, slaveId, functionCode);
+              const { registers, rawRx: rxHex } = parseRtuResponse(rxBuffer, slaveId, functionCode, quantity);
               rawRx = rxHex;
               resolve({
                 success: true,
@@ -394,7 +617,17 @@ export async function readSerialRegisters(
                 timing: Date.now() - startTime,
               });
             } catch (e: unknown) {
-              reject(e);
+              const errorMsg = e instanceof Error ? e.message : String(e);
+              const exMatch = errorMsg.match(/ModBus exception: (\d+)/);
+              const exceptionCode = exMatch ? parseInt(exMatch[1]) : undefined;
+              resolve({
+                success: false,
+                error: errorMsg,
+                rawTx,
+                rawRx: rxBuffer.toString('hex').toUpperCase(),
+                timing: Date.now() - startTime,
+                exceptionCode,
+              });
             }
           }
         });
@@ -423,17 +656,52 @@ export async function readSerialRegisters(
               rawRx = match[1];
               const respData = Buffer.from(match[1], 'hex');
               if (respData[0] !== slaveId) {
-                reject(new Error(`Slave ID mismatch: expected ${slaveId}, got ${respData[0]}`));
+                resolve({
+                  success: false,
+                  error: `Slave ID mismatch: expected ${slaveId}, got ${respData[0]}`,
+                  rawTx,
+                  rawRx,
+                  timing: Date.now() - startTime,
+                });
+                return;
+              }
+              // Check for exception response (function code + 0x80)
+              if (respData[1] === functionCode + 0x80) {
+                const exCode = respData[2];
+                resolve({
+                  success: false,
+                  error: `ModBus exception: ${exCode} - ${getExceptionMessage(exCode)}`,
+                  rawTx,
+                  rawRx,
+                  timing: Date.now() - startTime,
+                  exceptionCode: exCode,
+                });
                 return;
               }
               if (respData[1] !== functionCode) {
-                reject(new Error(`Function code mismatch: expected ${functionCode}, got ${respData[1]}`));
+                resolve({
+                  success: false,
+                  error: `Function code mismatch: expected ${functionCode}, got ${respData[1]}`,
+                  rawTx,
+                  rawRx,
+                  timing: Date.now() - startTime,
+                });
                 return;
               }
               const byteCount = respData[2];
               const registers: number[] = [];
-              for (let i = 0; i < byteCount; i += 2) {
-                registers.push(respData.readUInt16BE(3 + i));
+              // Coil/discrete input response: byteCount bytes, each bit = 1 value
+              if (functionCode === MODBUS_FC.READ_COILS || functionCode === MODBUS_FC.READ_DISCRETE_INPUTS) {
+                for (let i = 0; i < byteCount; i++) {
+                  for (let bit = 0; bit < 8; bit++) {
+                    registers.push((respData[3 + i] >> bit) & 1);
+                  }
+                }
+              } else {
+                // Register response: 2 bytes per register
+                for (let i = 0; i < byteCount; i += 2) {
+                  registers.push(respData.readUInt16BE(3 + i));
+                }
               }
               resolve({
                 success: true,
@@ -443,7 +711,13 @@ export async function readSerialRegisters(
                 timing: Date.now() - startTime,
               });
             } else {
-              reject(new Error('Invalid ASCII response format'));
+              resolve({
+                success: false,
+                error: 'Invalid ASCII response format',
+                rawTx,
+                rawRx: rxStr.trim(),
+                timing: Date.now() - startTime,
+              });
             }
           }
         });
@@ -465,7 +739,7 @@ export async function readSerialRegisters(
 function buildWriteSingleCoilRtu(slaveId: number, address: number, value: boolean): Buffer {
   const pdu = Buffer.alloc(6);
   pdu[0] = slaveId;
-  pdu[1] = 0x05;
+  pdu[1] = MODBUS_FC.WRITE_SINGLE_COIL;
   pdu.writeUInt16BE(address, 2);
   pdu.writeUInt16BE(value ? 0xFF00 : 0x0000, 4);
   const crc = crc16(pdu);
@@ -476,7 +750,7 @@ function buildWriteSingleCoilRtu(slaveId: number, address: number, value: boolea
 function buildWriteSingleRegisterRtu(slaveId: number, address: number, value: number): Buffer {
   const pdu = Buffer.alloc(6);
   pdu[0] = slaveId;
-  pdu[1] = 0x06;
+  pdu[1] = MODBUS_FC.WRITE_SINGLE_REGISTER;
   pdu.writeUInt16BE(address, 2);
   pdu.writeUInt16BE(value, 4);
   const crc = crc16(pdu);
@@ -489,7 +763,7 @@ function buildWriteMultipleCoilsRtu(slaveId: number, startAddress: number, value
   const byteCount = Math.ceil(quantity / 8);
   const pdu = Buffer.alloc(7 + byteCount);
   pdu[0] = slaveId;
-  pdu[1] = 0x0F;
+  pdu[1] = MODBUS_FC.WRITE_MULTIPLE_COILS;
   pdu.writeUInt16BE(startAddress, 2);
   pdu.writeUInt16BE(quantity, 4);
   pdu[6] = byteCount;
@@ -506,7 +780,7 @@ function buildWriteMultipleRegistersRtu(slaveId: number, startAddress: number, v
   const byteCount = quantity * 2;
   const pdu = Buffer.alloc(7 + byteCount);
   pdu[0] = slaveId;
-  pdu[1] = 0x10;
+  pdu[1] = MODBUS_FC.WRITE_MULTIPLE_REGISTERS;
   pdu.writeUInt16BE(startAddress, 2);
   pdu.writeUInt16BE(quantity, 4);
   pdu[6] = byteCount;
@@ -540,14 +814,14 @@ export async function writeSingleCoil(
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
   if (protocol === 'serial') {
-    return writeSerial(connectionId, slaveId, buildWriteSingleCoilRtu(slaveId, address, value), mode, timeoutMs, 0x05);
+    return writeSerial(connectionId, slaveId, buildWriteSingleCoilRtu(slaveId, address, value), mode, timeoutMs, MODBUS_FC.WRITE_SINGLE_COIL);
   }
   const tid = globalTransactionId++;
   const pdu = Buffer.alloc(5);
-  pdu[0] = 0x05;
+  pdu[0] = MODBUS_FC.WRITE_SINGLE_COIL;
   pdu.writeUInt16BE(address, 1);
   pdu.writeUInt16BE(value ? 0xFF00 : 0x0000, 3);
-  const frame = buildTcpWriteFrame(slaveId, 0x05, pdu, tid);
+  const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_SINGLE_COIL, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
   return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
 }
@@ -565,14 +839,14 @@ export async function writeSingleRegister(
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
   if (protocol === 'serial') {
-    return writeSerial(connectionId, slaveId, buildWriteSingleRegisterRtu(slaveId, address, value), mode, timeoutMs, 0x06);
+    return writeSerial(connectionId, slaveId, buildWriteSingleRegisterRtu(slaveId, address, value), mode, timeoutMs, MODBUS_FC.WRITE_SINGLE_REGISTER);
   }
   const tid = globalTransactionId++;
   const pdu = Buffer.alloc(5);
-  pdu[0] = 0x06;
+  pdu[0] = MODBUS_FC.WRITE_SINGLE_REGISTER;
   pdu.writeUInt16BE(address, 1);
   pdu.writeUInt16BE(value, 3);
-  const frame = buildTcpWriteFrame(slaveId, 0x06, pdu, tid);
+  const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_SINGLE_REGISTER, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
   return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
 }
@@ -590,20 +864,20 @@ export async function writeMultipleCoils(
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
   if (protocol === 'serial') {
-    return writeSerial(connectionId, slaveId, buildWriteMultipleCoilsRtu(slaveId, startAddress, values), mode, timeoutMs, 0x0F);
+    return writeSerial(connectionId, slaveId, buildWriteMultipleCoilsRtu(slaveId, startAddress, values), mode, timeoutMs, MODBUS_FC.WRITE_MULTIPLE_COILS);
   }
   const tid = globalTransactionId++;
   const quantity = values.length;
   const byteCount = Math.ceil(quantity / 8);
   const pdu = Buffer.alloc(6 + byteCount);
-  pdu[0] = 0x0F;
+  pdu[0] = MODBUS_FC.WRITE_MULTIPLE_COILS;
   pdu.writeUInt16BE(startAddress, 1);
   pdu.writeUInt16BE(quantity, 3);
   pdu[5] = byteCount;
   for (let i = 0; i < quantity; i++) {
     if (values[i]) pdu[6 + Math.floor(i / 8)] |= (1 << (i % 8));
   }
-  const frame = buildTcpWriteFrame(slaveId, 0x0F, pdu, tid);
+  const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_MULTIPLE_COILS, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
   return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
 }
@@ -621,20 +895,20 @@ export async function writeMultipleRegisters(
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
   if (protocol === 'serial') {
-    return writeSerial(connectionId, slaveId, buildWriteMultipleRegistersRtu(slaveId, startAddress, values), mode, timeoutMs, 0x10);
+    return writeSerial(connectionId, slaveId, buildWriteMultipleRegistersRtu(slaveId, startAddress, values), mode, timeoutMs, MODBUS_FC.WRITE_MULTIPLE_REGISTERS);
   }
   const tid = globalTransactionId++;
   const quantity = values.length;
   const byteCount = quantity * 2;
   const pdu = Buffer.alloc(6 + byteCount);
-  pdu[0] = 0x10;
+  pdu[0] = MODBUS_FC.WRITE_MULTIPLE_REGISTERS;
   pdu.writeUInt16BE(startAddress, 1);
   pdu.writeUInt16BE(quantity, 3);
   pdu[5] = byteCount;
   for (let i = 0; i < quantity; i++) {
     pdu.writeUInt16BE(values[i], 6 + i * 2);
   }
-  const frame = buildTcpWriteFrame(slaveId, 0x10, pdu, tid);
+  const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_MULTIPLE_REGISTERS, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
   return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
 }
@@ -652,7 +926,7 @@ async function sendWriteFrame(
 ): Promise<ModbusResponse> {
   if (protocol === 'tcp') {
     const conn = tcpConnections.get(connectionId);
-    if (!conn) return { success: false, error: 'Connection not found', rawTx };
+    if (!conn) return { success: false, error: 'Connection not found', rawTx, rawRx: '' };
     return new Promise((resolve, reject) => {
       conn.buffer = Buffer.alloc(0);
       const timer = setTimeout(() => reject(new Error('Write response timeout')), timeoutMs);
@@ -680,7 +954,7 @@ async function sendWriteFrame(
   } else {
     // UDP
     const socket = udpConnections.get(connectionId);
-    if (!socket) return { success: false, error: 'UDP connection not found', rawTx };
+    if (!socket) return { success: false, error: 'UDP connection not found', rawTx, rawRx: '' };
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('UDP write response timeout')), timeoutMs);
       const startTime = Date.now();
@@ -706,7 +980,7 @@ async function writeSerial(
   expectedFc: number,
 ): Promise<ModbusResponse> {
   const port = serialConnections.get(connectionId);
-  if (!port || !port.isOpen) return { success: false, error: 'Serial port not open' };
+  if (!port || !port.isOpen) return { success: false, error: 'Serial port not open', rawTx: '', rawRx: '' };
 
   const rawTx = frame.toString('hex').toUpperCase();
   return new Promise((resolve) => {
@@ -721,6 +995,14 @@ async function writeSerial(
       if (rxBuffer.length >= 4) {
         clearTimeout(timer);
         const rawRx = rxBuffer.toString('hex').toUpperCase();
+
+        // Check for exception response
+        if (rxBuffer[1] === (expectedFc | 0x80)) {
+          const excCode = rxBuffer[2];
+          resolve({ success: false, error: `Exception ${excCode}: ${getExceptionMessage(excCode)}`, rawTx, rawRx, timing: Date.now() - startTime });
+          return;
+        }
+
         resolve({ success: true, rawTx, rawRx, timing: Date.now() - startTime });
       }
     });
