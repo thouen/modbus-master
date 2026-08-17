@@ -823,7 +823,7 @@ export async function writeSingleCoil(
   pdu.writeUInt16BE(value ? 0xFF00 : 0x0000, 3);
   const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_SINGLE_COIL, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
-  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, MODBUS_FC.WRITE_SINGLE_COIL, slaveId, host, port);
 }
 
 /** 写单个寄存器 (FC06) */
@@ -838,6 +838,10 @@ export async function writeSingleRegister(
   port?: number,
   timeoutMs = 2000,
 ): Promise<ModbusResponse> {
+  // 值范围校验：16 位无符号整数 0~65535
+  if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
+    return { success: false, error: `FC06 value out of range: ${value} (must be 0~65535)`, rawTx: '', rawRx: '', timing: 0 };
+  }
   if (protocol === 'serial') {
     return writeSerial(connectionId, slaveId, buildWriteSingleRegisterRtu(slaveId, address, value), mode, timeoutMs, MODBUS_FC.WRITE_SINGLE_REGISTER);
   }
@@ -848,7 +852,7 @@ export async function writeSingleRegister(
   pdu.writeUInt16BE(value, 3);
   const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_SINGLE_REGISTER, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
-  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, MODBUS_FC.WRITE_SINGLE_REGISTER, slaveId, host, port);
 }
 
 /** 写多个线圈 (FC15) */
@@ -879,7 +883,7 @@ export async function writeMultipleCoils(
   }
   const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_MULTIPLE_COILS, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
-  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, MODBUS_FC.WRITE_MULTIPLE_COILS, slaveId, host, port);
 }
 
 /** 写多个寄存器 (FC16) */
@@ -910,7 +914,7 @@ export async function writeMultipleRegisters(
   }
   const frame = buildTcpWriteFrame(slaveId, MODBUS_FC.WRITE_MULTIPLE_REGISTERS, pdu, tid);
   const rawTx = frame.toString('hex').toUpperCase();
-  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, host, port);
+  return sendWriteFrame(protocol, connectionId, frame, tid, timeoutMs, rawTx, MODBUS_FC.WRITE_MULTIPLE_REGISTERS, slaveId, host, port);
 }
 
 /** 发送写帧并等待响应 */
@@ -921,6 +925,8 @@ async function sendWriteFrame(
   transactionId: number,
   timeoutMs: number,
   rawTx: string,
+  expectedFc: number,
+  expectedSlaveId: number,
   host?: string,
   port?: number,
 ): Promise<ModbusResponse> {
@@ -938,12 +944,16 @@ async function sendWriteFrame(
         if (conn.buffer.length >= 9) {
           try {
             const rawRx = conn.buffer.toString('hex').toUpperCase();
+            // 校验响应：异常码、FC 回显、地址/值验证
+            parseTcpResponse(conn.buffer, expectedFc, transactionId, expectedSlaveId);
             clearTimeout(timer);
             conn.buffer = Buffer.alloc(0);
             resolve({ success: true, rawTx, rawRx, timing: Date.now() - startTime });
           } catch (e) {
+            const errRawRx = conn.buffer.toString('hex').toUpperCase();
             clearTimeout(timer);
-            reject(e);
+            conn.buffer = Buffer.alloc(0);
+            resolve({ success: false, error: e instanceof Error ? e.message : String(e), rawTx, rawRx: errRawRx, timing: Date.now() - startTime });
           }
         } else {
           setTimeout(checkResponse, 50);
@@ -964,7 +974,13 @@ async function sendWriteFrame(
       socket.once('message', (msg) => {
         clearTimeout(timer);
         const rawRx = msg.toString('hex').toUpperCase();
-        resolve({ success: true, rawTx, rawRx, timing: Date.now() - startTime });
+        try {
+          // UDP 响应也需要校验（MBAP 头格式与 TCP 相同）
+          parseTcpResponse(msg, expectedFc, transactionId, expectedSlaveId);
+          resolve({ success: true, rawTx, rawRx, timing: Date.now() - startTime });
+        } catch (e) {
+          resolve({ success: false, error: e instanceof Error ? e.message : String(e), rawTx, rawRx, timing: Date.now() - startTime });
+        }
       });
     });
   }

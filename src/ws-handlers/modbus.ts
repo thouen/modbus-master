@@ -255,11 +255,11 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
 
     // ── 写入操作 ──
     case 'write': {
-      const { connectionId, slaveId, functionCode, address, values, tabId, mode } = payload as {
+      const { connectionId, slaveId, functionCode, startAddress, values, tabId, mode } = payload as {
         connectionId: string;
         slaveId: number;
         functionCode: number;
-        address: number;
+        startAddress: number;
         values: number[] | boolean[];
         tabId: string;
         mode: 'ascii' | 'rtu';
@@ -279,13 +279,13 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
       let result;
       try {
         if (functionCode === 5) {
-          result = await writeSingleCoil(protocol, connectionId, slaveId, address, values[0] as boolean, actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+          result = await writeSingleCoil(protocol, connectionId, slaveId, startAddress, values[0] as boolean, actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
         } else if (functionCode === 6) {
-          result = await writeSingleRegister(protocol, connectionId, slaveId, address, values[0] as number, actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+          result = await writeSingleRegister(protocol, connectionId, slaveId, startAddress, values[0] as number, actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
         } else if (functionCode === 15) {
-          result = await writeMultipleCoils(protocol, connectionId, slaveId, address, values as boolean[], actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+          result = await writeMultipleCoils(protocol, connectionId, slaveId, startAddress, values as boolean[], actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
         } else if (functionCode === 16) {
-          result = await writeMultipleRegisters(protocol, connectionId, slaveId, address, values as number[], actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
+          result = await writeMultipleRegisters(protocol, connectionId, slaveId, startAddress, values as number[], actualMode.toUpperCase() as 'ASCII' | 'RTU', undefined, undefined, 2000);
         } else {
           result = { success: false, error: `Unsupported write function code: ${functionCode}` };
         }
@@ -299,7 +299,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         type: 'log',
         payload: {
           connectionId, tabId, direction: 'tx',
-          message: `${fcName} Write Addr:${address}` + (Array.isArray(values) ? ` Qty:${values.length}` : ''),
+          message: `${fcName} Write Addr:${startAddress}` + (Array.isArray(values) ? ` Qty:${values.length}` : ''),
           rawData: result.rawTx || '', timestamp: Date.now(),
         },
       }));
@@ -315,7 +315,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         }));
         ws.send(JSON.stringify({
           type: 'write_ack',
-          payload: { connectionId, tabId, functionCode, address, rawTx: result.rawTx, rawRx: result.rawRx },
+          payload: { connectionId, tabId, functionCode, address: startAddress, rawTx: result.rawTx, rawRx: result.rawRx },
         }));
       } else {
         ws.send(JSON.stringify({ type: 'error', payload: { connectionId, tabId, message: result.error || 'Write failed' } }));
