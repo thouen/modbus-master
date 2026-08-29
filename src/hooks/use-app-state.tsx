@@ -1,31 +1,29 @@
 'use client';
 
-import { createContext, useContext, useReducer, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react';
 import type {
   ConnectionConfig,
   RegisterTab,
   RegisterData,
   LogEntry,
-  SavedProfile,
-  ByteOrder32,
-  ByteOrder64,
   FunctionCode,
 } from '@/lib/modbus-types';
 import { generateId } from '@/lib/modbus-utils';
+
+/** localStorage 存储键 */
+const STORAGE_KEY = 'modbus-master-config';
+/** 全局日志环形缓冲上限 */
+const MAX_LOG_ENTRIES = 500;
 
 interface AppState {
   connections: ConnectionConfig[];
   connectionStatus: Record<string, 'connected' | 'disconnected' | 'connecting'>;
   tabs: RegisterTab[];
   activeTabId: string | null;
+  /** 当前选中的连接卡片 */
+  activeConnectionId: string | null;
   registerData: Record<string, RegisterData[]>; // tabId -> data
-  logs: Record<string, LogEntry[]>; // connectionId -> logs (merged per connection)
-  profiles: SavedProfile[];
-  showConnectionPanel: boolean;
-  editingConnection: ConnectionConfig | null;
-  /** Global default byte order for new connections */
-  globalByteOrder32: ByteOrder32;
-  globalByteOrder64: ByteOrder64;
+  logs: LogEntry[]; // 全局日志（按 connectionId 筛选展示）
 }
 
 export type Action =
@@ -33,42 +31,59 @@ export type Action =
   | { type: 'UPDATE_CONNECTION'; payload: ConnectionConfig }
   | { type: 'DELETE_CONNECTION'; payload: string }
   | { type: 'SET_CONNECTION_STATUS'; payload: { id: string; status: 'connected' | 'disconnected' | 'connecting' } }
+  | { type: 'SET_ACTIVE_CONNECTION'; payload: string | null }
   | { type: 'ADD_TAB'; payload: RegisterTab }
   | { type: 'UPDATE_TAB'; payload: RegisterTab }
   | { type: 'DELETE_TAB'; payload: string }
   | { type: 'SET_ACTIVE_TAB'; payload: string }
   | { type: 'SET_REGISTER_DATA'; payload: { tabId: string; data: RegisterData[] } }
-  | { type: 'ADD_LOG'; payload: { connectionId: string; log: LogEntry } }
-  | { type: 'CLEAR_LOGS'; payload: string } // connectionId
-  | { type: 'SAVE_PROFILE'; payload: SavedProfile }
-  | { type: 'LOAD_PROFILE'; payload: SavedProfile }
-  | { type: 'DELETE_PROFILE'; payload: string }
-  | { type: 'TOGGLE_CONNECTION_PANEL'; payload?: boolean }
-  | { type: 'SET_EDITING_CONNECTION'; payload: ConnectionConfig | null }
-  | { type: 'SET_GLOBAL_BYTE_ORDER'; payload: { type: '32' | '64'; order: ByteOrder32 | ByteOrder64 } };
+  | { type: 'ADD_LOG'; payload: LogEntry }
+  | { type: 'CLEAR_LOGS'; payload?: string } // connectionId，缺省清全部
+  | { type: 'IMPORT_CONFIG'; payload: { connections: ConnectionConfig[]; tabs: RegisterTab[]; strategy: 'overwrite' | 'merge' } }
+  | { type: 'RESET_ACTIVE' };
 
 const initialState: AppState = {
   connections: [],
   connectionStatus: {},
   tabs: [],
   activeTabId: null,
+  activeConnectionId: null,
   registerData: {},
-  logs: {},
-  profiles: [],
-  showConnectionPanel: false,
-  editingConnection: null,
-  globalByteOrder32: 'ABCD',
-  globalByteOrder64: 'ABCDEFGH',
+  logs: [],
 };
 
-/** Create a default tab for a given connection */
-function createDefaultTab(connectionId: string, tabIndex: number, conn: ConnectionConfig): RegisterTab {
+/** 从 localStorage 恢复持久化配置 */
+function loadPersistedState(): AppState {
+  if (typeof window === 'undefined') return initialState;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return initialState;
+    const parsed = JSON.parse(raw) as Partial<AppState>;
+    const connections = parsed.connections ?? [];
+    return {
+      ...initialState,
+      connections,
+      tabs: parsed.tabs ?? [],
+      activeTabId: parsed.activeTabId ?? null,
+      activeConnectionId: parsed.activeConnectionId ?? (connections.length > 0 ? connections[0].id : null),
+      // 运行时状态不持久化
+      connectionStatus: Object.fromEntries(connections.map(c => [c.id, 'disconnected' as const])),
+      registerData: {},
+      logs: [],
+    };
+  } catch {
+    return initialState;
+  }
+}
+
+/** 创建默认标签页（自动命名） */
+function createDefaultTab(connectionId: string, conn: ConnectionConfig, index: number): RegisterTab {
   return {
     id: generateId(),
-    name: `Reg ${tabIndex}`,
+    name: `Tab ${index}`,
     connectionId,
     startAddress: 0,
-    bitCount: 160,
+    bitCount: 10,
     functionCode: '03' as FunctionCode,
     pollInterval: 1000,
     displayFormat: 'hex',
@@ -81,16 +96,14 @@ function createDefaultTab(connectionId: string, tabIndex: number, conn: Connecti
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'ADD_CONNECTION': {
-      // Auto-create a default tab for the new connection
-      const tabIndex = state.tabs.filter(t => t.connectionId === action.payload.id).length + 1;
-      const defaultTab = createDefaultTab(action.payload.id, tabIndex, action.payload);
+      const defaultTab = createDefaultTab(action.payload.id, action.payload, 1);
       return {
         ...state,
         connections: [...state.connections, action.payload],
         connectionStatus: { ...state.connectionStatus, [action.payload.id]: 'disconnected' },
-        logs: { ...state.logs, [action.payload.id]: [] },
+        activeConnectionId: action.payload.id,
         tabs: [...state.tabs, defaultTab],
-        activeTabId: state.activeTabId ?? defaultTab.id,
+        activeTabId: defaultTab.id,
       };
     }
     case 'UPDATE_CONNECTION':
@@ -101,20 +114,29 @@ function appReducer(state: AppState, action: Action): AppState {
         ),
       };
     case 'DELETE_CONNECTION': {
-      const { [action.payload]: _removedLogs, ...remainingLogs } = state.logs;
+      // 自动删除关联标签页
       const remainingTabs = state.tabs.filter(t => t.connectionId !== action.payload);
-      const newActiveId = state.activeTabId && state.tabs.find(t => t.id === state.activeTabId)?.connectionId === action.payload
-        ? (remainingTabs.length > 0 ? remainingTabs[remainingTabs.length - 1].id : null)
-        : state.activeTabId;
+      const removedTabIds = new Set(
+        state.tabs.filter(t => t.connectionId === action.payload).map(t => t.id)
+      );
+      const registerData = Object.fromEntries(
+        Object.entries(state.registerData).filter(([tabId]) => !removedTabIds.has(tabId))
+      );
       return {
         ...state,
         connections: state.connections.filter(c => c.id !== action.payload),
         connectionStatus: Object.fromEntries(
           Object.entries(state.connectionStatus).filter(([k]) => k !== action.payload)
         ),
-        logs: remainingLogs,
         tabs: remainingTabs,
-        activeTabId: newActiveId,
+        activeTabId: state.activeTabId && remainingTabs.find(t => t.id === state.activeTabId)
+          ? state.activeTabId
+          : (remainingTabs.length > 0 ? remainingTabs[remainingTabs.length - 1].id : null),
+        activeConnectionId: state.activeConnectionId === action.payload
+          ? (state.connections.find(c => c.id !== action.payload)?.id ?? null)
+          : state.activeConnectionId,
+        registerData,
+        logs: state.logs.filter(l => l.connectionId !== action.payload),
       };
     }
     case 'SET_CONNECTION_STATUS':
@@ -125,11 +147,14 @@ function appReducer(state: AppState, action: Action): AppState {
           [action.payload.id]: action.payload.status,
         },
       };
+    case 'SET_ACTIVE_CONNECTION':
+      return { ...state, activeConnectionId: action.payload };
     case 'ADD_TAB':
       return {
         ...state,
         tabs: [...state.tabs, action.payload],
-        activeTabId: state.activeTabId ?? action.payload.id,
+        activeTabId: action.payload.id,
+        activeConnectionId: action.payload.connectionId,
       };
     case 'UPDATE_TAB':
       return {
@@ -158,59 +183,63 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         registerData: { ...state.registerData, [action.payload.tabId]: action.payload.data },
       };
-    case 'ADD_LOG':
-      return {
-        ...state,
-        logs: {
-          ...state.logs,
-          [action.payload.connectionId]: [
-            ...(state.logs[action.payload.connectionId] ?? []),
-            action.payload.log,
-          ].slice(-1000), // keep last 1000 entries per connection
-        },
-      };
+    case 'ADD_LOG': {
+      // 全局环形缓冲，保留最近 500 条
+      const nextLogs = [...state.logs, action.payload];
+      if (nextLogs.length > MAX_LOG_ENTRIES) {
+        return { ...state, logs: nextLogs.slice(-MAX_LOG_ENTRIES) };
+      }
+      return { ...state, logs: nextLogs };
+    }
     case 'CLEAR_LOGS':
       return {
         ...state,
-        logs: { ...state.logs, [action.payload]: [] },
+        logs: action.payload ? state.logs.filter(l => l.connectionId !== action.payload) : [],
       };
-    case 'SAVE_PROFILE':
+    case 'IMPORT_CONFIG': {
+      const { connections: importedConns, tabs: importedTabs, strategy } = action.payload;
+      let connections: ConnectionConfig[];
+      let tabs: RegisterTab[];
+      if (strategy === 'overwrite') {
+        connections = importedConns;
+        tabs = importedTabs;
+      } else {
+        // 合并：追加新连接和标签页（简单追加，避免 ID 冲突）
+        const connIds = new Set(state.connections.map(c => c.id));
+        const mergedConns = [...state.connections];
+        const idMap: Record<string, string> = {};
+        for (const c of importedConns) {
+          if (connIds.has(c.id)) {
+            const newId = generateId();
+            idMap[c.id] = newId;
+            mergedConns.push({ ...c, id: newId });
+          } else {
+            mergedConns.push(c);
+          }
+        }
+        tabs = [
+          ...state.tabs,
+          ...importedTabs.map(t => ({
+            ...t,
+            id: generateId(),
+            connectionId: idMap[t.connectionId] ?? t.connectionId,
+          })),
+        ];
+        connections = mergedConns;
+      }
       return {
         ...state,
-        profiles: [...state.profiles.filter(p => p.id !== action.payload.id), action.payload],
-      };
-    case 'LOAD_PROFILE': {
-      const profile = action.payload;
-      return {
-        ...state,
-        connections: profile.connections,
-        tabs: profile.tabs,
-        activeTabId: profile.tabs.length > 0 ? profile.tabs[0].id : null,
-        connectionStatus: Object.fromEntries(
-          profile.connections.map(c => [c.id, 'disconnected' as const])
-        ),
-        logs: Object.fromEntries(
-          profile.connections.map(c => [c.id, []])
-        ),
+        connections,
+        tabs,
+        connectionStatus: Object.fromEntries(connections.map(c => [c.id, 'disconnected' as const])),
+        activeTabId: tabs.length > 0 ? tabs[0].id : null,
+        activeConnectionId: connections.length > 0 ? connections[0].id : null,
+        registerData: {},
+        logs: [],
       };
     }
-    case 'DELETE_PROFILE':
-      return {
-        ...state,
-        profiles: state.profiles.filter(p => p.id !== action.payload),
-      };
-    case 'TOGGLE_CONNECTION_PANEL':
-      return {
-        ...state,
-        showConnectionPanel: action.payload ?? !state.showConnectionPanel,
-      };
-    case 'SET_EDITING_CONNECTION':
-      return { ...state, editingConnection: action.payload };
-    case 'SET_GLOBAL_BYTE_ORDER':
-      if (action.payload.type === '32') {
-        return { ...state, globalByteOrder32: action.payload.order as ByteOrder32 };
-      }
-      return { ...state, globalByteOrder64: action.payload.order as ByteOrder64 };
+    case 'RESET_ACTIVE':
+      return { ...state, activeConnectionId: null, activeTabId: null };
     default:
       return state;
   }
@@ -224,7 +253,25 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, initialState);
+  const [state, dispatch] = useReducer(appReducer, undefined, loadPersistedState);
+
+  // 防抖 500ms 自动保存配置到 localStorage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          connections: state.connections,
+          tabs: state.tabs,
+          activeTabId: state.activeTabId,
+          activeConnectionId: state.activeConnectionId,
+        }));
+      } catch {
+        /* storage 不可用时静默忽略 */
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [state.connections, state.tabs, state.activeTabId, state.activeConnectionId]);
+
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}

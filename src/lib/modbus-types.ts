@@ -2,9 +2,17 @@
 // Reference: libmodbus (https://github.com/stephane/libmodbus)
 //            Modicon Modbus Protocol Reference Guide (www.modbus.org)
 
-export type Protocol = 'serial' | 'tcp' | 'udp';
+export type Protocol = 'serial' | 'tcp';
 export type Mode = 'ascii' | 'rtu';
 export type FunctionCode = '01' | '02' | '03' | '04' | '05' | '06' | '15' | '16';
+
+/** ModBus 广播从站地址：0（仅写操作有效，无响应） */
+export const MODBUS_BROADCAST_SLAVE_ID = 0;
+
+/** 判断是否为广播从站地址 */
+export function isBroadcastSlave(slaveId: number): boolean {
+  return slaveId === MODBUS_BROADCAST_SLAVE_ID;
+}
 
 export type ModbusConnectionStatus = 'connected' | 'disconnected' | 'connecting';
 
@@ -148,11 +156,12 @@ export function getExpectedResponseLength(
 export interface ModbusResponse {
   success: boolean;
   data?: number[];          // 寄存器值（读操作）或写入确认值
-  rawTx: string;            // 发送的十六进制数据
-  rawRx: string;            // 接收的十六进制数据
+  rawTx: string;            // 发送的十六进制数据（modbus-serial 不暴露原始帧，留空）
+  rawRx: string;            // 接收的十六进制数据（modbus-serial 不暴露原始帧，留空）
   error?: string;
   timing?: number;          // 响应时间 ms
   exceptionCode?: number;   // ModBus 异常码 (0x01~0x0B)
+  broadcast?: boolean;      // 是否为广播写入（无响应，超时视为成功）
 }
 
 export interface SerialConfig {
@@ -168,12 +177,6 @@ export interface TcpConfig {
   port: number;
 }
 
-export interface UdpConfig {
-  host: string;
-  port: number;
-  localPort: number;
-}
-
 export interface ConnectionConfig {
   id: string;
   name: string;
@@ -181,7 +184,6 @@ export interface ConnectionConfig {
   mode: Mode;
   serialConfig?: SerialConfig;
   tcpConfig?: TcpConfig;
-  udpConfig?: UdpConfig;
   slaveId: number;
   /** Per-connection default byte order for 32-bit values */
   byteOrder32: ByteOrder32;

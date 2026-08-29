@@ -23,9 +23,17 @@ export function LogViewer() {
     ?? state.connections[0]?.id
     ?? null;
 
+  // logs 是全局数组，按 connectionId 筛选
   const logs = useMemo(
-    () => effectiveConnectionId ? (state.logs[effectiveConnectionId] ?? []) : [],
+    () => effectiveConnectionId
+      ? state.logs.filter(l => l.connectionId === effectiveConnectionId)
+      : state.logs,
     [effectiveConnectionId, state.logs]
+  );
+
+  const connectionLogCount = useCallback(
+    (connectionId: string) => state.logs.filter(l => l.connectionId === connectionId).length,
+    [state.logs]
   );
 
   const tabNameMap = useMemo(() => {
@@ -77,14 +85,12 @@ export function LogViewer() {
   };
 
   const handleClear = () => {
-    if (effectiveConnectionId) {
-      dispatch({ type: 'CLEAR_LOGS', payload: effectiveConnectionId });
-    }
+    dispatch({ type: 'CLEAR_LOGS', payload: effectiveConnectionId ?? undefined });
   };
 
   const handleExport = () => {
     const conn = state.connections.find(c => c.id === effectiveConnectionId);
-    const connName = conn?.name ?? 'unknown';
+    const connName = conn?.name ?? 'all';
     const text = logs.map(log => {
       const time = new Date(log.timestamp).toISOString();
       const dir = log.direction === 'tx' ? 'TX' : log.direction === 'rx' ? 'RX' : 'SYS';
@@ -135,7 +141,7 @@ export function LogViewer() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-[#0f1319] shrink-0">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="text-xs font-semibold text-foreground/90">{t('logTitle')}</h3>
           {effectiveConnectionId && (
@@ -163,28 +169,26 @@ export function LogViewer() {
       </div>
 
       {/* Connection selector */}
-      {state.connections.length > 1 && (
-        <div className="px-3 py-1 border-b border-border/30 bg-[#0f1319]/50">
-          <Select
-            value={effectiveConnectionId ?? ''}
-            onValueChange={v => setSelectedConnectionId(v === '__auto__' ? null : v)}
-          >
-            <SelectTrigger className="h-6 text-[11px] bg-background/50 border-border/50 w-[200px]">
-              <SelectValue placeholder="Select connection" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__auto__">
-                Auto ({activeTab ? state.connections.find(c => c.id === activeTab.connectionId)?.name ?? '-' : '-'})
+      <div className="px-3 py-1 border-b border-border/30 bg-surface/50">
+        <Select
+          value={selectedConnectionId ?? '__all__'}
+          onValueChange={v => setSelectedConnectionId(v === '__all__' ? null : v)}
+        >
+          <SelectTrigger className="h-6 text-[11px] bg-background/50 border-border/50 w-[200px]">
+            <SelectValue placeholder={t('filterByConnection')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">
+              {t('allConnections')} ({state.logs.length})
+            </SelectItem>
+            {state.connections.map(c => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name} ({connectionLogCount(c.id)})
               </SelectItem>
-              {state.connections.map(c => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} ({state.logs[c.id]?.length ?? 0})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Log entries */}
       <div className="flex-1 min-h-0" ref={logViewerRef}>
@@ -205,11 +209,12 @@ export function LogViewer() {
                 const isError = log.type === 'error';
                 const isInfo = log.type === 'info';
                 const isData = !isError && !isInfo;
+                const isBroadcast = log.message.includes('[BROADCAST]');
                 const parsed = parseLogMessage(log.message);
 
                 let rowClass = 'flex flex-col transition-colors hover:bg-white/[0.03] cursor-pointer';
                 if (isError) rowClass += ' bg-red-500/[0.04]';
-                else if (isSys) rowClass += ' bg-amber-500/[0.03]';
+                else if (isSys || isBroadcast) rowClass += ' bg-amber-500/[0.03]';
                 else if (isTx) rowClass += ' bg-blue-500/[0.02]';
 
                 return (
@@ -256,7 +261,7 @@ export function LogViewer() {
                       </span>
 
                       {/* Message - main content */}
-                      <span className="text-foreground/85 text-[12px] leading-5 flex-1 min-w-0 break-all">
+                      <span className={'text-[12px] leading-5 flex-1 min-w-0 break-all ' + (isBroadcast ? 'text-amber-400/90' : 'text-foreground/85')}>
                         {log.message}
                       </span>
 

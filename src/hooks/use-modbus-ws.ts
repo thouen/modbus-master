@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createWsConnection, type WsMessage } from '@/lib/ws-client';
 import { useAppState } from './use-app-state';
-import type { ConnectionConfig, ModbusConnectionStatus } from '@/lib/modbus-types';
+import type { ConnectionConfig, ModbusConnectionStatus, LogEntry } from '@/lib/modbus-types';
 
 export function useModbusWs() {
   const { dispatch } = useAppState();
@@ -23,15 +23,10 @@ export function useModbusWs() {
         break;
       }
       case 'data': {
-        const { connectionId, tabId, registers, rawTx, rawRx, timing } = payload as {
-          connectionId: string;
+        const { tabId, registers } = payload as {
           tabId: string;
           registers: number[];
-          rawTx?: string;
-          rawRx?: string;
-          timing?: number;
         };
-        // 更新寄存器数据
         const data = registers.map((value, i) => ({
           address: i,
           rawValue: value,
@@ -40,28 +35,26 @@ export function useModbusWs() {
         break;
       }
       case 'log': {
-        const { connectionId, tabId, direction, message, rawData, timestamp } = payload as {
+        const { connectionId, tabId, direction, message, rawData, timestamp, type: logType } = payload as {
           connectionId: string;
           tabId?: string;
-          direction: 'tx' | 'rx' | 'sys';
+          direction: LogEntry['direction'];
           message: string;
           rawData?: string;
           timestamp?: number;
+          type?: LogEntry['type'];
         };
         dispatch({
           type: 'ADD_LOG',
           payload: {
+            id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             connectionId,
-            log: {
-              id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-              connectionId,
-              tabId: tabId || '',
-              direction,
-              type: 'info',
-              message,
-              rawData: rawData || '',
-              timestamp: timestamp || Date.now(),
-            },
+            tabId: tabId || '',
+            direction,
+            type: logType || (direction === 'sys' ? 'error' : 'info'),
+            message,
+            rawData: rawData || '',
+            timestamp: timestamp || Date.now(),
           },
         });
         break;
@@ -75,17 +68,14 @@ export function useModbusWs() {
         dispatch({
           type: 'ADD_LOG',
           payload: {
+            id: `err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             connectionId,
-            log: {
-              id: `err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-              connectionId,
-              tabId: tabId || '',
-              direction: 'sys',
-              type: 'error',
-              message: `Error: ${message}`,
-              rawData: '',
-              timestamp: Date.now(),
-            },
+            tabId: tabId || '',
+            direction: 'sys',
+            type: 'error',
+            message: `Error: ${message}`,
+            rawData: '',
+            timestamp: Date.now(),
           },
         });
         break;
@@ -131,7 +121,6 @@ export function useModbusWs() {
     functionCode: number,
     startAddress: number,
     quantity: number,
-    mode: 'ascii' | 'rtu',
   ) => {
     wsRef.current?.send({
       type: 'read',
@@ -142,7 +131,6 @@ export function useModbusWs() {
         functionCode,
         startAddress,
         quantity,
-        mode,
       },
     });
   }, []);
@@ -155,7 +143,6 @@ export function useModbusWs() {
     functionCode: number,
     startAddress: number,
     values: number[],
-    mode: 'ascii' | 'rtu',
   ) => {
     wsRef.current?.send({
       type: 'write',
@@ -166,7 +153,6 @@ export function useModbusWs() {
         functionCode,
         startAddress,
         values,
-        mode,
       },
     });
   }, []);

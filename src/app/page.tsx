@@ -1,63 +1,32 @@
 'use client';
 
-import { useState } from 'react';
 import { I18nProvider, useI18n } from '@/hooks/use-i18n';
 import { AppProvider, useAppState } from '@/hooks/use-app-state';
 import { usePolling } from '@/components/register-tab-manager';
 import { ConnectionPanel } from '@/components/connection-panel';
 import { RegisterTabManager } from '@/components/register-tab-manager';
 import { LogViewer } from '@/components/log-viewer';
-import { ProfileManager } from '@/components/profile-manager';
 import { Button } from '@/components/ui/button';
-
-type SidePanel = 'connections' | 'profiles' | null;
+import { Cpu } from 'lucide-react';
 
 function AppContent() {
   const { t, locale, setLocale } = useI18n();
-  const [sidePanel, setSidePanel] = useState<SidePanel>('connections');
-  const [showLogPanel, setShowLogPanel] = useState(true);
   usePolling();
-
-  const togglePanel = (panel: SidePanel) => {
-    setSidePanel(prev => prev === panel ? null : panel);
-  };
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-[#0f1319] shrink-0">
+      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
+            <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center">
+              <Cpu className="w-3.5 h-3.5 text-primary" />
+            </div>
             <h1 className="text-sm font-bold text-foreground tracking-wide">{t('appTitle')}</h1>
           </div>
           <span className="text-[10px] text-muted-foreground hidden sm:inline">{t('appSubtitle')}</span>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant={sidePanel === 'connections' ? 'secondary' : 'ghost'}
-            className="h-7 text-[10px] px-2"
-            onClick={() => togglePanel('connections')}
-          >
-            {t('connections_management')}
-          </Button>
-          <Button
-            size="sm"
-            variant={sidePanel === 'profiles' ? 'secondary' : 'ghost'}
-            className="h-7 text-[10px] px-2"
-            onClick={() => togglePanel('profiles')}
-          >
-            {t('profiles')}
-          </Button>
-          <Button
-            size="sm"
-            variant={showLogPanel ? 'secondary' : 'ghost'}
-            className="h-7 text-[10px] px-2"
-            onClick={() => setShowLogPanel(!showLogPanel)}
-          >
-            {t('logs')}
-          </Button>
           <div className="w-px h-4 bg-border mx-1" />
           <Button
             size="sm"
@@ -70,28 +39,21 @@ function AppContent() {
         </div>
       </header>
 
-      {/* Main content area */}
+      {/* Main content area: left connections + right (tabs+table+logs) */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left side panel */}
-        {sidePanel && (
-          <>
-            <div className="w-[240px] shrink-0 bg-[#0f1319] border-r border-border overflow-hidden">
-              {sidePanel === 'connections' && <ConnectionPanel />}
-              {sidePanel === 'profiles' && <ProfileManager />}
-            </div>
-          </>
-        )}
+        {/* Left: connection panel (always visible) */}
+        <div className="w-64 shrink-0 bg-surface border-r border-border overflow-hidden">
+          <ConnectionPanel />
+        </div>
 
-        {/* Center + bottom log */}
+        {/* Right: tabs + config + table + logs */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="flex-1 min-h-0 overflow-hidden">
             <RegisterTabManager />
           </div>
-          {showLogPanel && (
-            <div className="h-[250px] min-h-[150px] max-h-[50vh] border-t border-border overflow-hidden shrink-0">
-              <LogViewer />
-            </div>
-          )}
+          <div className="h-56 min-h-[140px] max-h-[40vh] border-t border-border overflow-hidden shrink-0">
+            <LogViewer />
+          </div>
         </div>
       </div>
 
@@ -108,7 +70,7 @@ function StatusBar() {
   const pollingCount = state.tabs.filter(t => t.isPolling).length;
 
   return (
-    <footer className="flex items-center justify-between px-4 py-1 border-t border-border bg-[#0f1319] text-[10px] text-muted-foreground shrink-0">
+    <footer className="flex items-center justify-between px-4 py-1 border-t border-border bg-surface text-[10px] text-muted-foreground shrink-0">
       <div className="flex items-center gap-4">
         <span>
           <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${
@@ -125,7 +87,7 @@ function StatusBar() {
         )}
       </div>
       <div className="flex items-center gap-2">
-        <span>ModBus TCP/UDP/Serial</span>
+        <span>ModBus TCP/Serial</span>
         <span>ASCII/RTU</span>
       </div>
     </footer>

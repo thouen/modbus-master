@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet"/>
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色 === */
+      --color-primary:              #3B82F6;
+      --color-primary-container:    #1E3A5F;
+      --color-on-primary:           #ffffff;
+      /* === 背景 / 表面 === */
+      --color-background:                 #0B1120;
+      --color-surface-container-lowest:   #0F1729;
+      --color-surface:                    #131C2E;
+      --color-surface-container:          #1A2540;
+      --color-surface-container-high:     #213052;
+      --color-surface-container-highest:  #2A3B64;
+      /* === 文字 === */
+      --color-on-surface:           #CBD5E1;
+      --color-on-surface-variant:   #64748B;
+      /* === 功能色 === */
+      --color-success:  #22c55e;
+      --color-error:    #ef4444;
+      --color-warning:  #f59e0b;
+      /* === 数据高亮 === */
+      --color-data:     #06B6D4;
+      /* === 边框 === */
+      --color-outline:          #1E293B;
+      --color-outline-variant:  #1A2540;
+      /* === 圆角 === */
+      --radius-sm:   0.25rem;
+      --radius-md:   0.375rem;
+      --radius-lg:   0.5rem;
+      --radius-xl:   0.75rem;
+      --radius-2xl:  1rem;
+      --radius-full: 9999px;
+      /* === 阴影 === */
+      --shadow-card:   0 2px 8px rgba(0,0,0,0.3);
+      --shadow-float:  0 10px 25px rgba(0,0,0,0.4);
+      --shadow-dialog: 0 25px 50px rgba(0,0,0,0.5);
+      /* === 字体 === */
+      --font-sans: "Inter", "Noto Sans SC", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", monospace;
+    }
+  </style>
+
+  <!-- 图片兜底 -->
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '交通工具': '🚗', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="45%" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" font-size="${Math.min(w, h) * 0.07}" fill="%239ca3af" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans min-h-screen">
+
+  <!-- @nav:start 导航组件 -->
+  <header class="bg-surface border-b border-outline/20 h-12 flex items-center justify-between px-4 sticky top-0 z-40">
+    <div class="flex items-center gap-2">
+      <i data-lucide="cpu" class="w-5 h-5 text-primary"></i>
+      <span class="font-bold text-sm text-on-surface">ModBus Master</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-on-surface-variant">ModBus 测试工具</span>
+      <div class="w-px h-4 bg-outline/30"></div>
+      <button id="btn-lang-toggle" class="px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" title="切换语言">
+        中/EN
+      </button>
+    </div>
+  </header>
+  <!-- @nav:end 导航组件 -->
+
+  <!-- @main-content:start -->
+  <main class="flex-1 min-w-0 overflow-hidden" style="height: calc(100vh - 3rem)">
+    <div class="flex h-full">
+
+      <!-- 左侧连接面板 -->
+      <aside class="w-64 shrink-0 bg-surface border-r border-outline/20 overflow-y-auto flex flex-col">
+        <!-- 面板头部 -->
+        <div class="flex items-center justify-between px-3 py-3 border-b border-outline/20">
+          <div class="flex items-center gap-2">
+            <i data-lucide="plug" class="w-4 h-4 text-primary"></i>
+            <span class="text-sm font-semibold text-on-surface">连接管理</span>
+          </div>
+          <button id="btn-new-connection" class="bg-primary text-on-primary p-1.5 rounded-md hover:opacity-90 active:scale-[0.98] transition-all" title="新建连接">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <!-- 连接列表 -->
+        <div id="connection-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+
+          <!-- 连接卡片 1：TCP 已连接 -->
+          <div id="conn-card-1" class="conn-card bg-surface-container rounded-lg p-3 relative group cursor-pointer ring-1 ring-primary/40">
+            <!-- 状态指示灯 -->
+            <div class="flex items-start justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span id="conn-status-1" class="w-2.5 h-2.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.6)]"></span>
+                <span class="text-sm font-semibold text-on-surface">PLC-1</span>
+              </div>
+              <!-- 操作按钮 hover 显示 -->
+              <div class="hidden group-hover:flex items-center gap-1">
+                <button id="btn-conn-edit-1" class="btn-conn-action p-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors" title="编辑">
+                  <i data-lucide="pencil" class="w-3 h-3"></i>
+                </button>
+                <button id="btn-conn-delete-1" class="btn-conn-action p-1 rounded hover:bg-error/20 text-on-surface-variant hover:text-error transition-colors" title="删除">
+                  <i data-lucide="trash-2" class="w-3 h-3"></i>
+                </button>
+              </div>
+            </div>
+            <!-- 协议标签 -->
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-primary/15 text-primary">TCP</span>
+              <span class="text-[11px] text-on-surface-variant">Slave: 1</span>
+            </div>
+            <!-- 连接目标 -->
+            <div class="text-[11px] text-on-surface-variant font-mono mb-2">192.168.1.100:502</div>
+            <!-- 连接/断开按钮 -->
+            <button id="btn-conn-toggle-1" class="btn-conn-toggle w-full text-[11px] font-medium py-1 rounded-md bg-error/15 text-error hover:bg-error/25 transition-colors flex items-center justify-center gap-1">
+              <i data-lucide="plug-zap" class="w-3 h-3"></i>
+              断开连接
+            </button>
+          </div>
+
+          <!-- 连接卡片 2：Serial 未连接 -->
+          <div id="conn-card-2" class="conn-card bg-surface-container rounded-lg p-3 relative group cursor-pointer ring-1 ring-outline/30">
+            <!-- 状态指示灯 -->
+            <div class="flex items-start justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span id="conn-status-2" class="w-2.5 h-2.5 rounded-full bg-on-surface-variant/50"></span>
+                <span class="text-sm font-semibold text-on-surface">温度传感器</span>
+              </div>
+              <!-- 操作按钮 hover 显示 -->
+              <div class="hidden group-hover:flex items-center gap-1">
+                <button id="btn-conn-edit-2" class="btn-conn-action p-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors" title="编辑">
+                  <i data-lucide="pencil" class="w-3 h-3"></i>
+                </button>
+                <button id="btn-conn-delete-2" class="btn-conn-action p-1 rounded hover:bg-error/20 text-on-surface-variant hover:text-error transition-colors" title="删除">
+                  <i data-lucide="trash-2" class="w-3 h-3"></i>
+                </button>
+              </div>
+            </div>
+            <!-- 协议标签 -->
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-warning/15 text-warning">Serial</span>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-surface-container-high text-on-surface-variant">RTU</span>
+              <span class="text-[11px] text-on-surface-variant">Slave: 2</span>
+            </div>
+            <!-- 连接目标 -->
+            <div class="text-[11px] text-on-surface-variant font-mono mb-2">/dev/ttyUSB0@9600</div>
+            <!-- 连接/断开按钮 -->
+            <button id="btn-conn-toggle-2" class="btn-conn-toggle w-full text-[11px] font-medium py-1 rounded-md bg-success/15 text-success hover:bg-success/25 transition-colors flex items-center justify-center gap-1">
+              <i data-lucide="plug" class="w-3 h-3"></i>
+              连接
+            </button>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- 右侧主内容区 -->
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
+
+        <!-- 标签页管理栏 + 配置区 -->
+        <div class="flex-1 min-h-0 overflow-y-auto flex flex-col">
+
+          <!-- 标签页管理栏 -->
+          <div id="tab-bar" class="flex items-center gap-0 bg-surface-container-lowest border-b border-outline/20 px-2 pt-2">
+            <!-- 标签 1：激活态 -->
+            <button id="tab-1" class="tab-item flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-md bg-surface text-on-surface border-b-2 border-primary ring-1 ring-outline/20 ring-b-0" data-tab="1">
+              <span>保持寄存器 FC03 @0</span>
+              <span class="ml-1 p-0.5 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors">
+                <i data-lucide="x" class="w-3 h-3"></i>
+              </span>
+            </button>
+            <!-- 标签 2：非激活态 -->
+            <button id="tab-2" class="tab-item flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50 transition-colors" data-tab="2">
+              <span>输入寄存器 FC04 @100</span>
+              <span class="ml-1 p-0.5 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors">
+                <i data-lucide="x" class="w-3 h-3"></i>
+              </span>
+            </button>
+            <!-- 添加标签按钮 -->
+            <button id="btn-add-tab" class="ml-1 p-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50 transition-colors" title="添加标签页">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- 标签配置区 -->
+          <div id="tab-config" class="bg-surface-container-lowest/50 border-b border-outline/20 px-4 py-2.5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <!-- 功能码 -->
+              <div class="flex items-center gap-1.5">
+                <label class="text-[11px] text-on-surface-variant font-medium whitespace-nowrap">功能码</label>
+                <select id="select-fc" class="bg-surface-container border-none rounded-md px-2 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors">
+                  <option value="03" selected>03 - 保持寄存器</option>
+                  <option value="04">04 - 输入寄存器</option>
+                  <option value="01">01 - 线圈</option>
+                  <option value="02">02 - 离散输入</option>
+                  <option value="06">06 - 写单寄存器</option>
+                  <option value="16">16 - 写多寄存器</option>
+                </select>
+              </div>
+              <!-- 起始地址 -->
+              <div class="flex items-center gap-1.5">
+                <label class="text-[11px] text-on-surface-variant font-medium whitespace-nowrap">起始地址</label>
+                <input id="input-start-addr" type="number" value="0" min="0" max="65535" class="w-20 bg-surface-container border-none rounded-md px-2 py-1.5 text-xs text-on-surface font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors"/>
+              </div>
+              <!-- 寄存器数量 -->
+              <div class="flex items-center gap-1.5">
+                <label class="text-[11px] text-on-surface-variant font-medium whitespace-nowrap">数量</label>
+                <input id="input-reg-count" type="number" value="10" min="1" max="125" class="w-16 bg-surface-container border-none rounded-md px-2 py-1.5 text-xs text-on-surface font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors"/>
+              </div>
+              <!-- 轮询间隔 -->
+              <div class="flex items-center gap-1.5">
+                <label class="text-[11px] text-on-surface-variant font-medium whitespace-nowrap">轮询间隔</label>
+                <div class="flex items-center gap-1">
+                  <input id="input-poll-interval" type="number" value="1000" min="100" step="100" class="w-16 bg-surface-container border-none rounded-md px-2 py-1.5 text-xs text-on-surface font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors"/>
+                  <span class="text-[10px] text-on-surface-variant">ms</span>
+                </div>
+              </div>
+              <!-- 分隔线 -->
+              <div class="w-px h-5 bg-outline/30"></div>
+              <!-- 读取按钮 -->
+              <button id="btn-read" class="bg-primary text-on-primary px-3 py-1.5 rounded-md text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all inline-flex items-center gap-1.5">
+                <i data-lucide="download" class="w-3 h-3"></i>读取
+              </button>
+              <!-- 写入按钮 -->
+              <button id="btn-write" class="bg-surface-container text-on-surface px-3 py-1.5 rounded-md text-xs font-medium hover:bg-surface-container-high active:scale-[0.98] transition-all inline-flex items-center gap-1.5">
+                <i data-lucide="upload" class="w-3 h-3"></i>写入
+              </button>
+              <!-- 分隔线 -->
+              <div class="w-px h-5 bg-outline/30"></div>
+              <!-- 自动轮询开关 -->
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] text-on-surface-variant font-medium whitespace-nowrap">自动轮询</label>
+                <button id="toggle-autopoll" class="relative w-8 h-4.5 rounded-full bg-surface-container-high transition-colors" role="switch" aria-checked="false">
+                  <span class="absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-on-surface-variant transition-all"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 数据表格 -->
+          <div class="flex-1 min-h-0 overflow-auto">
+            <table class="w-full text-xs">
+              <thead class="sticky top-0 z-10">
+                <tr class="bg-surface-container text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide">
+                  <th class="px-4 py-2.5 text-left w-28">地址</th>
+                  <th class="px-4 py-2.5 text-left w-32">原始值 (HEX)</th>
+                  <th class="px-4 py-2.5 text-left w-32">原始值 (DEC)</th>
+                  <th class="px-4 py-2.5 text-left">格式化值</th>
+                  <th class="px-4 py-2.5 text-left w-28">数据类型</th>
+                </tr>
+              </thead>
+              <tbody id="data-table-body" class="divide-y divide-outline-variant/30 font-mono">
+                <!-- 数据行 1 -->
+                <tr class="hover:bg-surface-container/50 transition-colors">
+                  <td class="px-4 py-2 text-data font-semibold">40001</td>
+                  <td class="px-4 py-2 text-data">0x00 0x64</td>
+                  <td class="px-4 py-2 text-on-surface">100</td>
+                  <td class="px-4 py-2 text-data font-semibold">100</td>
+                  <td class="px-4 py-2">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-surface-container-high text-on-surface-variant">UInt16</span>
+                  </td>
+                </tr>
+                <!-- 数据行 2 -->
+                <tr class="hover:bg-surface-container/50 transition-colors">
+                  <td class="px-4 py-2 text-data font-semibold">40002</td>
+                  <td class="px-4 py-2 text-data">0x01 0x2C</td>
+                  <td class="px-4 py-2 text-on-surface">300</td>
+                  <td class="px-4 py-2 text-data font-semibold">300</td>
+                  <td class="px-4 py-2">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-surface-container-high text-on-surface-variant">UInt16</span>
+                  </td>
+                </tr>
+                <!-- 数据行 3 -->
+                <tr class="hover:bg-surface-container/50 transition-colors">
+                  <td class="px-4 py-2 text-data font-semibold">40003</td>
+                  <td class="px-4 py-2 text-data">0x42 0x28</td>
+                  <td class="px-4 py-2 text-on-surface">16936</td>
+                  <td class="px-4 py-2 text-data font-semibold">42.00 (Float)</td>
+                  <td class="px-4 py-2">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-primary/15 text-primary">Float32</span>
+                  </td>
+                </tr>
+                <!-- 数据行 4 -->
+                <tr class="hover:bg-surface-container/50 transition-colors">
+                  <td class="px-4 py-2 text-data font-semibold">40005</td>
+                  <td class="px-4 py-2 text-data">0xFF 0x9C</td>
+                  <td class="px-4 py-2 text-on-surface">65436</td>
+                  <td class="px-4 py-2 text-data font-semibold">-100 (Int16)</td>
+                  <td class="px-4 py-2">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-warning/15 text-warning">Int16</span>
+                  </td>
+                </tr>
+                <!-- 数据行 5 -->
+                <tr class="hover:bg-surface-container/50 transition-colors">
+                  <td class="px-4 py-2 text-data font-semibold">40006</td>
+                  <td class="px-4 py-2 text-data">0x00 0x01</td>
+                  <td class="px-4 py-2 text-on-surface">1</td>
+                  <td class="px-4 py-2 text-data font-semibold">ON</td>
+                  <td class="px-4 py-2">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-success/15 text-success">Bool</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 日志查看器 -->
+        <div class="h-56 shrink-0 bg-surface-container-lowest border-t border-outline/20 flex flex-col overflow-hidden">
+          <!-- 日志工具栏 -->
+          <div class="flex items-center justify-between px-3 py-1.5 border-b border-outline/20 shrink-0">
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="scroll-text" class="w-3.5 h-3.5 text-on-surface-variant"></i>
+                <span class="text-xs font-semibold text-on-surface">日志</span>
+              </div>
+              <!-- 连接筛选 -->
+              <select id="select-log-filter" class="bg-surface-container border-none rounded-md px-2 py-1 text-[11px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors">
+                <option value="all">全部连接</option>
+                <option value="1" selected>PLC-1</option>
+                <option value="2">温度传感器</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <!-- 自动滚动开关 -->
+              <div class="flex items-center gap-1.5">
+                <span class="text-[11px] text-on-surface-variant">自动滚动</span>
+                <button id="toggle-autoscroll" class="relative w-7 h-4 rounded-full bg-success transition-colors" role="switch" aria-checked="true">
+                  <span class="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-on-primary transition-all"></span>
+                </button>
+              </div>
+              <!-- 清除按钮 -->
+              <button id="btn-clear-log" class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors" title="清除日志">
+                <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 日志列表 -->
+          <div id="log-list" class="flex-1 overflow-y-auto px-3 py-1 space-y-0.5 font-mono text-[11px]">
+            <!-- 日志 1：系统消息 -->
+            <div id="log-entry-1" class="log-entry flex items-start gap-2 py-0.5 text-on-surface-variant">
+              <span class="text-warning shrink-0 w-4 text-center">⚙</span>
+              <span class="text-on-surface-variant/60 shrink-0 w-16">10:23:01</span>
+              <span class="text-on-surface-variant">[SYS] 已连接到 PLC-1 (192.168.1.100:502)</span>
+            </div>
+            <!-- 日志 2：发送 -->
+            <div id="log-entry-2" class="log-entry flex items-start gap-2 py-0.5">
+              <span class="text-primary shrink-0 w-4 text-center">→</span>
+              <span class="text-on-surface-variant/60 shrink-0 w-16">10:23:05</span>
+              <span class="text-on-surface">FC03 读取 10 个保持寄存器，起始地址 0</span>
+              <span class="text-on-surface-variant ml-auto shrink-0">Slave:1</span>
+            </div>
+            <!-- 日志 3：接收 -->
+            <div id="log-entry-3" class="log-entry flex items-start gap-2 py-0.5">
+              <span class="text-success shrink-0 w-4 text-center">←</span>
+              <span class="text-on-surface-variant/60 shrink-0 w-16">10:23:05</span>
+              <span class="text-success">响应成功 - 收到 10 个寄存器数据 (20 bytes)</span>
+              <span class="text-on-surface-variant ml-auto shrink-0">12ms</span>
+            </div>
+            <!-- 日志 4：发送 -->
+            <div id="log-entry-4" class="log-entry flex items-start gap-2 py-0.5">
+              <span class="text-primary shrink-0 w-4 text-center">→</span>
+              <span class="text-on-surface-variant/60 shrink-0 w-16">10:23:06</span>
+              <span class="text-on-surface">FC03 读取 10 个保持寄存器，起始地址 0</span>
+              <span class="text-on-surface-variant ml-auto shrink-0">Slave:1</span>
+            </div>
+            <!-- 日志 5：接收 -->
+            <div id="log-entry-5" class="log-entry flex items-start gap-2 py-0.5">
+              <span class="text-success shrink-0 w-4 text-center">←</span>
+              <span class="text-on-surface-variant/60 shrink-0 w-16">10:23:06</span>
+              <span class="text-success">响应成功 - 收到 10 个寄存器数据 (20 bytes)</span>
+              <span class="text-on-surface-variant ml-auto shrink-0">8ms</span>
+            </div>
+            <!-- 日志 6：发送（广播） -->
+            <div id="log-entry-6" class="log-entry flex items-start gap-2 py-0.5">
+              <span class="text-warning shrink-0 w-4 text-center">→</span>
+              <span class="text-on-surface-variant/60 shrink-0 w-16">10:23:08</span>
+              <span class="text-warning">[BROADCAST] FC16 写入 2 个寄存器，起始地址 100</span>
+              <span class="text-on-surface-variant ml-auto shrink-0">Slave:0</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+  <!-- @main-content:end -->
+
+  <script>lucide.createIcons();</script>
+
+  <script>
+  $(function() {
+
+    // ========== 连接管理交互 ==========
+
+    // 新建连接按钮 - 点击后应实现：
+    // 1. 弹出连接配置模态框，包含协议选择（TCP/Serial）、模式选择（RTU/ASCII 仅 Serial）、
+    //    TCP 时填写 IP+端口，Serial 时填写串口/波特率/数据位/停止位/校验位
+    // 2. Slave ID 输入（0~247），0 时显示广播标识提示
+    // 3. 连接名称输入
+    // 4. 保存后在连接列表中新增一张卡片
+    $('#btn-new-connection').on('click', function() {
+      console.log('打开新建连接配置弹窗');
+    });
+
+    // 连接/断开按钮
+    $('#btn-conn-toggle-1').on('click', function() {
+      console.log('断开 PLC-1 连接');
+    });
+
+    $('#btn-conn-toggle-2').on('click', function() {
+      console.log('连接温度传感器');
+    });
+
+    // 编辑连接 - 点击后应实现：
+    // 1. 弹出编辑模态框，预填当前连接的所有配置信息
+    // 2. 用户修改后点击保存，更新连接卡片上的显示内容
+    // 3. 如果连接处于已连接状态，需先断开再编辑，或提示用户
+    $('#connection-list').on('click', '.btn-conn-action', function(e) {
+      e.stopPropagation();
+      var card = $(this).closest('.conn-card');
+      var connId = card.attr('id');
+      console.log('编辑连接:', connId);
+    });
+
+    // 删除连接 - 点击后应实现：
+    // 1. 弹出确认对话框："确定删除连接 XXX 吗？"
+    // 2. 确认后从连接列表中移除该卡片
+    // 3. 如果该连接有关联的标签页，提示用户并清理相关标签页
+    // 4. 如果连接处于已连接状态，先断开再删除
+    $('#connection-list').on('click', '#btn-conn-delete-1, #btn-conn-delete-2', function(e) {
+      e.stopPropagation();
+      var card = $(this).closest('.conn-card');
+      console.log('删除连接:', card.attr('id'));
+    });
+
+    // 点击连接卡片选中
+    $('#connection-list').on('click', '.conn-card', function() {
+      $('.conn-card').removeClass('ring-1 ring-primary/40').addClass('ring-1 ring-outline/30');
+      $(this).removeClass('ring-1 ring-outline/30').addClass('ring-1 ring-primary/40');
+    });
+
+    // ========== 标签页交互 ==========
+
+    // 切换标签页
+    $('#tab-bar').on('click', '.tab-item', function() {
+      $('.tab-item').removeClass('bg-surface text-on-surface border-b-2 border-primary ring-1 ring-outline/20 ring-b-0')
+        .addClass('text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50');
+      $(this).addClass('bg-surface text-on-surface border-b-2 border-primary ring-1 ring-outline/20 ring-b-0')
+        .removeClass('text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50');
+    });
+
+    // 添加标签页 - 点击后应实现：
+    // 1. 在标签栏末尾（"+"按钮前）插入一个新标签
+    // 2. 新标签默认名称为"新标签"，自动进入编辑状态
+    // 3. 新标签自动激活，显示默认配置（FC03, 地址 0, 数量 10）
+    // 4. 数据表格清空或显示默认空数据
+    $('#btn-add-tab').on('click', function() {
+      console.log('添加新标签页');
+    });
+
+    // ========== 配置区交互 ==========
+
+    // 读取按钮
+    $('#btn-read').on('click', function() {
+      var fc = $('#select-fc').val();
+      var addr = $('#input-start-addr').val();
+      var count = $('#input-reg-count').val();
+      console.log('读取: FC' + fc + ', 起始地址 ' + addr + ', 数量 ' + count);
+    });
+
+    // 写入按钮 - 点击后应实现：
+    // 1. 收集数据表格中用户编辑的值
+    // 2. 如果是广播连接（Slave ID = 0），弹出确认对话框提示"广播写入无法确认结果，确定继续？"
+    // 3. 确认后发送写入请求
+    // 4. 在日志中添加写入记录
+    $('#btn-write').on('click', function() {
+      console.log('写入寄存器');
+    });
+
+    // 自动轮询开关
+    $('#toggle-autopoll').on('click', function() {
+      var isOn = $(this).attr('aria-checked') === 'true';
+      $(this).attr('aria-checked', !isOn);
+      if (!isOn) {
+        $(this).removeClass('bg-surface-container-high').addClass('bg-success');
+        $(this).find('span').removeClass('left-0.5 bg-on-surface-variant').addClass('right-0.5 bg-on-primary');
+      } else {
+        $(this).removeClass('bg-success').addClass('bg-surface-container-high');
+        $(this).find('span').removeClass('right-0.5 bg-on-primary').addClass('left-0.5 bg-on-surface-variant');
+      }
+    });
+
+    // ========== 日志交互 ==========
+
+    // 自动滚动开关
+    $('#toggle-autoscroll').on('click', function() {
+      var isOn = $(this).attr('aria-checked') === 'true';
+      $(this).attr('aria-checked', !isOn);
+      if (!isOn) {
+        $(this).removeClass('bg-surface-container-high').addClass('bg-success');
+        $(this).find('span').removeClass('left-0.5 bg-on-surface-variant').addClass('right-0.5 bg-on-primary');
+      } else {
+        $(this).removeClass('bg-success').addClass('bg-surface-container-high');
+        $(this).find('span').removeClass('right-0.5 bg-on-primary').addClass('left-0.5 bg-on-surface-variant');
+      }
+    });
+
+    // 清除日志
+    $('#btn-clear-log').on('click', function() {
+      $('#log-list').empty();
+    });
+
+    // 日志筛选
+    $('#select-log-filter').on('change', function() {
+      var filter = $(this).val();
+      console.log('日志筛选:', filter);
+    });
+
+    // 语言切换
+    $('#btn-lang-toggle').on('click', function() {
+      var isZh = $(this).text().trim() === '中/EN';
+      $(this).text(isZh ? 'EN/中' : '中/EN');
+      console.log(isZh ? 'Switch to English' : '切换到中文');
+    });
+
+  });
+  </script>
+
+</body>
+
+</html>
