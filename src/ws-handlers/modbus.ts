@@ -4,6 +4,7 @@ import {
   disconnectClient,
   readRegisters,
   writeRegisters,
+  toErrorMessage,
 } from '../lib/modbus-client';
 import type { ConnectionConfig, ModbusConnectionStatus } from '../lib/modbus-types';
 import { isBroadcastSlave } from '../lib/modbus-types';
@@ -63,7 +64,7 @@ export function setupModbusHandler(wss: WebSocketServer) {
       try {
         await handleMessage(ws, msg);
       } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
+        const errMsg = toErrorMessage(err);
         ws.send(JSON.stringify({ type: 'error', payload: { message: errMsg } }));
       }
     });
@@ -98,7 +99,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
       } catch (err: unknown) {
         connectionConfigs.set(connectionId, { config, status: 'disconnected' });
         broadcastStatus(ws, connectionId, 'disconnected');
-        const errMsg = err instanceof Error ? err.message : String(err);
+        const errMsg = toErrorMessage(err);
         sendError(ws, connectionId, `Connection failed: ${errMsg}`);
         sendLog(ws, {
           connectionId,

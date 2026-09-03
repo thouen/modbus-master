@@ -9,6 +9,29 @@ const DEFAULT_TIMEOUT = 2000;
 /** 广播写入超时（毫秒）：广播无响应，需短超时避免长时间等待 */
 const BROADCAST_TIMEOUT = 300;
 
+/**
+ * 从任意未知异常中提取可读的错误信息。
+ * modbus-serial 的部分错误（如 TransactionTimedOutError）不是标准 Error 实例，
+ * 直接 String(err) 会得到 "[object Object]"。
+ */
+export function toErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message || String(err);
+  }
+  if (typeof err === 'object' && err !== null) {
+    const obj = err as { message?: unknown; errno?: unknown; name?: unknown; code?: unknown };
+    const msg = obj.message ?? obj.errno ?? obj.code ?? obj.name;
+    if (typeof msg === 'string' && msg.trim() !== '') return msg;
+    try {
+      const json = JSON.stringify(err);
+      if (json && json !== '{}') return json;
+    } catch {
+      /* ignore */
+    }
+  }
+  return String(err);
+}
+
 /** 活跃客户端连接表 */
 const clients = new Map<string, ModbusRTU>();
 
@@ -110,8 +133,7 @@ export async function readRegisters(
     }
     return { success: true, data, rawTx: '', rawRx: '', timing: Date.now() - started };
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    return { success: false, rawTx: '', rawRx: '', error: errMsg, timing: Date.now() - started };
+    return { success: false, rawTx: '', rawRx: '', error: toErrorMessage(err), timing: Date.now() - started };
   }
 }
 
@@ -151,7 +173,7 @@ export async function writeRegisters(
     }
     return { success: true, rawTx: '', rawRx: '', timing: Date.now() - started, broadcast };
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
+    const errMsg = toErrorMessage(err);
     // 广播写入无响应：超时视为已发送成功
     if (broadcast && /timeout/i.test(errMsg)) {
       return { success: true, rawTx: '', rawRx: '', timing: Date.now() - started, broadcast };

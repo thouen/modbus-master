@@ -311,7 +311,7 @@ export function LogViewer() {
                                 }
                                 return lines.map(l => (
                                   <div key={l.offset} className="text-cyan-300/90">
-                                    <span className="text-muted-foreground/40">{l.offset}</span>
+                                    <span className="text-muted-foreground/40">0x{l.offset}</span>
                                     {'  │  '}
                                     <span className="text-cyan-300/90">{l.hex}</span>
                                     {'  '}

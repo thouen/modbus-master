@@ -341,6 +341,7 @@ export function RegisterTabManager() {
       {/* 标签栏 */}
       <TabBar
         tabs={tabs}
+        connections={connections}
         activeTabId={activeTab?.id ?? null}
         editingTabId={editingTabId}
         editingName={editingName}
@@ -357,6 +358,7 @@ export function RegisterTabManager() {
       {activeTab && activeConn && (
         <ConfigBar
           tab={activeTab}
+          connName={activeConn.name}
           connSlaveId={activeConn.slaveId}
           isConnected={isConnected}
           isBroadcast={isBroadcast}
@@ -478,7 +480,7 @@ function DataTable({
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      <table className="w-full border-collapse text-xs">
+      <table className="border-collapse text-xs">
         <thead className="sticky top-0 z-10">
           <tr className="border-b border-border/30 bg-surface-container/90 backdrop-blur">
             <th className="px-3 py-2 text-left font-medium text-muted-foreground">
@@ -491,10 +493,10 @@ function DataTable({
               {t("rawDec")}
             </th>
             <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-              {t("formattedValue")}
+              {t("dataType")}
             </th>
             <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-              {t("dataType")}
+              {t("formattedValue")}
             </th>
           </tr>
         </thead>
@@ -519,38 +521,6 @@ function DataTable({
                 {/* 原始 DEC */}
                 <td className="px-3 py-1.5 font-mono text-muted-foreground">
                   {item.rawValue}
-                </td>
-                {/* 格式化值（行内编辑） */}
-                <td className="px-3 py-1.5">
-                  {isEditingThis ? (
-                    <input
-                      autoFocus
-                      value={cellValue}
-                      onChange={(e) => setCellValue(e.target.value)}
-                      onBlur={() => onCommitCellEdit(index, cellValue)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") onCommitCellEdit(index, cellValue);
-                        if (e.key === "Escape") setEditingCell(null);
-                      }}
-                      disabled={!isConnected || !isWriteFc || isBroadcast}
-                      className="w-28 rounded border border-primary/40 bg-background px-1.5 py-0.5 font-mono text-xs text-foreground outline-none"
-                    />
-                  ) : (
-                    <span
-                      className={`cursor-pointer rounded px-1.5 py-0.5 font-mono ${
-                        isWriteFc && isConnected && !isBroadcast
-                          ? "text-cyan-400 hover:bg-primary/10"
-                          : "text-foreground"
-                      }`}
-                      onClick={() => {
-                        if (!isWriteFc || !isConnected || isBroadcast) return;
-                        setEditingCell(cellKey);
-                        setCellValue(formatRegisterValue([item], 0, tab.displayFormat, tab.byteOrder32, tab.byteOrder64));
-                      }}
-                    >
-                      {formatRegisterValue([item], 0, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)}
-                    </span>
-                  )}
                 </td>
                 {/* 数据类型（逐行格式切换） */}
                 <td className="px-3 py-1.5">
@@ -588,6 +558,38 @@ function DataTable({
                     >
                       {t(FORMAT_KEY_MAP[tab.displayFormat] as Parameters<typeof t>[0])}
                     </Badge>
+                  )}
+                </td>
+                {/* 格式化值（行内编辑） */}
+                <td className="px-3 py-1.5">
+                  {isEditingThis ? (
+                    <input
+                      autoFocus
+                      value={cellValue}
+                      onChange={(e) => setCellValue(e.target.value)}
+                      onBlur={() => onCommitCellEdit(index, cellValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") onCommitCellEdit(index, cellValue);
+                        if (e.key === "Escape") setEditingCell(null);
+                      }}
+                      disabled={!isConnected || !isWriteFc || isBroadcast}
+                      className="w-28 rounded border border-primary/40 bg-background px-1.5 py-0.5 font-mono text-xs text-foreground outline-none"
+                    />
+                  ) : (
+                    <span
+                      className={`cursor-pointer rounded px-1.5 py-0.5 font-mono ${
+                        isWriteFc && isConnected && !isBroadcast
+                          ? "text-cyan-400 hover:bg-primary/10"
+                          : "text-foreground"
+                      }`}
+                      onClick={() => {
+                        if (!isWriteFc || !isConnected || isBroadcast) return;
+                        setEditingCell(cellKey);
+                        setCellValue(formatRegisterValue([item], 0, tab.displayFormat, tab.byteOrder32, tab.byteOrder64));
+                      }}
+                    >
+                      {formatRegisterValue([item], 0, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)}
+                    </span>
                   )}
                 </td>
               </tr>
@@ -760,6 +762,7 @@ const FORMAT_KEY_MAP: Record<DataDisplayFormat, string> = {
 /* ========== 标签栏 ========== */
 function TabBar({
   tabs,
+  connections,
   activeTabId,
   editingTabId,
   editingName,
@@ -772,6 +775,7 @@ function TabBar({
   onCancelRename,
 }: {
   tabs: RegisterTab[];
+  connections: ConnectionConfig[];
   activeTabId: string | null;
   editingTabId: string | null;
   editingName: string;
@@ -784,6 +788,8 @@ function TabBar({
   onCancelRename: () => void;
 }) {
   const { t } = useI18n();
+  const connNameOf = (connectionId: string) =>
+    connections.find((c) => c.id === connectionId)?.name ?? '—';
   return (
     <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border/30 bg-surface px-1.5 pt-1">
       {tabs.map((tab) => {
@@ -815,7 +821,19 @@ function TabBar({
                 className="w-20 rounded border border-primary/40 bg-background px-1 py-0.5 text-xs text-foreground outline-none"
               />
             ) : (
-              <span className="max-w-32 truncate font-medium">{tab.name || "—"}</span>
+              <>
+                <span className="max-w-32 truncate font-medium">{tab.name || "—"}</span>
+                <span
+                  className={`max-w-24 truncate rounded px-1 py-0.5 text-[9px] leading-none ${
+                    isActive
+                      ? "bg-primary/15 text-primary"
+                      : "bg-foreground/5 text-muted-foreground"
+                  }`}
+                  title={connNameOf(tab.connectionId)}
+                >
+                  {connNameOf(tab.connectionId)}
+                </span>
+              </>
             )}
             {!isEditing && (
               <button
@@ -845,6 +863,7 @@ function TabBar({
 /* ========== 配置条 ========== */
 function ConfigBar({
   tab,
+  connName,
   connSlaveId,
   isConnected,
   isBroadcast,
@@ -854,6 +873,7 @@ function ConfigBar({
   onTogglePolling,
 }: {
   tab: RegisterTab;
+  connName: string;
   connSlaveId: number;
   isConnected: boolean;
   isBroadcast: boolean;
@@ -871,6 +891,13 @@ function ConfigBar({
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border/30 bg-surface px-3 py-2">
+      {/* 绑定连接 */}
+      <span className="inline-flex max-w-40 items-center gap-1.5 rounded border border-primary/30 bg-primary/[0.08] px-2 py-0.5 text-[11px] text-primary">
+        <Radio className="h-3 w-3 shrink-0" />
+        <span className="truncate font-medium">{connName}</span>
+        <span className="text-[10px] text-muted-foreground">#{connSlaveId}</span>
+      </span>
+
       {/* 功能码 */}
       <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         {t("functionCode")}
@@ -1015,7 +1042,6 @@ function ConfigBar({
           }
           className="h-6 w-18 border-border/40 bg-background px-2 text-xs"
         />
-        <span className="text-[10px] text-muted-foreground/50">ms</span>
       </label>
 
       {/* 操作按钮 */}

@@ -182,7 +182,7 @@ export function ConnectionPanel() {
                       </Button>
                     ) : (
                       <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] text-green-400" onClick={e => { e.stopPropagation(); handleConnect(conn); }}>
-                        <Plug className="w-3 h-3 mr-0.5" />{t('connect')}
+                        <Plug className="w-3 h-3 mr-0.5" />
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] text-blue-400" onClick={e => { e.stopPropagation(); handleEdit(conn); }}>

@@ -40,7 +40,8 @@ export type Action =
   | { type: 'ADD_LOG'; payload: LogEntry }
   | { type: 'CLEAR_LOGS'; payload?: string } // connectionId，缺省清全部
   | { type: 'IMPORT_CONFIG'; payload: { connections: ConnectionConfig[]; tabs: RegisterTab[]; strategy: 'overwrite' | 'merge' } }
-  | { type: 'RESET_ACTIVE' };
+  | { type: 'RESET_ACTIVE' }
+  | { type: 'HYDRATE'; payload: AppState };
 
 const initialState: AppState = {
   connections: [],
@@ -240,6 +241,9 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'RESET_ACTIVE':
       return { ...state, activeConnectionId: null, activeTabId: null };
+    case 'HYDRATE':
+      // 从 localStorage 恢复的持久化数据，仅在客户端挂载后应用；服务端/首次渲染用 initialState 保持一致
+      return action.payload;
     default:
       return state;
   }
@@ -253,7 +257,17 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, undefined, loadPersistedState);
+  // 服务端首次渲染与客户端首次渲染均使用 initialState，避免 hydration 不匹配；
+  // 持久化数据在客户端挂载后通过 HYDRATE action 恢复。
+  const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // 客户端挂载后从 localStorage 恢复持久化配置
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const persisted = loadPersistedState();
+    dispatch({ type: 'HYDRATE', payload: persisted });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 防抖 500ms 自动保存配置到 localStorage
   useEffect(() => {
