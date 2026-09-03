@@ -42,7 +42,7 @@ function AppContent() {
       {/* Main content area: left connections + right (tabs+table+logs) */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left: connection panel (always visible) */}
-        <div className="w-64 shrink-0 bg-surface border-r border-border overflow-hidden">
+        <div className="w-70 shrink-0 bg-surface border-r border-border overflow-hidden">
           <ConnectionPanel />
         </div>
 

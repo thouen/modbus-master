@@ -880,7 +880,7 @@ function ConfigBar({
             onUpdate(tab.id, { functionCode: v as FunctionCode })
           }
         >
-          <SelectTrigger className="h-6 w-24 border-border/40 bg-background px-2 text-xs">
+          <SelectTrigger className="h-6 w-36 border-border/40 bg-background px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -937,7 +937,7 @@ function ConfigBar({
             onUpdate(tab.id, { displayFormat: v as DataDisplayFormat })
           }
         >
-          <SelectTrigger className="h-6 w-24 border-border/40 bg-background px-2 text-xs">
+          <SelectTrigger className="h-6 w-32 border-border/40 bg-background px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1013,7 +1013,7 @@ function ConfigBar({
           onChange={(e) =>
             onUpdate(tab.id, { pollInterval: Number(e.target.value) || 1000 })
           }
-          className="h-6 w-16 border-border/40 bg-background px-2 text-xs"
+          className="h-6 w-18 border-border/40 bg-background px-2 text-xs"
         />
         <span className="text-[10px] text-muted-foreground/50">ms</span>
       </label>

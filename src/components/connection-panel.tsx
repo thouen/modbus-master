@@ -173,12 +173,12 @@ export function ConnectionPanel() {
 
                 <div className="mt-1.5 flex items-center justify-between pl-4">
                   <span className="text-[9px] text-muted-foreground/60">
-                    {tabCount} {t('tabs')} · 32:{conn.byteOrder32} · 64:{conn.byteOrder64}
+                    32:{conn.byteOrder32} · 64:{conn.byteOrder64} · {tabCount} {t('tabs')}
                   </span>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     {status === 'connected' ? (
                       <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] text-red-400" onClick={e => { e.stopPropagation(); handleConnect(conn); }}>
-                        <Unplug className="w-3 h-3 mr-0.5" />{t('disconnect')}
+                        <Unplug className="w-3 h-3 mr-0.5" />
                       </Button>
                     ) : (
                       <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] text-green-400" onClick={e => { e.stopPropagation(); handleConnect(conn); }}>
