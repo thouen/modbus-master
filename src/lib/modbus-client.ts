@@ -42,6 +42,9 @@ export function getClient(connectionId: string): ModbusRTU | undefined {
 
 /** 建立连接 */
 export async function connectClient(connectionId: string, config: ConnectionConfig): Promise<void> {
+  // 防止重复连接泄漏：先关闭同 ID 的旧客户端
+  await disconnectClient(connectionId);
+
   const client = new ModbusRTU();
   try {
     if (config.protocol === 'tcp') {

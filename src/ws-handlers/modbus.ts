@@ -179,6 +179,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
           payload: {
             connectionId,
             tabId,
+            startAddress,
             registers: result.data,
             timing: result.timing,
           },

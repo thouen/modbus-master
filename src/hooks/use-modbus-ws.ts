@@ -23,12 +23,13 @@ export function useModbusWs() {
         break;
       }
       case 'data': {
-        const { tabId, registers } = payload as {
+        const { tabId, startAddress, registers } = payload as {
           tabId: string;
+          startAddress: number;
           registers: number[];
         };
         const data = registers.map((value, i) => ({
-          address: i,
+          address: startAddress + i,
           rawValue: value,
         }));
         dispatch({ type: 'SET_REGISTER_DATA', payload: { tabId, data } });

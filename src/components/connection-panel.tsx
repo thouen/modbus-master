@@ -281,6 +281,7 @@ function ImportDialog({
 function DeleteConfirmDialog({ target, onClose }: { target: ConnectionConfig | null; onClose: () => void }) {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
+  const { disconnectDevice } = useModbusWs();
 
   if (!target) return null;
   const tabCount = state.tabs.filter(t => t.connectionId === target.id).length;
@@ -301,6 +302,9 @@ function DeleteConfirmDialog({ target, onClose }: { target: ConnectionConfig | n
           <AlertDialogAction
             className="text-xs h-8 bg-red-500/90 hover:bg-red-500 text-white"
             onClick={() => {
+              if (state.connectionStatus[target.id] === 'connected') {
+                disconnectDevice(target.id);
+              }
               dispatch({ type: 'DELETE_CONNECTION', payload: target.id });
               onClose();
             }}
@@ -324,6 +328,7 @@ function ConnectionDialog({
 }) {
   const { t } = useI18n();
   const { state, dispatch } = useAppState();
+  const { disconnectDevice } = useModbusWs();
 
   const [name, setName] = useState(editing?.name ?? '');
   const [protocol, setProtocol] = useState<Protocol>(editing?.protocol ?? 'tcp');
@@ -364,6 +369,10 @@ function ConnectionDialog({
     };
 
     if (editing) {
+      // 编辑已连接设备：先断开，避免旧连接继续占用端口；用户保存后手动重连
+      if (state.connectionStatus[editing.id] === 'connected') {
+        disconnectDevice(editing.id);
+      }
       dispatch({ type: 'UPDATE_CONNECTION', payload: config });
     } else {
       dispatch({ type: 'ADD_CONNECTION', payload: config });

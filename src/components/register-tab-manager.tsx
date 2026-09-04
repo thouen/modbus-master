@@ -138,14 +138,13 @@ export function RegisterTabManager() {
   const [pendingWrite, setPendingWrite] = useState<null | {
     tab: RegisterTab;
     values: number[];
+    startAddress?: number;
   }>(null);
 
   // 行内编辑状态
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [cellValue, setCellValue] = useState("");
   const [editingFormatRow, setEditingFormatRow] = useState<string | null>(null);
-
-  const pollTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   // 标签选择
   const selectTab = useCallback(
@@ -180,10 +179,6 @@ export function RegisterTabManager() {
   // 关闭标签
   const closeTab = useCallback(
     (tabId: string) => {
-      if (pollTimers.current[tabId]) {
-        clearInterval(pollTimers.current[tabId]);
-        delete pollTimers.current[tabId];
-      }
       dispatch({ type: "DELETE_TAB", payload: tabId });
     },
     [dispatch],
@@ -236,9 +231,9 @@ export function RegisterTabManager() {
     [connections, readRegisters, isBroadcast],
   );
 
-  // 执行写入（含广播确认）
+  // 执行写入（含广播确认），startAddress 缺省为 tab.startAddress
   const performWrite = useCallback(
-    (tab: RegisterTab, values: number[]) => {
+    (tab: RegisterTab, values: number[], startAddress?: number) => {
       const conn = connections.find((c) => c.id === tab.connectionId);
       if (!conn) return;
       writeRegisters(
@@ -246,7 +241,7 @@ export function RegisterTabManager() {
         tab.id,
         conn.slaveId,
         parseInt(tab.functionCode, 16),
-        tab.startAddress,
+        startAddress ?? tab.startAddress,
         values,
       );
     },
@@ -284,53 +279,35 @@ export function RegisterTabManager() {
     }
   }, [activeTab, writeValues, isBroadcast, performWrite]);
 
-  // 行内编辑提交
+  // 行内编辑提交（按真实寄存器地址写入）
   const commitCellEdit = useCallback(
-    (tab: RegisterTab, index: number, raw: string) => {
+    (tab: RegisterTab, address: number, raw: string) => {
       const num = parseDisplayValue(raw, tab.displayFormat);
       if (num === null) return;
       if (isBroadcast) {
-        setPendingWrite({ tab, values: [num] });
+        setPendingWrite({ tab, values: [num], startAddress: address });
         setBroadcastConfirmOpen(true);
       } else {
-        performWrite(tab, [num]);
+        performWrite(tab, [num], address);
       }
       setEditingCell(null);
     },
     [isBroadcast, performWrite],
   );
 
-  // 切换轮询（广播连接禁止轮询）
+  // 切换轮询（广播连接禁止轮询，实际定时器由 usePolling 统一调度）
   const togglePolling = useCallback(
     (tab: RegisterTab) => {
       if (isBroadcast) return;
-      const next = !tab.isPolling;
-      updateTab(tab.id, { isPolling: next });
-      if (next) {
-        const timer = setInterval(() => {
-          handleRead(tab);
-        }, Math.max(tab.pollInterval, 200));
-        pollTimers.current[tab.id] = timer;
-      } else if (pollTimers.current[tab.id]) {
-        clearInterval(pollTimers.current[tab.id]);
-        delete pollTimers.current[tab.id];
-      }
+      updateTab(tab.id, { isPolling: !tab.isPolling });
     },
-    [isBroadcast, handleRead, updateTab],
+    [isBroadcast, updateTab],
   );
-
-  // 清理轮询定时器
-  useEffect(() => {
-    return () => {
-      Object.values(pollTimers.current).forEach((timer) => clearInterval(timer));
-      pollTimers.current = {};
-    };
-  }, []);
 
   // 广播确认后执行写入
   const confirmBroadcastWrite = useCallback(() => {
     if (pendingWrite) {
-      performWrite(pendingWrite.tab, pendingWrite.values);
+      performWrite(pendingWrite.tab, pendingWrite.values, pendingWrite.startAddress);
       setPendingWrite(null);
     }
     setBroadcastConfirmOpen(false);
@@ -382,7 +359,7 @@ export function RegisterTabManager() {
           setEditingCell={setEditingCell}
           cellValue={cellValue}
           setCellValue={setCellValue}
-          onCommitCellEdit={(index, raw) => commitCellEdit(activeTab, index, raw)}
+          onCommitCellEdit={(address, raw) => commitCellEdit(activeTab, address, raw)}
           editingFormatRow={editingFormatRow}
           setEditingFormatRow={setEditingFormatRow}
         />
@@ -457,7 +434,7 @@ function DataTable({
   setEditingCell: (key: string | null) => void;
   cellValue: string;
   setCellValue: (v: string) => void;
-  onCommitCellEdit: (index: number, raw: string) => void;
+  onCommitCellEdit: (address: number, raw: string) => void;
   editingFormatRow: string | null;
   setEditingFormatRow: (address: string | null) => void;
 }) {
@@ -505,6 +482,13 @@ function DataTable({
             const cellKey = `${item.address}:${index}`;
             const isEditingThis = editingCell === cellKey;
             const formatEditing = editingFormatRow === String(item.address);
+            const isMultiRegister = bitsPerValue > 16;
+            const groupSize = isMultiRegister ? bitsPerValue / 16 : 1;
+            const isGroupStart = !isMultiRegister || index % groupSize === 0;
+            const displayValue = isGroupStart
+              ? formatRegisterValue(data, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)
+              : "—";
+            const canEdit = !isMultiRegister && isWriteFc && isConnected && !isBroadcast;
             return (
               <tr
                 key={cellKey}
@@ -560,35 +544,35 @@ function DataTable({
                     </Badge>
                   )}
                 </td>
-                {/* 格式化值（行内编辑） */}
+                {/* 格式化值（行内编辑，32/64 位只读展示） */}
                 <td className="px-3 py-1.5">
                   {isEditingThis ? (
                     <input
                       autoFocus
                       value={cellValue}
                       onChange={(e) => setCellValue(e.target.value)}
-                      onBlur={() => onCommitCellEdit(index, cellValue)}
+                      onBlur={() => onCommitCellEdit(item.address, cellValue)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") onCommitCellEdit(index, cellValue);
+                        if (e.key === "Enter") onCommitCellEdit(item.address, cellValue);
                         if (e.key === "Escape") setEditingCell(null);
                       }}
-                      disabled={!isConnected || !isWriteFc || isBroadcast}
+                      disabled={!canEdit}
                       className="w-28 rounded border border-primary/40 bg-background px-1.5 py-0.5 font-mono text-xs text-foreground outline-none"
                     />
                   ) : (
                     <span
-                      className={`cursor-pointer rounded px-1.5 py-0.5 font-mono ${
-                        isWriteFc && isConnected && !isBroadcast
-                          ? "text-cyan-400 hover:bg-primary/10"
+                      className={`rounded px-1.5 py-0.5 font-mono ${
+                        canEdit
+                          ? "cursor-pointer text-cyan-400 hover:bg-primary/10"
                           : "text-foreground"
                       }`}
                       onClick={() => {
-                        if (!isWriteFc || !isConnected || isBroadcast) return;
+                        if (!canEdit) return;
                         setEditingCell(cellKey);
-                        setCellValue(formatRegisterValue([item], 0, tab.displayFormat, tab.byteOrder32, tab.byteOrder64));
+                        setCellValue(formatRegisterValue(data, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64));
                       }}
                     >
-                      {formatRegisterValue([item], 0, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)}
+                      {displayValue}
                     </span>
                   )}
                 </td>
@@ -694,7 +678,7 @@ function WriteDialog({
 
 /* ========== 轮询 Hook ========== */
 export function usePolling() {
-  const { state, dispatch } = useAppState();
+  const { state } = useAppState();
   const { readRegisters } = useModbusWs();
   const timers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
@@ -707,7 +691,7 @@ export function usePolling() {
 
   const startPolling = useCallback(
     (tab: RegisterTab, conn: ConnectionConfig) => {
-      if (tab.isPolling || conn.slaveId === 0) return;
+      if (!tab.isPolling || conn.slaveId === 0) return;
       stopPolling(tab.id);
       timers.current[tab.id] = setInterval(() => {
         readRegisters(
@@ -723,12 +707,20 @@ export function usePolling() {
     [readRegisters, stopPolling],
   );
 
-  // 同步轮询状态
+  // 统一同步轮询定时器：只保留一处调度，避免重复轮询；
+  // 仅当连接状态为 connected 时启动，否则停止。
   useEffect(() => {
     state.tabs.forEach((tab) => {
       if (tab.isPolling) {
         const conn = state.connections.find((c) => c.id === tab.connectionId);
-        if (conn) startPolling(tab, conn);
+        const isConnected = conn
+          ? state.connectionStatus[conn.id] === "connected"
+          : false;
+        if (conn && isConnected && conn.slaveId !== 0) {
+          startPolling(tab, conn);
+        } else {
+          stopPolling(tab.id);
+        }
       } else {
         stopPolling(tab.id);
       }
@@ -737,7 +729,7 @@ export function usePolling() {
       Object.values(timers.current).forEach((timer) => clearInterval(timer));
       timers.current = {};
     };
-  }, [state.tabs, state.connections, startPolling, stopPolling]);
+  }, [state.tabs, state.connections, state.connectionStatus, startPolling, stopPolling]);
 
   return null;
 }
