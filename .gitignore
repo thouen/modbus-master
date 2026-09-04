@@ -163,3 +163,5 @@ Desktop.ini
 # Misc
 .coze-logs
 .codegraph/
+# Reasonix
+.reasonix/
