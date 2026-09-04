@@ -254,7 +254,7 @@ export function LogViewer() {
                       {/* Type badge */}
                       <span className={'shrink-0 w-[28px] text-center text-[10px] leading-5 rounded-sm select-none ' + (
                         isError ? 'bg-red-500/15 text-red-400' :
-                        isInfo ? 'bg-amber-500/15 text-amber-400' :
+                        isInfo ? 'bg-cyan-500/15 text-cyan-400' :
                         'text-foreground/40'
                       )}>
                         {isError ? 'ERR' : isInfo ? 'INF' : 'DAT'}

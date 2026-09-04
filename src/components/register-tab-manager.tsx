@@ -4,10 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   X,
-  Pencil,
   RefreshCw,
   Radio,
-  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,14 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,6 +91,11 @@ const BYTE_ORDER_64: { value: ByteOrder64; label: string }[] = [
   { value: "GHEFCDAB", label: "GHEFCDAB" },
 ];
 
+/** 功能码字符串（十进制 '01'~'16'）转数字 */
+function parseFunctionCode(fc: FunctionCode): number {
+  return parseInt(fc, 10);
+}
+
 /** 生成默认标签名称：FCxx @起始地址 */
 function generateTabName(functionCode: FunctionCode, startAddress: number): string {
   return `FC${functionCode} @${startAddress}`;
@@ -128,10 +123,6 @@ export function RegisterTabManager() {
   // 标签重命名编辑态
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-
-  // 写入弹窗
-  const [writeDialogOpen, setWriteDialogOpen] = useState(false);
-  const [writeValues, setWriteValues] = useState<string[]>([]);
 
   // 广播写入确认弹窗
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false);
@@ -164,7 +155,7 @@ export function RegisterTabManager() {
       connectionId: connId,
       functionCode: '03' as FunctionCode,
       startAddress: 0,
-      bitCount: 10,
+      quantity: 10,
       pollInterval: 1000,
       isPolling: false,
       byteOrder32: "ABCD",
@@ -223,9 +214,9 @@ export function RegisterTabManager() {
         conn.id,
         tab.id,
         conn.slaveId,
-        parseInt(tab.functionCode, 16),
+        parseFunctionCode(tab.functionCode),
         tab.startAddress,
-        tab.bitCount,
+        tab.quantity,
       );
     },
     [connections, readRegisters, isBroadcast],
@@ -240,44 +231,13 @@ export function RegisterTabManager() {
         conn.id,
         tab.id,
         conn.slaveId,
-        parseInt(tab.functionCode, 16),
+        parseFunctionCode(tab.functionCode),
         startAddress ?? tab.startAddress,
         values,
       );
     },
     [connections, writeRegisters],
   );
-
-  // 打开写入弹窗（根据当前表格数据）
-  const openWriteDialog = useCallback(
-    (tab: RegisterTab) => {
-      const data = registerData[tab.id] ?? [];
-      const initial = data.length > 0 ? data.map((d) => String(d.rawValue)) : [""];
-      setWriteValues(initial);
-      setWriteDialogOpen(true);
-    },
-    [registerData],
-  );
-
-  // 提交写入（弹窗）
-  const submitWriteDialog = useCallback(() => {
-    if (!activeTab) return;
-    const values = writeValues
-      .filter((v) => v.trim() !== "")
-      .map((v) => {
-        const num = parseDisplayValue(v, activeTab.displayFormat);
-        return typeof num === "number" ? num : 0;
-      });
-    if (values.length === 0) return;
-    if (isBroadcast) {
-      setPendingWrite({ tab: activeTab, values });
-      setWriteDialogOpen(false);
-      setBroadcastConfirmOpen(true);
-    } else {
-      performWrite(activeTab, values);
-      setWriteDialogOpen(false);
-    }
-  }, [activeTab, writeValues, isBroadcast, performWrite]);
 
   // 行内编辑提交（按真实寄存器地址写入）
   const commitCellEdit = useCallback(
@@ -341,7 +301,6 @@ export function RegisterTabManager() {
           isBroadcast={isBroadcast}
           onUpdate={updateTab}
           onRead={() => handleRead(activeTab)}
-          onWrite={() => openWriteDialog(activeTab)}
           onTogglePolling={() => togglePolling(activeTab)}
         />
       )}
@@ -352,7 +311,6 @@ export function RegisterTabManager() {
           tab={activeTab}
           data={registerData[activeTab.id] ?? []}
           isConnected={isConnected}
-          isBroadcast={isBroadcast}
           onUpdate={updateTab}
           onRead={() => handleRead(activeTab)}
           editingCell={editingCell}
@@ -368,17 +326,6 @@ export function RegisterTabManager() {
           {t("empty")}
         </div>
       )}
-
-      {/* 写入弹窗 */}
-      <WriteDialog
-        open={writeDialogOpen}
-        onOpenChange={setWriteDialogOpen}
-        tab={activeTab}
-        values={writeValues}
-        setValues={setWriteValues}
-        onSubmit={submitWriteDialog}
-        isBroadcast={isBroadcast}
-      />
 
       {/* 广播写入确认 */}
       <AlertDialog open={broadcastConfirmOpen} onOpenChange={setBroadcastConfirmOpen}>
@@ -413,7 +360,6 @@ function DataTable({
   tab,
   data,
   isConnected,
-  isBroadcast,
   onUpdate,
   onRead,
   editingCell,
@@ -427,7 +373,6 @@ function DataTable({
   tab: RegisterTab;
   data: RegisterData[];
   isConnected: boolean;
-  isBroadcast: boolean;
   onUpdate: (tabId: string, updates: Partial<RegisterTab>) => void;
   onRead: () => void;
   editingCell: string | null;
@@ -446,18 +391,16 @@ function DataTable({
     tab.functionCode === '16';
 
   const bitsPerValue = getBitsPerValue(tab.displayFormat);
-
-  if (data.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground/50">
-        {t("noData")}
-      </div>
-    );
-  }
+  const isSingleWrite = tab.functionCode === '05' || tab.functionCode === '06';
+  const rowCount = isSingleWrite ? 1 : Math.max(1, tab.quantity);
+  const rows: RegisterData[] = Array.from({ length: rowCount }, (_, i) => {
+    const address = tab.startAddress + i;
+    return data.find((d) => d.address === address) ?? { address, rawValue: 0 };
+  });
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      <table className="border-collapse text-xs">
+      <table className="w-full border-collapse text-xs">
         <thead className="sticky top-0 z-10">
           <tr className="border-b border-border/30 bg-surface-container/90 backdrop-blur">
             <th className="px-3 py-2 text-left font-medium text-muted-foreground">
@@ -478,7 +421,7 @@ function DataTable({
           </tr>
         </thead>
         <tbody>
-          {data.map((item, index) => {
+          {rows.map((item, index) => {
             const cellKey = `${item.address}:${index}`;
             const isEditingThis = editingCell === cellKey;
             const formatEditing = editingFormatRow === String(item.address);
@@ -486,28 +429,28 @@ function DataTable({
             const groupSize = isMultiRegister ? bitsPerValue / 16 : 1;
             const isGroupStart = !isMultiRegister || index % groupSize === 0;
             const displayValue = isGroupStart
-              ? formatRegisterValue(data, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)
+              ? formatRegisterValue(rows, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)
               : "—";
-            const canEdit = !isMultiRegister && isWriteFc && isConnected && !isBroadcast;
+            const canEdit = !isMultiRegister && isWriteFc && isConnected;
             return (
               <tr
                 key={cellKey}
-                className="border-b border-border/20 transition-colors odd:bg-surface/40 even:bg-transparent hover:bg-surface-container/50"
+                className="h-12 border-b border-border/20 transition-colors odd:bg-surface/40 even:bg-transparent hover:bg-surface-container/50"
               >
                 {/* 地址 */}
-                <td className="px-3 py-1.5 font-mono text-data font-semibold">
+                <td className="w-18 px-3 py-1.5 font-mono text-data font-semibold">
                   {item.address}
                 </td>
                 {/* 原始 HEX */}
-                <td className="px-3 py-1.5 font-mono text-muted-foreground">
+                <td className="w-28 px-3 py-1.5 font-mono text-muted-foreground">
                   {item.rawValue.toString(16).toUpperCase().padStart(4, '0')}
                 </td>
                 {/* 原始 DEC */}
-                <td className="px-3 py-1.5 font-mono text-muted-foreground">
+                <td className="w-28 px-3 py-1.5 font-mono text-muted-foreground">
                   {item.rawValue}
                 </td>
                 {/* 数据类型（逐行格式切换） */}
-                <td className="px-3 py-1.5">
+                <td className="w-48 px-3 py-1.5">
                   {formatEditing ? (
                     <Select
                       value={tab.displayFormat}
@@ -516,7 +459,7 @@ function DataTable({
                         setEditingFormatRow(null);
                       }}
                     >
-                      <SelectTrigger className="h-6 w-24 border-border/40 bg-background px-2 text-xs">
+                      <SelectTrigger className="h-6 w-42 border-border/40 bg-background px-2 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -545,7 +488,7 @@ function DataTable({
                   )}
                 </td>
                 {/* 格式化值（行内编辑，32/64 位只读展示） */}
-                <td className="px-3 py-1.5">
+                <td className="w-48 px-3 py-1.5">
                   {isEditingThis ? (
                     <input
                       autoFocus
@@ -557,7 +500,7 @@ function DataTable({
                         if (e.key === "Escape") setEditingCell(null);
                       }}
                       disabled={!canEdit}
-                      className="w-28 rounded border border-primary/40 bg-background px-1.5 py-0.5 font-mono text-xs text-foreground outline-none"
+                      className="w-42 rounded border border-primary/40 bg-background px-1.5 py-0.5 font-mono text-xs text-foreground outline-none"
                     />
                   ) : (
                     <span
@@ -569,7 +512,7 @@ function DataTable({
                       onClick={() => {
                         if (!canEdit) return;
                         setEditingCell(cellKey);
-                        setCellValue(formatRegisterValue(data, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64));
+                        setCellValue(formatRegisterValue(rows, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64));
                       }}
                     >
                       {displayValue}
@@ -581,98 +524,12 @@ function DataTable({
           })}
         </tbody>
       </table>
-      {data.length > 0 && bitsPerValue > 1 && (
+      {rows.length > 0 && bitsPerValue > 1 && (
         <div className="px-3 py-1 text-[10px] text-muted-foreground/50">
           {t("bitHint").replace("{bits}", String(bitsPerValue))}
         </div>
       )}
     </div>
-  );
-}
-
-/* ========== 写入弹窗 ========== */
-function WriteDialog({
-  open,
-  onOpenChange,
-  tab,
-  values,
-  setValues,
-  onSubmit,
-  isBroadcast,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  tab: RegisterTab | undefined;
-  values: string[];
-  setValues: (v: string[]) => void;
-  onSubmit: () => void;
-  isBroadcast: boolean;
-}) {
-  const { t } = useI18n();
-  if (!tab) return null;
-  const isMulti = tab.functionCode === '15' || tab.functionCode === '16';
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border/40 bg-surface-container sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-sm">{t("writeTitle")}</DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            {isBroadcast ? t("broadcastHint") : t("writeDescription")}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-2 py-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="w-16 shrink-0 text-muted-foreground">{t("address")}</span>
-            <span className="font-mono text-data">{tab.startAddress}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="w-16 shrink-0 text-muted-foreground">{t("functionCode")}</span>
-            <span className="font-mono">{t(`fc${tab.functionCode}` as Parameters<typeof t>[0])}</span>
-          </div>
-          {isMulti && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="w-16 shrink-0 text-muted-foreground">{t("registerCount")}</span>
-              <span className="font-mono">{tab.bitCount}</span>
-            </div>
-          )}
-          <div className="mt-1 flex flex-col gap-1.5">
-            <span className="text-[11px] text-muted-foreground">{t("writeValue")}</span>
-            {values.map((v, i) => (
-              <Input
-                key={i}
-                value={v}
-                onChange={(e) => {
-                  const next = [...values];
-                  next[i] = e.target.value;
-                  setValues(next);
-                }}
-                placeholder={String(tab.startAddress + i)}
-                className="h-7 border-border/40 bg-background px-2 font-mono text-xs"
-              />
-            ))}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            {t("cancel")}
-          </Button>
-          <Button
-            size="sm"
-            onClick={onSubmit}
-            className={isBroadcast ? "border-amber-500/40 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25" : "bg-primary text-primary-foreground hover:bg-primary/90"}
-          >
-            {isBroadcast ? (
-              <>
-                <Radio className="mr-1 h-3 w-3" />
-                {t("confirmBroadcast")}
-              </>
-            ) : (
-              t("confirm")
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -698,9 +555,9 @@ export function usePolling() {
           conn.id,
           tab.id,
           conn.slaveId,
-          parseInt(tab.functionCode, 16),
+          parseFunctionCode(tab.functionCode),
           tab.startAddress,
-          tab.bitCount,
+          tab.quantity,
         );
       }, Math.max(tab.pollInterval, 200));
     },
@@ -861,7 +718,6 @@ function ConfigBar({
   isBroadcast,
   onUpdate,
   onRead,
-  onWrite,
   onTogglePolling,
 }: {
   tab: RegisterTab;
@@ -871,15 +727,9 @@ function ConfigBar({
   isBroadcast: boolean;
   onUpdate: (tabId: string, updates: Partial<RegisterTab>) => void;
   onRead: () => void;
-  onWrite: () => void;
   onTogglePolling: () => void;
 }) {
   const { t } = useI18n();
-  const isWriteFc =
-    tab.functionCode === '05' ||
-    tab.functionCode === '06' ||
-    tab.functionCode === '15' ||
-    tab.functionCode === '16';
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border/30 bg-surface px-3 py-2">
@@ -938,9 +788,9 @@ function ConfigBar({
           type="number"
           min={1}
           max={125}
-          value={tab.bitCount}
+          value={tab.quantity}
           onChange={(e) =>
-            onUpdate(tab.id, { bitCount: Number(e.target.value) || 1 })
+            onUpdate(tab.id, { quantity: Number(e.target.value) || 1 })
           }
           className="h-6 w-16 border-border/40 bg-background px-2 text-xs"
         />
@@ -956,7 +806,7 @@ function ConfigBar({
             onUpdate(tab.id, { displayFormat: v as DataDisplayFormat })
           }
         >
-          <SelectTrigger className="h-6 w-32 border-border/40 bg-background px-2 text-xs">
+          <SelectTrigger className="h-6 w-42 border-border/40 bg-background px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1050,16 +900,6 @@ function ConfigBar({
             {t("read")}
           </Button>
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!isConnected || !isWriteFc}
-          onClick={onWrite}
-          className="h-7 border-border/40 bg-surface-container px-2.5 text-xs text-foreground hover:bg-surface-container/70"
-        >
-          <Pencil className="mr-1 h-3 w-3" />
-          {t("write")}
-        </Button>
         {!isBroadcast && (
           <label className="flex cursor-pointer items-center gap-1.5 rounded border border-border/40 bg-surface-container px-2 py-1 text-[11px] text-muted-foreground">
             <span>{t("autoPoll")}</span>

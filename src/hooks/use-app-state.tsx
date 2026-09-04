@@ -53,6 +53,23 @@ const initialState: AppState = {
   logs: [],
 };
 
+/** 兼容旧版字段 bitCount -> quantity 的标签迁移 */
+function migrateTab(tab: Partial<RegisterTab> & { bitCount?: number }): RegisterTab {
+  return {
+    id: tab.id ?? generateId(),
+    name: tab.name ?? '',
+    connectionId: tab.connectionId ?? '',
+    startAddress: tab.startAddress ?? 0,
+    quantity: tab.quantity ?? tab.bitCount ?? 10,
+    functionCode: (tab.functionCode ?? '03') as FunctionCode,
+    pollInterval: tab.pollInterval ?? 1000,
+    displayFormat: tab.displayFormat ?? 'hex',
+    byteOrder32: tab.byteOrder32 ?? 'ABCD',
+    byteOrder64: tab.byteOrder64 ?? 'ABCDEFGH',
+    isPolling: tab.isPolling ?? false,
+  };
+}
+
 /** 从 localStorage 恢复持久化配置 */
 function loadPersistedState(): AppState {
   if (typeof window === 'undefined') return initialState;
@@ -64,7 +81,7 @@ function loadPersistedState(): AppState {
     return {
       ...initialState,
       connections,
-      tabs: parsed.tabs ?? [],
+      tabs: (parsed.tabs ?? []).map(migrateTab),
       activeTabId: parsed.activeTabId ?? null,
       activeConnectionId: parsed.activeConnectionId ?? (connections.length > 0 ? connections[0].id : null),
       // 运行时状态不持久化
@@ -84,7 +101,7 @@ function createDefaultTab(connectionId: string, conn: ConnectionConfig, index: n
     name: `Tab ${index}`,
     connectionId,
     startAddress: 0,
-    bitCount: 10,
+    quantity: 10,
     functionCode: '03' as FunctionCode,
     pollInterval: 1000,
     displayFormat: 'hex',
@@ -203,7 +220,7 @@ function appReducer(state: AppState, action: Action): AppState {
       let tabs: RegisterTab[];
       if (strategy === 'overwrite') {
         connections = importedConns;
-        tabs = importedTabs;
+        tabs = importedTabs.map(migrateTab);
       } else {
         // 合并：追加新连接和标签页（简单追加，避免 ID 冲突）
         const connIds = new Set(state.connections.map(c => c.id));
@@ -220,7 +237,7 @@ function appReducer(state: AppState, action: Action): AppState {
         }
         tabs = [
           ...state.tabs,
-          ...importedTabs.map(t => ({
+          ...importedTabs.map(t => migrateTab({
             ...t,
             id: generateId(),
             connectionId: idMap[t.connectionId] ?? t.connectionId,

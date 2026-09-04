@@ -104,6 +104,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         sendLog(ws, {
           connectionId,
           direction: 'sys',
+          type: 'error',
           message: `Connection failed: ${errMsg}`,
         });
       }
@@ -152,6 +153,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
           connectionId,
           tabId,
           direction: 'sys',
+          type: 'error',
           message: `Read error: ${errMsg}`,
         });
         return;
@@ -190,6 +192,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
           connectionId,
           tabId,
           direction: 'sys',
+          type: 'error',
           message: `Read error: ${result.error}`,
         });
       }
@@ -244,6 +247,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
           connectionId,
           tabId,
           direction: 'sys',
+          type: 'error',
           message: `Write error: ${result.error}`,
         });
       }
@@ -268,6 +272,7 @@ function sendLog(
     connectionId: string;
     tabId?: string;
     direction: 'tx' | 'rx' | 'sys';
+    type?: 'info' | 'data' | 'error';
     message: string;
   },
 ) {
@@ -277,6 +282,7 @@ function sendLog(
       connectionId: payload.connectionId,
       tabId: payload.tabId ?? '',
       direction: payload.direction,
+      type: payload.type ?? 'info',
       message: payload.message,
       timestamp: Date.now(),
     },

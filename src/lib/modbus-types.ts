@@ -196,7 +196,7 @@ export interface RegisterTab {
   name: string;
   connectionId: string;
   startAddress: number;
-  bitCount: number;
+  quantity: number;
   functionCode: FunctionCode;
   pollInterval: number; // ms
   displayFormat: DataDisplayFormat;
