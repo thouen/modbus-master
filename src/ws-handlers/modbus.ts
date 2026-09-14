@@ -207,7 +207,7 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         slaveId: number;
         functionCode: number;
         startAddress: number;
-        values: number[] | boolean[];
+        values: number[];
       };
 
       const conn = connectionConfigs.get(connectionId);

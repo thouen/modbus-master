@@ -140,13 +140,13 @@ export async function readRegisters(
   }
 }
 
-/** 写入（FC05/06/15/16），支持广播（slaveId=0） */
+/** 写入（FC05/06/15/16），支持广播（slaveId=0）；values 统一为 number[]，布尔转换在函数内完成 */
 export async function writeRegisters(
   connectionId: string,
   slaveId: number,
   functionCode: number,
   startAddress: number,
-  values: number[] | boolean[],
+  values: number[],
 ): Promise<ModbusResponse> {
   const client = clients.get(connectionId);
   if (!client) {
@@ -166,10 +166,10 @@ export async function writeRegisters(
         await client.writeRegister(startAddress, Number(values[0]));
         break;
       case 0x0f:
-        await client.writeCoils(startAddress, values as boolean[]);
+        await client.writeCoils(startAddress, values.map((v) => Boolean(v)));
         break;
       case 0x10:
-        await client.writeRegisters(startAddress, values as number[]);
+        await client.writeRegisters(startAddress, values.map((v) => Number(v)));
         break;
       default:
         return { success: false, rawTx: '', rawRx: '', error: `Unsupported write FC: ${functionCode}` };

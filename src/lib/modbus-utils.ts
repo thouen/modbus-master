@@ -193,6 +193,91 @@ export function getBitsPerValue(format: DataDisplayFormat): number {
   }
 }
 
+/** 32 位 / 64 位（跨寄存器）类型集合 */
+const WIDE_FORMATS: ReadonlySet<DataDisplayFormat> = new Set<DataDisplayFormat>([
+  'long', 'ulong', 'float', 'double',
+]);
+
+/** 该功能码是否为"寄存器（word, 16-bit）"类型；线圈/离散输入为 bit 类型 */
+export function isWordFunctionCode(functionCode: string | number): boolean {
+  const fc = typeof functionCode === 'string' ? parseInt(functionCode, 10) : functionCode;
+  // 03/04 读寄存器, 06/16 写寄存器
+  return fc === 0x03 || fc === 0x04 || fc === 0x06 || fc === 0x10;
+}
+
+/** 某格式在"寄存器（word）"视图下占用的寄存器数量；线圈视图恒为 1 */
+export function getSpanForFormat(format: DataDisplayFormat, isWordType: boolean): number {
+  if (!isWordType) return 1;
+  const bits = getBitsPerValue(format);
+  return bits > 16 ? bits / 16 : 1;
+}
+
+/** 某地址（相对 index，从 0 起）是否有足够空间切换为指定格式 */
+export function formatFitsAt(
+  format: DataDisplayFormat,
+  index: number,
+  quantity: number,
+  isWordType: boolean,
+): boolean {
+  const span = getSpanForFormat(format, isWordType);
+  return index + span <= quantity;
+}
+
+/** 单个地址在逐行类型映射中的角色 */
+export interface AddressResolution {
+  /** 'start' = 分组起始地址（可设置类型）；'consumed' = 被前一宽类型占用 */
+  role: 'start' | 'consumed';
+  /** 所属分组的起始地址 */
+  groupStart: number;
+  /** 该分组实际使用的显示格式 */
+  format: DataDisplayFormat;
+  /** 占用的寄存器数（1 / 2 / 4） */
+  span: number;
+  /** 该分组是否在可用地址范围内完整放下（越界为 false） */
+  fits: boolean;
+  /** 该地址的类型是否为用户逐行 override（仅 start 有意义） */
+  overridden: boolean;
+}
+
+/**
+ * 逐行类型映射解析：从 startAddress 起按 quantity 个地址推进，
+ * 依据默认格式与逐行 override 计算每个地址的角色（起点/被占用）。
+ * 32 位类型占用后续 1 个地址，64 位占用后续 3 个地址；空间不足时 fits=false。
+ */
+export function resolveRegisterLayout(opts: {
+  startAddress: number;
+  quantity: number;
+  isWordType: boolean;
+  defaultFormat: DataDisplayFormat;
+  formatOverrides?: Record<number, DataDisplayFormat>;
+}): Map<number, AddressResolution> {
+  const { startAddress, quantity, isWordType, defaultFormat, formatOverrides } = opts;
+  const end = startAddress + quantity;
+  const map = new Map<number, AddressResolution>();
+  let cursor = startAddress;
+
+  while (cursor < end) {
+    const overridden = Object.prototype.hasOwnProperty.call(formatOverrides ?? {}, cursor);
+    const format = (formatOverrides?.[cursor] as DataDisplayFormat | undefined) ?? defaultFormat;
+    const span = getSpanForFormat(format, isWordType);
+    const fits = cursor + span <= end;
+
+    for (let s = 0; s < span && cursor + s < end; s++) {
+      map.set(cursor + s, {
+        role: s === 0 ? 'start' : 'consumed',
+        groupStart: cursor,
+        format,
+        span,
+        fits,
+        overridden: s === 0 ? overridden : false,
+      });
+    }
+    cursor += span;
+  }
+
+  return map;
+}
+
 export function parseDisplayValue(value: string, format: DataDisplayFormat): number {
   const trimmed = value.trim();
   switch (format) {
