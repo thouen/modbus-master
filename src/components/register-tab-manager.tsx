@@ -361,7 +361,6 @@ export function RegisterTabManager() {
         <DataTable
           tab={activeTab}
           data={registerData[activeTab.id] ?? []}
-          isConnected={isConnected}
           writeDraft={writeDraft}
           onUpdate={updateTab}
           onRead={() => handleRead(activeTab)}
@@ -460,7 +459,6 @@ function LedBits({
 function DataTable({
   tab,
   data,
-  isConnected,
   writeDraft,
   onUpdate,
   onRead,
@@ -474,7 +472,6 @@ function DataTable({
 }: {
   tab: RegisterTab;
   data: RegisterData[];
-  isConnected: boolean;
   writeDraft: Map<number, number>;
   onUpdate: (tabId: string, updates: Partial<RegisterTab>) => void;
   onRead: () => void;
@@ -547,8 +544,9 @@ function DataTable({
             const groupFits = res?.fits ?? true;
             const groupSpan = res?.span ?? 1;
             const format = res?.format ?? tab.displayFormat;
-            // 写入：仅 16 位/bit 分组起点可编辑；跨寄存器组、占用行不可编辑
-            const canEdit = isGroupStart && groupSpan === 1 && isWriteFc && isConnected;
+            // 写入：仅 16 位/bit 分组起点可编辑；跨寄存器组、占用行不可编辑。
+            // 编辑（暂存草稿）不依赖连接状态，仅"写入"提交才要求已连接。
+            const canEdit = isGroupStart && groupSpan === 1 && isWriteFc;
             const isDrafted = writeDraft.has(item.address);
             const draftValue = writeDraft.get(item.address);
             // 起点且空间足够才计算格式化值；占用行 / 越界组显示 —
