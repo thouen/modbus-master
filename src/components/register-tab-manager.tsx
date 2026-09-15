@@ -39,6 +39,7 @@ import {
   isWordFunctionCode,
   formatFitsAt,
   resolveRegisterLayout,
+  encodeValueToRegisters,
 } from "@/lib/modbus-utils";
 import type {
   RegisterTab,
@@ -247,14 +248,37 @@ export function RegisterTabManager() {
 
   // 行内编辑提交：暂存为草稿，不立即发送（点击「写入」整段提交）
   const commitCellEdit = useCallback(
-    (tab: RegisterTab, address: number, raw: string) => {
-      const num = parseDisplayValue(raw, tab.displayFormat);
-      if (num === null) return;
-      setWriteDraft((prev) => {
-        const next = new Map(prev);
-        next.set(address, num);
-        return next;
-      });
+    (
+      tab: RegisterTab,
+      address: number,
+      raw: string,
+      format?: DataDisplayFormat,
+      span?: number,
+    ) => {
+      const fmt = format ?? tab.displayFormat;
+      if (span && span > 1) {
+        // 宽类型（32/64 位）：解析为格式化值后拆分回 span 个 16 位寄存器原始值
+        const regs = encodeValueToRegisters(
+          parseDisplayValue(raw, fmt),
+          fmt,
+          tab.byteOrder32,
+          tab.byteOrder64,
+        );
+        if (regs.length !== span) return;
+        setWriteDraft((prev) => {
+          const next = new Map(prev);
+          for (let i = 0; i < span; i++) next.set(address + i, regs[i]);
+          return next;
+        });
+      } else {
+        const num = parseDisplayValue(raw, fmt);
+        if (num === null) return;
+        setWriteDraft((prev) => {
+          const next = new Map(prev);
+          next.set(address, num);
+          return next;
+        });
+      }
       setEditingCell(null);
     },
     [],
@@ -368,7 +392,9 @@ export function RegisterTabManager() {
           setEditingCell={setEditingCell}
           cellValue={cellValue}
           setCellValue={setCellValue}
-          onCommitCellEdit={(address, raw) => commitCellEdit(activeTab, address, raw)}
+          onCommitCellEdit={(address, raw, fmt, span) =>
+            commitCellEdit(activeTab, address, raw, fmt ?? activeTab.displayFormat, span ?? 1)
+          }
           editingFormatRow={editingFormatRow}
           setEditingFormatRow={setEditingFormatRow}
         />
@@ -479,7 +505,7 @@ function DataTable({
   setEditingCell: (key: string | null) => void;
   cellValue: string;
   setCellValue: (v: string) => void;
-  onCommitCellEdit: (address: number, raw: string) => void;
+  onCommitCellEdit: (address: number, raw: string, format?: DataDisplayFormat, span?: number) => void;
   editingFormatRow: string | null;
   setEditingFormatRow: (address: string | null) => void;
 }) {
@@ -544,9 +570,9 @@ function DataTable({
             const groupFits = res?.fits ?? true;
             const groupSpan = res?.span ?? 1;
             const format = res?.format ?? tab.displayFormat;
-            // 写入：仅 16 位/bit 分组起点可编辑；跨寄存器组、占用行不可编辑。
+            // 写入：仅分组起点可编辑（含 32/64 位宽类型）；被占用的后续地址不可编辑。
             // 编辑（暂存草稿）不依赖连接状态，仅"写入"提交才要求已连接。
-            const canEdit = isGroupStart && groupSpan === 1 && isWriteFc;
+            const canEdit = isGroupStart && isWriteFc;
             const isDrafted = writeDraft.has(item.address);
             const draftValue = writeDraft.get(item.address);
             // 起点且空间足够才计算格式化值；占用行 / 越界组显示 —
@@ -554,6 +580,16 @@ function DataTable({
               isGroupStart && groupFits
                 ? formatRegisterValue(rows, index, format, tab.byteOrder32, tab.byteOrder64)
                 : "—";
+            // 宽类型整组草稿展示：整组地址均已编辑时按草稿重算格式化值
+            let groupDisplay = displayValue;
+            if (isGroupStart && groupSpan > 1) {
+              const addrs = Array.from({ length: groupSpan }, (_, k) => rows[index + k]?.address ?? 0);
+              const drafted = addrs.map((a) => writeDraft.get(a));
+              if (drafted.every((v) => v !== undefined)) {
+                const eff: RegisterData[] = addrs.map((a, k) => ({ address: a, rawValue: drafted[k]! }));
+                groupDisplay = formatRegisterValue(eff, 0, format, tab.byteOrder32, tab.byteOrder64);
+              }
+            }
             // 起点行可选格式：非寄存器（线圈）禁用 32/64 位；空间不足禁用跨寄存器类型
             const formatDisabled = !isGroupStart || !isWordType;
             return (
@@ -662,9 +698,9 @@ function DataTable({
                       autoFocus
                       value={cellValue}
                       onChange={(e) => setCellValue(e.target.value)}
-                      onBlur={() => onCommitCellEdit(item.address, cellValue)}
+                      onBlur={() => onCommitCellEdit(item.address, cellValue, format, groupSpan)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") onCommitCellEdit(item.address, cellValue);
+                        if (e.key === "Enter") onCommitCellEdit(item.address, cellValue, format, groupSpan);
                         if (e.key === "Escape") setEditingCell(null);
                       }}
                       disabled={!canEdit}
@@ -683,9 +719,11 @@ function DataTable({
                         setCellValue(formatRegisterValue(rows, index, format, tab.byteOrder32, tab.byteOrder64));
                       }}
                     >
-                      {isDrafted && draftValue !== undefined
-                        ? formatDraftValue(draftValue, format)
-                        : displayValue}
+                      {groupSpan > 1
+                        ? groupDisplay
+                        : isDrafted && draftValue !== undefined
+                          ? formatDraftValue(draftValue, format)
+                          : displayValue}
                     </span>
                   )}
                 </td>

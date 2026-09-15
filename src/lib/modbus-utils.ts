@@ -28,6 +28,29 @@ export function reorderBytes(bytes: number[], order: ByteOrder32 | ByteOrder64):
 }
 
 /**
+ * 逆字节序重排：将「逻辑顺序」字节恢复为「原始寄存器顺序」字节。
+ * 是 reorderBytes 的逆变换。
+ */
+export function reorderBytesInv(bytes: number[], order: ByteOrder32 | ByteOrder64): number[] {
+  const orderMap: Record<string, number[]> = {
+    'ABCD': [0, 1, 2, 3],
+    'DCBA': [3, 2, 1, 0],
+    'BADC': [1, 0, 3, 2],
+    'CDAB': [2, 3, 0, 1],
+    'ABCDEFGH': [0, 1, 2, 3, 4, 5, 6, 7],
+    'HGFEDCBA': [7, 6, 5, 4, 3, 2, 1, 0],
+    'BADCFEHG': [1, 0, 3, 2, 5, 4, 7, 6],
+    'GHEFCDAB': [6, 7, 4, 5, 2, 3, 0, 1],
+  };
+  const indices = orderMap[order] ?? [];
+  const out = new Array<number>(bytes.length).fill(0);
+  indices.forEach((src, i) => {
+    out[src] = bytes[i] ?? 0;
+  });
+  return out;
+}
+
+/**
  * Convert register values to bytes array
  */
 export function registersToBytes(registers: number[]): number[] {
@@ -100,6 +123,58 @@ export function bytesToDouble(bytes: number[]): number {
     view.setUint8(i, bytes[i] ?? 0);
   }
   return view.getFloat64(0);
+}
+
+/**
+ * 数值 → 大端逻辑字节序列（IEEE754 float32/float64）
+ */
+function numericToBigEndianBytes(value: number, double: boolean): number[] {
+  const buf = new ArrayBuffer(double ? 8 : 4);
+  const view = new DataView(buf);
+  if (double) view.setFloat64(0, value);
+  else view.setFloat32(0, value);
+  return Array.from({ length: buf.byteLength }, (_, i) => view.getUint8(i));
+}
+
+/**
+ * 将「格式化后的值」编码回一组 16 位寄存器原始值（用于宽类型写入）。
+ * long/ulong/float 返回 2 个寄存器，double 返回 4 个；16 位及 bit 类型返回 1 个。
+ */
+export function encodeValueToRegisters(
+  value: number,
+  format: DataDisplayFormat,
+  byteOrder32: ByteOrder32 = 'ABCD',
+  byteOrder64: ByteOrder64 = 'ABCDEFGH',
+): number[] {
+  let logical: number[];
+  let order: ByteOrder32 | ByteOrder64 = byteOrder32;
+  switch (format) {
+    case 'long': {
+      const u = value | 0;
+      logical = [(u >> 24) & 0xff, (u >> 16) & 0xff, (u >> 8) & 0xff, u & 0xff];
+      break;
+    }
+    case 'ulong': {
+      const u = value >>> 0;
+      logical = [(u >> 24) & 0xff, (u >> 16) & 0xff, (u >> 8) & 0xff, u & 0xff];
+      break;
+    }
+    case 'float':
+      logical = numericToBigEndianBytes(value, false);
+      break;
+    case 'double':
+      logical = numericToBigEndianBytes(value, true);
+      order = byteOrder64;
+      break;
+    default:
+      return [value & 0xffff];
+  }
+  const raw = reorderBytesInv(logical, order);
+  const regs: number[] = [];
+  for (let i = 0; i < raw.length; i += 2) {
+    regs.push(((raw[i] ?? 0) << 8) | (raw[i + 1] ?? 0));
+  }
+  return regs;
 }
 
 /**
