@@ -37,3 +37,46 @@
 - 不要使用渐变背景（保持简洁专业）
 - 不要使用过于鲜艳的色彩（避免视觉疲劳）
 - 不要使用动画过多的效果（工业工具注重效率）
+
+---
+
+## 架构（Architecture）
+
+> 本节补充实现层面的架构事实；视觉规范见上文。跨项目约定与实时契约以工作空间 [`AGENTS.md`](../AGENTS.md:1) 为准。
+
+### 运行时拓扑
+
+```mermaid
+flowchart LR
+  UI[React UI 三栏布局] -->|ws /ws/modbus| H[ws-handlers/modbus.ts]
+  H --> C[lib/modbus-client.ts]
+  C -->|TCP 502 或 Serial| DEV[(外部 ModBus 设备 / 第三方从站)]
+  subgraph Node 进程 端口 5000
+    H
+    C
+  end
+```
+
+浏览器**不直接**打开 TCP / 串口：所有协议动作都由 Node 侧执行，UI 只通过 WebSocket 下发指令。
+
+### 分层
+
+| 层 | 位置 | 职责 |
+|---|---|---|
+| 视图层 | [`components/`](src/components/register-tab-manager.tsx:1) | 三栏布局：连接面板 / 标签页寄存器表格 / 日志 |
+| 状态层 | [`hooks/use-app-state.tsx`](src/hooks/use-app-state.tsx:114) | Context + useReducer；`connections`/`tabs` 持久化到 localStorage，运行态不持久化 |
+| 传输层（前端） | [`hooks/use-modbus-ws.ts`](src/hooks/use-modbus-ws.ts:8) + [`lib/ws-client.ts`](src/lib/ws-client.ts:16) | WS 建连、消息 → dispatch、指令下发 |
+| 传输层（服务端） | [`ws-handlers/modbus.ts`](src/ws-handlers/modbus.ts:48) | `/ws/modbus` 路由、广播状态/日志、错误回执 |
+| 协议层 | [`lib/modbus-client.ts`](src/lib/modbus-client.ts:44) | 基于 `modbus-serial`（TCP / RTU / ASCII / 广播写入） |
+
+### 状态模型
+
+- 服务端 [`connectionConfigs`](src/ws-handlers/modbus.ts:19) 为进程内存态：**进程重启即丢失**。
+- 前端持久化 `connections` + `tabs` + 激活项；`connectionStatus` / `registerData` / `logs`（500 条环形缓冲）均为运行时状态。
+- 轮询由 [`usePolling()`](src/components/register-tab-manager.tsx:537) 统一调度：连接为 `connected` 才启动，广播连接禁止轮询。
+
+### 已知限制
+
+- 服务端目前**只把回执发给发起请求的那条 socket**（多 WebSocket 连接时，其它标签页收不到状态与日志）。对齐 slave 的广播模型是既定整改项。
+- 页面关闭后设备连接不会被回收（[`ws.on('close')`](src/ws-handlers/modbus.ts:72) 有意保留），刷新会留下僵尸连接与串口句柄。
+- 报文原文未采集：[`ModbusResponse.rawTx/rawRx`](src/lib/modbus-types.ts:159) 恒为空串。
