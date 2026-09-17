@@ -200,6 +200,9 @@ export interface RegisterTab {
   functionCode: FunctionCode;
   pollInterval: number; // ms
   displayFormat: DataDisplayFormat;
+  /** 逐行类型映射：起始地址 -> 该行的显示格式（覆盖标签默认 displayFormat）。
+   *  仅记录分组起始地址；32/64 位类型占用的后续地址不在此表中。 */
+  formatOverrides?: Record<number, DataDisplayFormat>;
   byteOrder32: ByteOrder32;
   byteOrder64: ByteOrder64;
   isPolling: boolean;

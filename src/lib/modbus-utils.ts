@@ -28,6 +28,29 @@ export function reorderBytes(bytes: number[], order: ByteOrder32 | ByteOrder64):
 }
 
 /**
+ * 逆字节序重排：将「逻辑顺序」字节恢复为「原始寄存器顺序」字节。
+ * 是 reorderBytes 的逆变换。
+ */
+export function reorderBytesInv(bytes: number[], order: ByteOrder32 | ByteOrder64): number[] {
+  const orderMap: Record<string, number[]> = {
+    'ABCD': [0, 1, 2, 3],
+    'DCBA': [3, 2, 1, 0],
+    'BADC': [1, 0, 3, 2],
+    'CDAB': [2, 3, 0, 1],
+    'ABCDEFGH': [0, 1, 2, 3, 4, 5, 6, 7],
+    'HGFEDCBA': [7, 6, 5, 4, 3, 2, 1, 0],
+    'BADCFEHG': [1, 0, 3, 2, 5, 4, 7, 6],
+    'GHEFCDAB': [6, 7, 4, 5, 2, 3, 0, 1],
+  };
+  const indices = orderMap[order] ?? [];
+  const out = new Array<number>(bytes.length).fill(0);
+  indices.forEach((src, i) => {
+    out[src] = bytes[i] ?? 0;
+  });
+  return out;
+}
+
+/**
  * Convert register values to bytes array
  */
 export function registersToBytes(registers: number[]): number[] {
@@ -100,6 +123,58 @@ export function bytesToDouble(bytes: number[]): number {
     view.setUint8(i, bytes[i] ?? 0);
   }
   return view.getFloat64(0);
+}
+
+/**
+ * 数值 → 大端逻辑字节序列（IEEE754 float32/float64）
+ */
+function numericToBigEndianBytes(value: number, double: boolean): number[] {
+  const buf = new ArrayBuffer(double ? 8 : 4);
+  const view = new DataView(buf);
+  if (double) view.setFloat64(0, value);
+  else view.setFloat32(0, value);
+  return Array.from({ length: buf.byteLength }, (_, i) => view.getUint8(i));
+}
+
+/**
+ * 将「格式化后的值」编码回一组 16 位寄存器原始值（用于宽类型写入）。
+ * long/ulong/float 返回 2 个寄存器，double 返回 4 个；16 位及 bit 类型返回 1 个。
+ */
+export function encodeValueToRegisters(
+  value: number,
+  format: DataDisplayFormat,
+  byteOrder32: ByteOrder32 = 'ABCD',
+  byteOrder64: ByteOrder64 = 'ABCDEFGH',
+): number[] {
+  let logical: number[];
+  let order: ByteOrder32 | ByteOrder64 = byteOrder32;
+  switch (format) {
+    case 'long': {
+      const u = value | 0;
+      logical = [(u >> 24) & 0xff, (u >> 16) & 0xff, (u >> 8) & 0xff, u & 0xff];
+      break;
+    }
+    case 'ulong': {
+      const u = value >>> 0;
+      logical = [(u >> 24) & 0xff, (u >> 16) & 0xff, (u >> 8) & 0xff, u & 0xff];
+      break;
+    }
+    case 'float':
+      logical = numericToBigEndianBytes(value, false);
+      break;
+    case 'double':
+      logical = numericToBigEndianBytes(value, true);
+      order = byteOrder64;
+      break;
+    default:
+      return [value & 0xffff];
+  }
+  const raw = reorderBytesInv(logical, order);
+  const regs: number[] = [];
+  for (let i = 0; i < raw.length; i += 2) {
+    regs.push(((raw[i] ?? 0) << 8) | (raw[i + 1] ?? 0));
+  }
+  return regs;
 }
 
 /**
@@ -191,6 +266,91 @@ export function getBitsPerValue(format: DataDisplayFormat): number {
     default:
       return 16;
   }
+}
+
+/** 32 位 / 64 位（跨寄存器）类型集合 */
+const WIDE_FORMATS: ReadonlySet<DataDisplayFormat> = new Set<DataDisplayFormat>([
+  'long', 'ulong', 'float', 'double',
+]);
+
+/** 该功能码是否为"寄存器（word, 16-bit）"类型；线圈/离散输入为 bit 类型 */
+export function isWordFunctionCode(functionCode: string | number): boolean {
+  const fc = typeof functionCode === 'string' ? parseInt(functionCode, 10) : functionCode;
+  // 03/04 读寄存器, 06/16 写寄存器
+  return fc === 0x03 || fc === 0x04 || fc === 0x06 || fc === 0x10;
+}
+
+/** 某格式在"寄存器（word）"视图下占用的寄存器数量；线圈视图恒为 1 */
+export function getSpanForFormat(format: DataDisplayFormat, isWordType: boolean): number {
+  if (!isWordType) return 1;
+  const bits = getBitsPerValue(format);
+  return bits > 16 ? bits / 16 : 1;
+}
+
+/** 某地址（相对 index，从 0 起）是否有足够空间切换为指定格式 */
+export function formatFitsAt(
+  format: DataDisplayFormat,
+  index: number,
+  quantity: number,
+  isWordType: boolean,
+): boolean {
+  const span = getSpanForFormat(format, isWordType);
+  return index + span <= quantity;
+}
+
+/** 单个地址在逐行类型映射中的角色 */
+export interface AddressResolution {
+  /** 'start' = 分组起始地址（可设置类型）；'consumed' = 被前一宽类型占用 */
+  role: 'start' | 'consumed';
+  /** 所属分组的起始地址 */
+  groupStart: number;
+  /** 该分组实际使用的显示格式 */
+  format: DataDisplayFormat;
+  /** 占用的寄存器数（1 / 2 / 4） */
+  span: number;
+  /** 该分组是否在可用地址范围内完整放下（越界为 false） */
+  fits: boolean;
+  /** 该地址的类型是否为用户逐行 override（仅 start 有意义） */
+  overridden: boolean;
+}
+
+/**
+ * 逐行类型映射解析：从 startAddress 起按 quantity 个地址推进，
+ * 依据默认格式与逐行 override 计算每个地址的角色（起点/被占用）。
+ * 32 位类型占用后续 1 个地址，64 位占用后续 3 个地址；空间不足时 fits=false。
+ */
+export function resolveRegisterLayout(opts: {
+  startAddress: number;
+  quantity: number;
+  isWordType: boolean;
+  defaultFormat: DataDisplayFormat;
+  formatOverrides?: Record<number, DataDisplayFormat>;
+}): Map<number, AddressResolution> {
+  const { startAddress, quantity, isWordType, defaultFormat, formatOverrides } = opts;
+  const end = startAddress + quantity;
+  const map = new Map<number, AddressResolution>();
+  let cursor = startAddress;
+
+  while (cursor < end) {
+    const overridden = Object.prototype.hasOwnProperty.call(formatOverrides ?? {}, cursor);
+    const format = (formatOverrides?.[cursor] as DataDisplayFormat | undefined) ?? defaultFormat;
+    const span = getSpanForFormat(format, isWordType);
+    const fits = cursor + span <= end;
+
+    for (let s = 0; s < span && cursor + s < end; s++) {
+      map.set(cursor + s, {
+        role: s === 0 ? 'start' : 'consumed',
+        groupStart: cursor,
+        format,
+        span,
+        fits,
+        overridden: s === 0 ? overridden : false,
+      });
+    }
+    cursor += span;
+  }
+
+  return map;
 }
 
 export function parseDisplayValue(value: string, format: DataDisplayFormat): number {

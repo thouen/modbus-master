@@ -6,6 +6,7 @@ import {
   X,
   RefreshCw,
   Radio,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,8 +35,11 @@ import { useModbusWs } from "@/hooks/use-modbus-ws";
 import {
   generateId,
   formatRegisterValue,
-  getBitsPerValue,
   parseDisplayValue,
+  isWordFunctionCode,
+  formatFitsAt,
+  resolveRegisterLayout,
+  encodeValueToRegisters,
 } from "@/lib/modbus-utils";
 import type {
   RegisterTab,
@@ -136,6 +140,9 @@ export function RegisterTabManager() {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [cellValue, setCellValue] = useState("");
   const [editingFormatRow, setEditingFormatRow] = useState<string | null>(null);
+
+  // 写入草稿：地址 -> 待写入值（编辑后暂存，点击「写入」整段提交）
+  const [writeDraft, setWriteDraft] = useState<Map<number, number>>(new Map());
 
   // 标签选择
   const selectTab = useCallback(
@@ -239,20 +246,75 @@ export function RegisterTabManager() {
     [connections, writeRegisters],
   );
 
-  // 行内编辑提交（按真实寄存器地址写入）
+  // 行内编辑提交：暂存为草稿，不立即发送（点击「写入」整段提交）
   const commitCellEdit = useCallback(
-    (tab: RegisterTab, address: number, raw: string) => {
-      const num = parseDisplayValue(raw, tab.displayFormat);
-      if (num === null) return;
-      if (isBroadcast) {
-        setPendingWrite({ tab, values: [num], startAddress: address });
-        setBroadcastConfirmOpen(true);
+    (
+      tab: RegisterTab,
+      address: number,
+      raw: string,
+      format?: DataDisplayFormat,
+      span?: number,
+    ) => {
+      const fmt = format ?? tab.displayFormat;
+      if (span && span > 1) {
+        // 宽类型（32/64 位）：解析为格式化值后拆分回 span 个 16 位寄存器原始值
+        const regs = encodeValueToRegisters(
+          parseDisplayValue(raw, fmt),
+          fmt,
+          tab.byteOrder32,
+          tab.byteOrder64,
+        );
+        if (regs.length !== span) return;
+        setWriteDraft((prev) => {
+          const next = new Map(prev);
+          for (let i = 0; i < span; i++) next.set(address + i, regs[i]);
+          return next;
+        });
       } else {
-        performWrite(tab, [num], address);
+        const num = parseDisplayValue(raw, fmt);
+        if (num === null) return;
+        setWriteDraft((prev) => {
+          const next = new Map(prev);
+          next.set(address, num);
+          return next;
+        });
       }
       setEditingCell(null);
     },
-    [isBroadcast, performWrite],
+    [],
+  );
+
+  // 整段批量提交：startAddress 起 quantity 个值（草稿覆盖 + 未编辑行回填原值）
+  const commitWriteDraft = useCallback(
+    (tab: RegisterTab) => {
+      if (!isConnected) return;
+      const data = registerData[tab.id] ?? [];
+      const isSingle = tab.functionCode === '05' || tab.functionCode === '06';
+      const count = isSingle ? 1 : Math.max(1, tab.quantity);
+      const values: number[] = [];
+      const nextDraft = new Map<number, number>();
+      for (let i = 0; i < count; i++) {
+        const addr = tab.startAddress + i;
+        const edited = writeDraft.get(addr);
+        if (edited !== undefined) {
+          values.push(edited);
+        } else {
+          // 未编辑行回填当前原始值，保证批量写完整覆盖
+          const row = data.find((d) => d.address === addr);
+          values.push(row ? row.rawValue : 0);
+        }
+        nextDraft.delete(addr);
+      }
+      if (isBroadcast) {
+        setPendingWrite({ tab, values, startAddress: tab.startAddress });
+        setBroadcastConfirmOpen(true);
+        // 广播确认后再清空，因此这里不清空草稿
+      } else {
+        performWrite(tab, values, tab.startAddress);
+        setWriteDraft(nextDraft);
+      }
+    },
+    [isConnected, registerData, writeDraft, isBroadcast, performWrite],
   );
 
   // 切换轮询（广播连接禁止轮询，实际定时器由 usePolling 统一调度）
@@ -268,6 +330,17 @@ export function RegisterTabManager() {
   const confirmBroadcastWrite = useCallback(() => {
     if (pendingWrite) {
       performWrite(pendingWrite.tab, pendingWrite.values, pendingWrite.startAddress);
+      // 清空已提交区间的草稿
+      const count =
+        pendingWrite.tab.functionCode === '05' || pendingWrite.tab.functionCode === '06'
+          ? 1
+          : Math.max(1, pendingWrite.tab.quantity);
+      const start = pendingWrite.startAddress ?? pendingWrite.tab.startAddress;
+      setWriteDraft((prev) => {
+        const next = new Map(prev);
+        for (let i = 0; i < count; i++) next.delete(start + i);
+        return next;
+      });
       setPendingWrite(null);
     }
     setBroadcastConfirmOpen(false);
@@ -299,9 +372,11 @@ export function RegisterTabManager() {
           connSlaveId={activeConn.slaveId}
           isConnected={isConnected}
           isBroadcast={isBroadcast}
+          hasDraft={writeDraft.size > 0}
           onUpdate={updateTab}
           onRead={() => handleRead(activeTab)}
           onTogglePolling={() => togglePolling(activeTab)}
+          onWrite={() => commitWriteDraft(activeTab)}
         />
       )}
 
@@ -310,14 +385,16 @@ export function RegisterTabManager() {
         <DataTable
           tab={activeTab}
           data={registerData[activeTab.id] ?? []}
-          isConnected={isConnected}
+          writeDraft={writeDraft}
           onUpdate={updateTab}
           onRead={() => handleRead(activeTab)}
           editingCell={editingCell}
           setEditingCell={setEditingCell}
           cellValue={cellValue}
           setCellValue={setCellValue}
-          onCommitCellEdit={(address, raw) => commitCellEdit(activeTab, address, raw)}
+          onCommitCellEdit={(address, raw, fmt, span) =>
+            commitCellEdit(activeTab, address, raw, fmt ?? activeTab.displayFormat, span ?? 1)
+          }
           editingFormatRow={editingFormatRow}
           setEditingFormatRow={setEditingFormatRow}
         />
@@ -356,10 +433,59 @@ export function RegisterTabManager() {
 }
 
 /* ========== 数据表格 ========== */
+/** Bits 格式：16 个可点击位开关，每 4 个一组排列 */
+function LedBits({
+  value,
+  editable,
+  drafted,
+  onChange,
+}: {
+  value: number;
+  editable: boolean;
+  drafted: boolean;
+  onChange: (raw: number) => void;
+}) {
+  const groups: number[][] = [
+    [15, 14, 13, 12],
+    [11, 10, 9, 8],
+    [7, 6, 5, 4],
+    [3, 2, 1, 0],
+  ];
+  return (
+    <div className="flex items-center gap-1.5">
+      {groups.map((g, gi) => (
+        <div key={gi} className="flex items-center gap-0.5">
+          {g.map((bit) => {
+            const on = (value >> bit) & 1;
+            return (
+              <button
+                key={bit}
+                type="button"
+                disabled={!editable}
+                onClick={() => onChange(value ^ (1 << bit))}
+                title={`bit${bit}`}
+                className={`flex h-4 w-4 items-center justify-center rounded-[2px] font-mono text-[9px] leading-none transition-colors ${
+                  drafted ? "ring-1 ring-amber-400/60" : ""
+                } ${
+                  on
+                    ? "bg-success text-background"
+                    : "bg-foreground/10 text-muted-foreground"
+                } ${editable ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
+              >
+                {on ? "1" : "0"}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DataTable({
   tab,
   data,
-  isConnected,
+  writeDraft,
   onUpdate,
   onRead,
   editingCell,
@@ -372,14 +498,14 @@ function DataTable({
 }: {
   tab: RegisterTab;
   data: RegisterData[];
-  isConnected: boolean;
+  writeDraft: Map<number, number>;
   onUpdate: (tabId: string, updates: Partial<RegisterTab>) => void;
   onRead: () => void;
   editingCell: string | null;
   setEditingCell: (key: string | null) => void;
   cellValue: string;
   setCellValue: (v: string) => void;
-  onCommitCellEdit: (address: number, raw: string) => void;
+  onCommitCellEdit: (address: number, raw: string, format?: DataDisplayFormat, span?: number) => void;
   editingFormatRow: string | null;
   setEditingFormatRow: (address: string | null) => void;
 }) {
@@ -390,13 +516,27 @@ function DataTable({
     tab.functionCode === '15' ||
     tab.functionCode === '16';
 
-  const bitsPerValue = getBitsPerValue(tab.displayFormat);
+  const isWordType = isWordFunctionCode(tab.functionCode);
   const isSingleWrite = tab.functionCode === '05' || tab.functionCode === '06';
   const rowCount = isSingleWrite ? 1 : Math.max(1, tab.quantity);
   const rows: RegisterData[] = Array.from({ length: rowCount }, (_, i) => {
     const address = tab.startAddress + i;
     return data.find((d) => d.address === address) ?? { address, rawValue: 0 };
   });
+
+  // 逐行类型映射：计算每个地址是分组起点还是被宽类型占用
+  const layout = resolveRegisterLayout({
+    startAddress: tab.startAddress,
+    quantity: rowCount,
+    isWordType,
+    defaultFormat: tab.displayFormat,
+    formatOverrides: tab.formatOverrides,
+  });
+
+  // 是否存在跨寄存器（32/64 位）分组：用于底部提示
+  const hasWideGroup = Array.from(layout.values()).some(
+    (r) => r.role === 'start' && r.span > 1,
+  );
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
@@ -425,20 +565,47 @@ function DataTable({
             const cellKey = `${item.address}:${index}`;
             const isEditingThis = editingCell === cellKey;
             const formatEditing = editingFormatRow === String(item.address);
-            const isMultiRegister = bitsPerValue > 16;
-            const groupSize = isMultiRegister ? bitsPerValue / 16 : 1;
-            const isGroupStart = !isMultiRegister || index % groupSize === 0;
-            const displayValue = isGroupStart
-              ? formatRegisterValue(rows, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64)
-              : "—";
-            const canEdit = !isMultiRegister && isWriteFc && isConnected;
+            const res = layout.get(item.address);
+            const isGroupStart = res?.role === 'start' || !res;
+            const groupFits = res?.fits ?? true;
+            const groupSpan = res?.span ?? 1;
+            const format = res?.format ?? tab.displayFormat;
+            // 写入：仅分组起点可编辑（含 32/64 位宽类型）；被占用的后续地址不可编辑。
+            // 编辑（暂存草稿）不依赖连接状态，仅"写入"提交才要求已连接。
+            const canEdit = isGroupStart && isWriteFc;
+            const isDrafted = writeDraft.has(item.address);
+            const draftValue = writeDraft.get(item.address);
+            // 起点且空间足够才计算格式化值；占用行 / 越界组显示 —
+            const displayValue =
+              isGroupStart && groupFits
+                ? formatRegisterValue(rows, index, format, tab.byteOrder32, tab.byteOrder64)
+                : "—";
+            // 宽类型整组草稿展示：整组地址均已编辑时按草稿重算格式化值
+            let groupDisplay = displayValue;
+            if (isGroupStart && groupSpan > 1) {
+              const addrs = Array.from({ length: groupSpan }, (_, k) => rows[index + k]?.address ?? 0);
+              const drafted = addrs.map((a) => writeDraft.get(a));
+              if (drafted.every((v) => v !== undefined)) {
+                const eff: RegisterData[] = addrs.map((a, k) => ({ address: a, rawValue: drafted[k]! }));
+                groupDisplay = formatRegisterValue(eff, 0, format, tab.byteOrder32, tab.byteOrder64);
+              }
+            }
+            // 起点行可选格式：非寄存器（线圈）禁用 32/64 位；空间不足禁用跨寄存器类型
+            const formatDisabled = !isGroupStart || !isWordType;
             return (
               <tr
                 key={cellKey}
-                className="h-12 border-b border-border/20 transition-colors odd:bg-surface/40 even:bg-transparent hover:bg-surface-container/50"
+                className={`h-12 border-b border-border/20 transition-colors ${
+                  isDrafted
+                    ? "bg-amber-500/[0.07] odd:bg-amber-500/[0.07] even:bg-amber-500/[0.07]"
+                    : "odd:bg-surface/40 even:bg-transparent hover:bg-surface-container/50"
+                }`}
               >
                 {/* 地址 */}
                 <td className="w-18 px-3 py-1.5 font-mono text-data font-semibold">
+                  {isDrafted && (
+                    <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400 align-middle" />
+                  )}
                   {item.address}
                 </td>
                 {/* 原始 HEX */}
@@ -449,13 +616,26 @@ function DataTable({
                 <td className="w-28 px-3 py-1.5 font-mono text-muted-foreground">
                   {item.rawValue}
                 </td>
-                {/* 数据类型（逐行格式切换） */}
+                {/* 数据类型（逐行格式切换，写入 formatOverrides） */}
                 <td className="w-48 px-3 py-1.5">
-                  {formatEditing ? (
+                  {!isGroupStart ? (
+                    // 被前一 32/64 位类型占用的后续地址：禁用选择
+                    <span className="px-2 font-mono text-[10px] text-muted-foreground/40">
+                      —
+                    </span>
+                  ) : formatEditing ? (
                     <Select
-                      value={tab.displayFormat}
+                      value={format}
                       onValueChange={(v) => {
-                        onUpdate(tab.id, { displayFormat: v as DataDisplayFormat });
+                        const next = v as DataDisplayFormat;
+                        const overrides = { ...(tab.formatOverrides ?? {}) };
+                        if (next === tab.displayFormat) {
+                          // 选回默认格式 → 移除 override
+                          delete overrides[item.address];
+                        } else {
+                          overrides[item.address] = next;
+                        }
+                        onUpdate(tab.id, { formatOverrides: overrides });
                         setEditingFormatRow(null);
                       }}
                     >
@@ -463,40 +643,64 @@ function DataTable({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {FORMAT_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                            {t(opt.labelKey as Parameters<typeof t>[0])}
-                          </SelectItem>
-                        ))}
+                        {FORMAT_OPTIONS.map((opt) => {
+                          // 空间不足 / 非寄存器：禁用无法应用的 32/64 位类型
+                          const fits = formatFitsAt(opt.value, index, rowCount, isWordType);
+                          return (
+                            <SelectItem
+                              key={opt.value}
+                              value={opt.value}
+                              disabled={!fits}
+                              className="text-xs"
+                            >
+                              {t(opt.labelKey as Parameters<typeof t>[0])}
+                              {!fits ? ` (${t("notEnoughRegisters")})` : ""}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   ) : (
                     <Badge
                       variant="outline"
-                      className={`cursor-pointer border-transparent bg-foreground/5 px-2 py-0.5 font-mono text-[10px] ${
-                        tab.displayFormat === "float" ||
-                        tab.displayFormat === "double"
-                          ? "text-primary"
-                          : tab.displayFormat === "led"
-                            ? "text-success"
-                            : "text-amber-500"
-                      }`}
-                      onClick={() => setEditingFormatRow(String(item.address))}
+                      className={`cursor-pointer border-transparent px-2 py-0.5 font-mono text-[10px] ${
+                        formatDisabled
+                          ? "cursor-not-allowed bg-foreground/5 text-muted-foreground/40"
+                          : "bg-foreground/5 " +
+                            (format === "float" || format === "double"
+                              ? "text-primary"
+                              : format === "led"
+                                ? "text-success"
+                                : "text-amber-500")
+                      } ${res?.overridden ? "ring-1 ring-primary/40" : ""}`}
+                      onClick={() => {
+                        if (formatDisabled) return;
+                        setEditingFormatRow(String(item.address));
+                      }}
+                      title={isWordType ? undefined : t("wideTypeRequiresRegisters")}
                     >
-                      {t(FORMAT_KEY_MAP[tab.displayFormat] as Parameters<typeof t>[0])}
+                      {t(FORMAT_KEY_MAP[format] as Parameters<typeof t>[0])}
+                      {res?.overridden ? " *" : ""}
                     </Badge>
                   )}
                 </td>
-                {/* 格式化值（行内编辑，32/64 位只读展示） */}
+                {/* 格式化值（行内编辑，32/64 位只读展示；led 渲染为位开关） */}
                 <td className="w-48 px-3 py-1.5">
-                  {isEditingThis ? (
+                  {format === "led" ? (
+                    <LedBits
+                      value={draftValue ?? item.rawValue}
+                      editable={canEdit}
+                      drafted={isDrafted}
+                      onChange={(raw) => onCommitCellEdit(item.address, String(raw))}
+                    />
+                  ) : isEditingThis ? (
                     <input
                       autoFocus
                       value={cellValue}
                       onChange={(e) => setCellValue(e.target.value)}
-                      onBlur={() => onCommitCellEdit(item.address, cellValue)}
+                      onBlur={() => onCommitCellEdit(item.address, cellValue, format, groupSpan)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") onCommitCellEdit(item.address, cellValue);
+                        if (e.key === "Enter") onCommitCellEdit(item.address, cellValue, format, groupSpan);
                         if (e.key === "Escape") setEditingCell(null);
                       }}
                       disabled={!canEdit}
@@ -508,14 +712,18 @@ function DataTable({
                         canEdit
                           ? "cursor-pointer text-cyan-400 hover:bg-primary/10"
                           : "text-foreground"
-                      }`}
+                      } ${isDrafted ? "text-amber-400" : ""}`}
                       onClick={() => {
                         if (!canEdit) return;
                         setEditingCell(cellKey);
-                        setCellValue(formatRegisterValue(rows, index, tab.displayFormat, tab.byteOrder32, tab.byteOrder64));
+                        setCellValue(formatRegisterValue(rows, index, format, tab.byteOrder32, tab.byteOrder64));
                       }}
                     >
-                      {displayValue}
+                      {groupSpan > 1
+                        ? groupDisplay
+                        : isDrafted && draftValue !== undefined
+                          ? formatDraftValue(draftValue, format)
+                          : displayValue}
                     </span>
                   )}
                 </td>
@@ -524,9 +732,9 @@ function DataTable({
           })}
         </tbody>
       </table>
-      {rows.length > 0 && bitsPerValue > 1 && (
+      {rows.length > 0 && hasWideGroup && (
         <div className="px-3 py-1 text-[10px] text-muted-foreground/50">
-          {t("bitHint").replace("{bits}", String(bitsPerValue))}
+          {t("perRowFormatHint")}
         </div>
       )}
     </div>
@@ -593,6 +801,26 @@ export function usePolling() {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** 格式化单个待写草稿值（写功能码行内编辑为 16 位单值） */
+function formatDraftValue(value: number, format: DataDisplayFormat): string {
+  switch (format) {
+    case 'hex':
+      return value.toString(16).toUpperCase().padStart(4, '0');
+    case 'binary':
+      return value.toString(2).padStart(16, '0');
+    case 'short': {
+      const s = value & 0xffff;
+      return String(s <= 0x7fff ? s : s - 0x10000);
+    }
+    case 'led':
+      return Array.from({ length: 16 }, (_, i) =>
+        (value & (1 << (15 - i))) ? '1' : '0',
+      ).join('');
+    default:
+      return String(value);
+  }
 }
 
 /** Map display format to i18n key */
@@ -716,20 +944,29 @@ function ConfigBar({
   connSlaveId,
   isConnected,
   isBroadcast,
+  hasDraft,
   onUpdate,
   onRead,
   onTogglePolling,
+  onWrite,
 }: {
   tab: RegisterTab;
   connName: string;
   connSlaveId: number;
   isConnected: boolean;
   isBroadcast: boolean;
+  hasDraft: boolean;
   onUpdate: (tabId: string, updates: Partial<RegisterTab>) => void;
   onRead: () => void;
   onTogglePolling: () => void;
+  onWrite: () => void;
 }) {
   const { t } = useI18n();
+  const isWriteFc =
+    tab.functionCode === '05' ||
+    tab.functionCode === '06' ||
+    tab.functionCode === '15' ||
+    tab.functionCode === '16';
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border/30 bg-surface px-3 py-2">
@@ -796,10 +1033,13 @@ function ConfigBar({
         />
       </label>
 
-      {/* 显示格式（标签级默认） */}
+      {/* 显示格式（标签级默认，可被表格逐行 override） */}
       <span className="hidden h-4 w-px bg-border/30 md:inline-block" />
-      <label className="hidden items-center gap-1.5 text-[11px] text-muted-foreground md:flex">
-        {t("displayFormat")}
+      <label
+        className="hidden items-center gap-1.5 text-[11px] text-muted-foreground md:flex"
+        title={t("defaultFormatHint")}
+      >
+        {t("defaultFormat")}
         <Select
           value={tab.displayFormat}
           onValueChange={(v) =>
@@ -900,6 +1140,22 @@ function ConfigBar({
             {t("read")}
           </Button>
         )}
+        {isWriteFc && !isBroadcast && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!isConnected}
+            onClick={onWrite}
+            className={`h-7 border-success/40 px-2.5 text-xs ${
+              hasDraft
+                ? "bg-success/15 text-success hover:bg-success/25"
+                : "border-border/40 bg-surface-container text-muted-foreground hover:bg-surface-container/80"
+            }`}
+          >
+            <Upload className="mr-1 h-3 w-3" />
+            {t("write")}
+          </Button>
+        )}
         {!isBroadcast && (
           <label className="flex cursor-pointer items-center gap-1.5 rounded border border-border/40 bg-surface-container px-2 py-1 text-[11px] text-muted-foreground">
             <span>{t("autoPoll")}</span>
@@ -910,6 +1166,22 @@ function ConfigBar({
               className="scale-75"
             />
           </label>
+        )}
+        {isWriteFc && isBroadcast && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!isConnected}
+            onClick={onWrite}
+            className={`h-7 border-amber-500/40 px-2.5 text-xs ${
+              hasDraft
+                ? "bg-amber-500/15 text-amber-500 hover:bg-amber-500/25"
+                : "border-border/40 bg-surface-container text-muted-foreground hover:bg-surface-container/80"
+            }`}
+          >
+            <Upload className="mr-1 h-3 w-3" />
+            {t("write")}
+          </Button>
         )}
         {isBroadcast && (
           <Badge

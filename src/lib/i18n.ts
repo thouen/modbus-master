@@ -52,6 +52,11 @@ export const translations = {
     functionCode: 'Function Code',
     pollInterval: 'Poll Interval (ms)',
     displayFormat: 'Display Format',
+    defaultFormat: 'Default Format',
+    defaultFormatHint: 'Default format for all addresses; can be overridden per row in the data table.',
+    perRowFormatHint: 'Per-address type mapping: a 32-bit value occupies 2 registers and a 64-bit value occupies 4; occupied rows are disabled.',
+    notEnoughRegisters: 'not enough registers',
+    wideTypeRequiresRegisters: '32/64-bit types only apply to holding/input registers, not coils.',
     byteOrder: 'Byte Order',
     startPolling: 'Start',
     stopPolling: 'Stop',
@@ -60,7 +65,7 @@ export const translations = {
     renameTab: 'Rename Tab',
 
     // Data Display Formats
-    formatLed: 'Bit (1-bit)',
+    formatLed: 'Bits',
     formatShort: 'Short (16-bit)',
     formatUShort: 'UShort (16-bit)',
     formatHex: 'Hexadecimal (16-bit)',
@@ -240,6 +245,11 @@ export const translations = {
     functionCode: '功能码',
     pollInterval: '轮询间隔 (ms)',
     displayFormat: '显示格式',
+    defaultFormat: '默认格式',
+    defaultFormatHint: '所有地址的默认格式；可在数据表格中逐行单独设置类型。',
+    perRowFormatHint: '逐行类型映射：32 位值占用 2 个寄存器，64 位占用 4 个；被占用的行不可选择。',
+    notEnoughRegisters: '寄存器不足',
+    wideTypeRequiresRegisters: '32/64 位类型仅适用于保持/输入寄存器，不适用于线圈。',
     byteOrder: '字节序',
     startPolling: '开始',
     stopPolling: '停止',
@@ -248,7 +258,7 @@ export const translations = {
     renameTab: '重命名标签',
 
     // Data Display Formats
-    formatLed: 'Bit (1位)',
+    formatLed: 'Bits（位）',
     formatShort: '短整型 (16位)',
     formatUShort: '无符号短整型 (16位)',
     formatHex: '十六进制 (16位)',
