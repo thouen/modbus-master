@@ -36,8 +36,12 @@ export function withBitSet(word: number, bit: number, value: boolean): number {
 /**
  * 从按位打包的字数组中读一个**位地址**。
  * ⚠️ 位序：字内 bit 0（LSB）= 编号最小的位地址（与协议"首线圈在字节最低位"一致）。
+ *
+ * 形参刻意用 `ArrayLike<number>`（而非 `Uint16Array`）：本函数只按下标读，
+ * 这样既吃镜像里的 `Uint16Array`，也吃 `packBitsToWords` 的 `number[]` 结果，
+ * 以及 `readonly number[]`，避免调用方为了过类型检查去无谓地包一层。
  */
-export function readPackedBit(words: Uint16Array, bitAddress: number): boolean {
+export function readPackedBit(words: ArrayLike<number>, bitAddress: number): boolean {
   const word = words[bitAddress >> 4] ?? 0;
   return ((word >> (bitAddress & 0xf)) & 1) !== 0;
 }

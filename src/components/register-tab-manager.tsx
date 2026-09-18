@@ -678,14 +678,14 @@ function DataTable({
                 }`}
               >
                 {/* 地址（寄存器编号；位区旁附只读的位范围，Q20） */}
-                <td className="w-18 px-3 py-1.5 font-mono text-data font-semibold">
+                <td className="w-24 px-3 py-1.5 font-mono text-data font-semibold">
                   {isDrafted && (
                     <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400 align-middle" />
                   )}
                   {item.address}
                   {isBit && (
-                    <span className="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground/50">
-                      {t("bitLabel")} {item.address * BITS_PER_REGISTER}~
+                    <span className="ml-1.5 rounded bg-foreground/10 px-1 py-0.5 font-mono text-[10px] font-normal text-muted-foreground">
+                      {t("bitLabel")} {item.address * BITS_PER_REGISTER} ~{" "}
                       {item.address * BITS_PER_REGISTER + BITS_PER_REGISTER - 1}
                     </span>
                   )}
@@ -1104,7 +1104,7 @@ function ConfigBar({
           className="h-6 w-20 border-border/40 bg-background px-2 text-xs"
         />
         {isBit && (
-          <span className="font-mono text-[10px] text-muted-foreground/50">
+          <span className="font-mono text-[10px] text-muted-foreground/70">
             {t("bitLabel")} {bitStart}
           </span>
         )}
@@ -1126,7 +1126,7 @@ function ConfigBar({
           className="h-6 w-16 border-border/40 bg-background px-2 text-xs"
         />
         {isBit && (
-          <span className="font-mono text-[10px] text-muted-foreground/50">
+          <span className="font-mono text-[10px] text-muted-foreground/70">
             {t("bitLabel")} {bitStart} ~ {bitEnd}
           </span>
         )}
