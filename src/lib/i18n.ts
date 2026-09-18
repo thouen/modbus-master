@@ -65,7 +65,7 @@ export const translations = {
     renameTab: 'Rename Tab',
 
     // Data Display Formats
-    formatLed: 'Bits',
+    formatLed: 'Bits (16-bit)',
     formatShort: 'Short (16-bit)',
     formatUShort: 'UShort (16-bit)',
     formatHex: 'Hexadecimal (16-bit)',
@@ -94,15 +94,15 @@ export const translations = {
     fc16: '16 - Write Multiple Registers',
 
     // Log
-    logTitle: 'Communication Log',
-    clearLog: 'Clear',
+    logTitle: 'Logs',
+    clearLogs: 'Clear Logs',
     autoScroll: 'Auto Scroll',
     allConnections: 'All Connections',
     timestamp: 'Time',
     direction: 'Dir',
-    tx: 'TX',
-    rx: 'RX',
-    sys: 'SYS',
+    sent: 'Sent',
+    received: 'Received',
+    system: 'System',
     message: 'Message',
     rawData: 'Raw Data',
     noLogs: 'No logs yet',
@@ -110,7 +110,7 @@ export const translations = {
     // Config Import/Export
     importConfig: 'Import',
     exportConfig: 'Export',
-    importTitle: 'Import Configuration',
+    importStrategy: 'Import Strategy',
     importOverwrite: 'Overwrite',
     importMerge: 'Merge',
     importOverwriteDesc: 'Replace all current connections and tabs',
@@ -176,7 +176,7 @@ export const translations = {
     // Additional keys
     name: 'Name',
     serialPort: 'Serial Port',
-    exportLog: 'Export Log',
+    exportLogs: 'Export Logs',
     filterByConnection: 'Filter by Connection',
     empty: 'No tabs available',
     rawHex: 'Raw Hex',
@@ -287,15 +287,15 @@ export const translations = {
     fc16: '16 - 写多个寄存器',
 
     // Log
-    logTitle: '通信日志',
-    clearLog: '清除',
+    logTitle: '日志',
+    clearLogs: '清除日志',
     autoScroll: '自动滚动',
     allConnections: '全部连接',
     timestamp: '时间',
     direction: '方向',
-    tx: '发送',
-    rx: '接收',
-    sys: '系统',
+    sent: '发送',
+    received: '接收',
+    system: '系统',
     message: '消息',
     rawData: '原始数据',
     noLogs: '暂无日志',
@@ -303,7 +303,7 @@ export const translations = {
     // Config Import/Export
     importConfig: '导入',
     exportConfig: '导出',
-    importTitle: '导入配置',
+    importStrategy: '导入策略',
     importOverwrite: '覆盖',
     importMerge: '合并',
     importOverwriteDesc: '替换当前所有连接和标签',
@@ -369,7 +369,7 @@ export const translations = {
     // Additional keys
     name: '名称',
     serialPort: '串口端口',
-    exportLog: '导出日志',
+    exportLogs: '导出日志',
     filterByConnection: '按连接筛选',
     empty: '暂无标签',
     rawHex: '原始十六进制',

@@ -255,7 +255,7 @@ function ImportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#141922] border-border text-foreground sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-sm">{t('importTitle')}</DialogTitle>
+          <DialogTitle className="text-sm">{t('importStrategy')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-2 py-2">
           <button

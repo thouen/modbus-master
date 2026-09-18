@@ -160,10 +160,10 @@ export function LogViewer() {
             />
           </div>
           <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground" onClick={handleClear}>
-            {t('clearLog')}
+            {t('clearLogs')}
           </Button>
           <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground" onClick={handleExport}>
-            {t('exportLog')}
+            {t('exportLogs')}
           </Button>
         </div>
       </div>
@@ -236,12 +236,12 @@ export function LogViewer() {
                       </span>
 
                       {/* Direction badge */}
-                      <span className={'shrink-0 w-[30px] text-center text-[10px] font-bold leading-5 rounded-sm select-none ' + (
+                      <span className={'shrink-0 w-[56px] text-center text-[10px] font-bold leading-5 rounded-sm select-none ' + (
                         isSys ? 'bg-amber-500/15 text-amber-400' :
                         isTx ? 'bg-blue-500/15 text-blue-400' :
                         'bg-green-500/15 text-green-400'
                       )}>
-                        {isSys ? 'SYS' : isTx ? 'TX' : 'RX'}
+                        {isSys ? t('system') : isTx ? t('sent') : t('received')}
                       </span>
 
                       {/* Tab name */}
