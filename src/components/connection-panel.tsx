@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAppState } from '@/hooks/use-app-state';
 import { useModbusWs } from '@/hooks/use-modbus-ws';
-import { isBroadcastSlave, type ConnectionConfig, type Protocol, type Mode, type ByteOrder32, type ByteOrder64 } from '@/lib/modbus-types';
+import { isBroadcastSlave, DEFAULT_AREA_TOTAL_REGISTERS, BITS_PER_REGISTER, type ConnectionConfig, type Protocol, type Mode, type ByteOrder32, type ByteOrder64 } from '@/lib/modbus-types';
 import { generateId } from '@/lib/modbus-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -341,6 +341,16 @@ function ConnectionDialog({
   const [byteOrder32, setByteOrder32] = useState<ByteOrder32>(editing?.byteOrder32 ?? 'ABCD');
   const [byteOrder64, setByteOrder64] = useState<ByteOrder64>(editing?.byteOrder64 ?? 'ABCDEFGH');
 
+  // 4 个区的「总寄存器数量」（概念名 areaTotalRegisters）：
+  // 主站侧它们是**设备镜像数组的初始长度**，收到更远的响应会自动扩容。
+  const [coilCount, setCoilCount] = useState(editing?.coilCount ?? DEFAULT_AREA_TOTAL_REGISTERS);
+  const [discreteInputCount, setDiscreteInputCount] = useState(editing?.discreteInputCount ?? DEFAULT_AREA_TOTAL_REGISTERS);
+  const [holdingRegisterCount, setHoldingRegisterCount] = useState(editing?.holdingRegisterCount ?? DEFAULT_AREA_TOTAL_REGISTERS);
+  const [inputRegisterCount, setInputRegisterCount] = useState(editing?.inputRegisterCount ?? DEFAULT_AREA_TOTAL_REGISTERS);
+
+  /** 位区的只读位范围提示（Q20：主显示是寄存器编号，位范围挂旁边作参考） */
+  const bitRange = (registers: number) => `0 ~ ${Math.max(1, registers) * BITS_PER_REGISTER - 1}`;
+
   const handleSave = () => {
     const config: ConnectionConfig = {
       id: editing?.id ?? generateId(),
@@ -350,6 +360,10 @@ function ConnectionDialog({
       slaveId,
       byteOrder32,
       byteOrder64,
+      coilCount: Math.max(1, coilCount),
+      discreteInputCount: Math.max(1, discreteInputCount),
+      holdingRegisterCount: Math.max(1, holdingRegisterCount),
+      inputRegisterCount: Math.max(1, inputRegisterCount),
       ...(protocol === 'serial'
         ? {
             serialConfig: {
@@ -510,6 +524,64 @@ function ConnectionDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* 设备镜像：4 个区的总寄存器数量（= 镜像数组的初始长度） */}
+          <div className="border-t border-border pt-3">
+            <div className="mb-2 text-xs font-medium text-foreground">
+              {t('deviceImage')}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">{t('coilCount')}</label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-8 text-xs bg-background border-border"
+                  value={coilCount}
+                  onChange={e => setCoilCount(Math.max(1, parseInt(e.target.value) || 1))}
+                />
+                <span className="block text-[9px] text-muted-foreground/60">
+                  {t('bitLabel')} {bitRange(coilCount)}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">{t('discreteInputCount')}</label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-8 text-xs bg-background border-border"
+                  value={discreteInputCount}
+                  onChange={e => setDiscreteInputCount(Math.max(1, parseInt(e.target.value) || 1))}
+                />
+                <span className="block text-[9px] text-muted-foreground/60">
+                  {t('bitLabel')} {bitRange(discreteInputCount)}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">{t('holdingRegisterCount')}</label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-8 text-xs bg-background border-border"
+                  value={holdingRegisterCount}
+                  onChange={e => setHoldingRegisterCount(Math.max(1, parseInt(e.target.value) || 1))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">{t('inputRegisterCount')}</label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-8 text-xs bg-background border-border"
+                  value={inputRegisterCount}
+                  onChange={e => setInputRegisterCount(Math.max(1, parseInt(e.target.value) || 1))}
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-[9px] leading-relaxed text-muted-foreground/60">
+              {t('deviceImageHint')}
+            </p>
           </div>
 
           {slaveId === 0 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   X,
@@ -40,7 +40,16 @@ import {
   formatFitsAt,
   resolveRegisterLayout,
   encodeValueToRegisters,
+  registerWindowKey,
 } from "@/lib/modbus-utils";
+import { readRegisterRows } from "@/lib/connection-image";
+import {
+  fcToArea,
+  isBitArea,
+  BITS_PER_REGISTER,
+  type RegisterArea,
+  type ConnectionRegisterImage,
+} from "@/lib/modbus-types";
 import type {
   RegisterTab,
   RegisterData,
@@ -53,6 +62,11 @@ import type {
 
 /** 广播从站地址（Slave ID = 0） */
 export const BROADCAST_SLAVE_ID = 0;
+
+/** 标签的功能码 → 它看的是哪个寄存器区域 */
+function tabArea(tab: RegisterTab): RegisterArea | null {
+  return fcToArea(parseFunctionCode(tab.functionCode));
+}
 
 /** 功能码选项 */
 const FC_OPTIONS: { value: FunctionCode; labelKey: string }[] = [
@@ -113,7 +127,7 @@ export function RegisterTabManager() {
   const { t } = useI18n();
   const { readRegisters, writeRegisters } = useModbusWs();
 
-  const { tabs, activeTabId, registerData, connections, connectionStatus, activeConnectionId } = state;
+  const { tabs, activeTabId, registerImages, connections, connectionStatus, activeConnectionId } = state;
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
   const activeConn = activeTab
@@ -123,6 +137,26 @@ export function RegisterTabManager() {
     ? connectionStatus[activeConn.id] === "connected"
     : false;
   const isBroadcast = activeConn?.slaveId === BROADCAST_SLAVE_ID;
+
+  /** 当前标签看的是哪个寄存器区域 */
+  const activeArea = activeTab ? tabArea(activeTab) : null;
+
+  /**
+   * 该标签所属连接（= 它所看那台"设备"）的镜像（R3）。
+   * ⭐ 值的来源是**连接**而不是标签：同一个物理寄存器在所有引用该连接的标签里
+   * 看到的是同一份值。标签只是视图。
+   */
+  const activeImage: ConnectionRegisterImage | undefined = activeConn
+    ? registerImages[activeConn.id]
+    : undefined;
+
+  /** 当前窗口的表格行 —— 四区同构，**一行 = 一个寄存器**（Q20） */
+  const activeRows: RegisterData[] = useMemo(() => {
+    if (!activeTab || !activeArea) return [];
+    const isSingleWrite = activeTab.functionCode === '05' || activeTab.functionCode === '06';
+    const count = isSingleWrite ? 1 : Math.max(1, activeTab.registerCount);
+    return readRegisterRows(activeImage, activeArea, activeTab.startAddress, count);
+  }, [activeTab, activeArea, activeImage]);
 
   // 标签重命名编辑态
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -141,8 +175,31 @@ export function RegisterTabManager() {
   const [cellValue, setCellValue] = useState("");
   const [editingFormatRow, setEditingFormatRow] = useState<string | null>(null);
 
-  // 写入草稿：地址 -> 待写入值（编辑后暂存，点击「写入」整段提交）
-  const [writeDraft, setWriteDraft] = useState<Map<number, number>>(new Map());
+  /**
+   * 写入草稿：**窗口身份 → (寄存器序号 → 待写入值)**。
+   *
+   * ⚠️ 按窗口分桶，而不是一张全局表：草稿若不带窗口身份，标签 A 在地址 3 的草稿
+   * 会串到标签 B（slave 侧踩过同一个坑，见 ROADMAP §3.2「R1 后续修复：跨区串值」）。
+   *
+   * ⚠️ 草稿值的口径是**寄存器**：位区的一个草稿值就是"该寄存器的 16 位打包字"，
+   * 与表格一行、与镜像一格完全对应。
+   */
+  const [writeDrafts, setWriteDrafts] = useState<Record<string, Map<number, number>>>({});
+
+  /**
+   * 当前窗口的草稿桶。
+   *
+   * ⚠️ `registerWindowKey()` **必须包在 useMemo 里，不要在渲染期直接调用**：
+   * 实测在渲染期调用一个编译器无法证明纯度的模块级函数，会让 React Compiler
+   * **跳过整个组件**的编译，报 `react-hooks/preserve-manual-memoization`，
+   * 且报错会落在与本次改动无关的回调上，极难定位。
+   */
+  const writeDraft: Map<number, number> = useMemo(
+    () =>
+      (activeTab ? writeDrafts[registerWindowKey(activeTab)] : undefined) ??
+      new Map<number, number>(),
+    [activeTab, writeDrafts],
+  );
 
   // 标签选择
   const selectTab = useCallback(
@@ -162,7 +219,7 @@ export function RegisterTabManager() {
       connectionId: connId,
       functionCode: '03' as FunctionCode,
       startAddress: 0,
-      quantity: 10,
+      registerCount: 10,
       pollInterval: 1000,
       isPolling: false,
       byteOrder32: "ABCD",
@@ -223,7 +280,7 @@ export function RegisterTabManager() {
         conn.slaveId,
         parseFunctionCode(tab.functionCode),
         tab.startAddress,
-        tab.quantity,
+        tab.registerCount,
       );
     },
     [connections, readRegisters, isBroadcast],
@@ -256,6 +313,16 @@ export function RegisterTabManager() {
       span?: number,
     ) => {
       const fmt = format ?? tab.displayFormat;
+      // 草稿按**窗口身份**分桶存：切走再切回来还在，别的窗口看不到（R3）
+      const key = registerWindowKey(tab);
+      const writeInto = (entries: [number, number][]) => {
+        setWriteDrafts((prev) => {
+          const next = new Map(prev[key] ?? []);
+          for (const [addr, value] of entries) next.set(addr, value);
+          return { ...prev, [key]: next };
+        });
+      };
+
       if (span && span > 1) {
         // 宽类型（32/64 位）：解析为格式化值后拆分回 span 个 16 位寄存器原始值
         const regs = encodeValueToRegisters(
@@ -265,56 +332,49 @@ export function RegisterTabManager() {
           tab.byteOrder64,
         );
         if (regs.length !== span) return;
-        setWriteDraft((prev) => {
-          const next = new Map(prev);
-          for (let i = 0; i < span; i++) next.set(address + i, regs[i]);
-          return next;
-        });
+        writeInto(regs.map((value, i) => [address + i, value] as [number, number]));
       } else {
         const num = parseDisplayValue(raw, fmt);
         if (num === null) return;
-        setWriteDraft((prev) => {
-          const next = new Map(prev);
-          next.set(address, num);
-          return next;
-        });
+        writeInto([[address, num]]);
       }
       setEditingCell(null);
     },
     [],
   );
 
-  // 整段批量提交：startAddress 起 quantity 个值（草稿覆盖 + 未编辑行回填原值）
+  // 整段批量提交：startAddress 起 registerCount 个值（草稿覆盖 + 未编辑行回填**镜像现值**）
   const commitWriteDraft = useCallback(
     (tab: RegisterTab) => {
       if (!isConnected) return;
-      const data = registerData[tab.id] ?? [];
+      const area = tabArea(tab);
+      if (!area) return;
       const isSingle = tab.functionCode === '05' || tab.functionCode === '06';
-      const count = isSingle ? 1 : Math.max(1, tab.quantity);
-      const values: number[] = [];
-      const nextDraft = new Map<number, number>();
-      for (let i = 0; i < count; i++) {
-        const addr = tab.startAddress + i;
-        const edited = writeDraft.get(addr);
-        if (edited !== undefined) {
-          values.push(edited);
-        } else {
-          // 未编辑行回填当前原始值，保证批量写完整覆盖
-          const row = data.find((d) => d.address === addr);
-          values.push(row ? row.rawValue : 0);
-        }
-        nextDraft.delete(addr);
-      }
+      const count = isSingle ? 1 : Math.max(1, tab.registerCount);
+      const key = registerWindowKey(tab);
+      const draft = writeDrafts[key] ?? new Map<number, number>();
+
+      // ⭐ 回填的"原值"取自**该连接的设备镜像**（不是标签自己的缓存）：
+      // 同一个物理寄存器在所有标签里是同一份值。
+      const conn = connections.find((c) => c.id === tab.connectionId);
+      const image = conn ? registerImages[conn.id] : undefined;
+      const rows = readRegisterRows(image, area, tab.startAddress, count);
+      const values: number[] = rows.map((row) => draft.get(row.address) ?? row.rawValue);
+
+      // 提交后只清空**本窗口**的草稿
+      const nextDraft = new Map(draft);
+      for (let i = 0; i < count; i++) nextDraft.delete(tab.startAddress + i);
+
       if (isBroadcast) {
         setPendingWrite({ tab, values, startAddress: tab.startAddress });
         setBroadcastConfirmOpen(true);
         // 广播确认后再清空，因此这里不清空草稿
       } else {
         performWrite(tab, values, tab.startAddress);
-        setWriteDraft(nextDraft);
+        setWriteDrafts((prev) => ({ ...prev, [key]: nextDraft }));
       }
     },
-    [isConnected, registerData, writeDraft, isBroadcast, performWrite],
+    [isConnected, connections, registerImages, writeDrafts, isBroadcast, performWrite],
   );
 
   // 切换轮询（广播连接禁止轮询，实际定时器由 usePolling 统一调度）
@@ -330,21 +390,33 @@ export function RegisterTabManager() {
   const confirmBroadcastWrite = useCallback(() => {
     if (pendingWrite) {
       performWrite(pendingWrite.tab, pendingWrite.values, pendingWrite.startAddress);
-      // 清空已提交区间的草稿
+      // 清空已提交区间的草稿（只动本窗口的桶）
       const count =
         pendingWrite.tab.functionCode === '05' || pendingWrite.tab.functionCode === '06'
           ? 1
-          : Math.max(1, pendingWrite.tab.quantity);
+          : Math.max(1, pendingWrite.tab.registerCount);
       const start = pendingWrite.startAddress ?? pendingWrite.tab.startAddress;
-      setWriteDraft((prev) => {
-        const next = new Map(prev);
+      const key = registerWindowKey(pendingWrite.tab);
+      setWriteDrafts((prev) => {
+        const next = new Map(prev[key] ?? []);
         for (let i = 0; i < count; i++) next.delete(start + i);
-        return next;
+        return { ...prev, [key]: next };
       });
       setPendingWrite(null);
     }
     setBroadcastConfirmOpen(false);
   }, [pendingWrite, performWrite]);
+
+  // 切换标签 / 换功能码 / 改窗口范围时，只清理**编辑态** —— 那几行已经不属于当前窗口了。
+  //
+  // ⚠️ 草稿**不在这里清**：草稿按窗口身份分桶保存，切走再切回来原样还在；
+  // 而"别的窗口看不到它"是分桶本身带来的，不需要靠清空来挡。
+  // ——**"不串"和"不丢"是同一套机制的两面**。
+  useEffect(() => {
+    setEditingCell(null);
+    setEditingFormatRow(null);
+    setEditingTabId(null);
+  }, [activeTabId, activeTab?.functionCode, activeTab?.startAddress, activeTab?.registerCount]);
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -365,9 +437,10 @@ export function RegisterTabManager() {
       />
 
       {/* 配置条 */}
-      {activeTab && activeConn && (
+      {activeTab && activeConn && activeArea && (
         <ConfigBar
           tab={activeTab}
+          area={activeArea}
           connName={activeConn.name}
           connSlaveId={activeConn.slaveId}
           isConnected={isConnected}
@@ -381,10 +454,11 @@ export function RegisterTabManager() {
       )}
 
       {/* 数据表格 */}
-      {activeTab ? (
+      {activeTab && activeArea ? (
         <DataTable
           tab={activeTab}
-          data={registerData[activeTab.id] ?? []}
+          area={activeArea}
+          rows={activeRows}
           writeDraft={writeDraft}
           onUpdate={updateTab}
           onRead={() => handleRead(activeTab)}
@@ -484,7 +558,8 @@ function LedBits({
 
 function DataTable({
   tab,
-  data,
+  area,
+  rows,
   writeDraft,
   onUpdate,
   onRead,
@@ -497,7 +572,10 @@ function DataTable({
   setEditingFormatRow,
 }: {
   tab: RegisterTab;
-  data: RegisterData[];
+  /** 该标签看的寄存器区域（决定是否按"16 位打包"呈现） */
+  area: RegisterArea;
+  /** 当前窗口的行：**一行 = 一个寄存器**（四区同构，Q20） */
+  rows: RegisterData[];
   writeDraft: Map<number, number>;
   onUpdate: (tabId: string, updates: Partial<RegisterTab>) => void;
   onRead: () => void;
@@ -517,12 +595,9 @@ function DataTable({
     tab.functionCode === '16';
 
   const isWordType = isWordFunctionCode(tab.functionCode);
-  const isSingleWrite = tab.functionCode === '05' || tab.functionCode === '06';
-  const rowCount = isSingleWrite ? 1 : Math.max(1, tab.quantity);
-  const rows: RegisterData[] = Array.from({ length: rowCount }, (_, i) => {
-    const address = tab.startAddress + i;
-    return data.find((d) => d.address === address) ?? { address, rawValue: 0 };
-  });
+  /** 位区（线圈 / 离散输入）：一行 = 1 寄存器 = 16 个位地址 */
+  const isBit = isBitArea(area);
+  const rowCount = rows.length;
 
   // 逐行类型映射：计算每个地址是分组起点还是被宽类型占用
   const layout = resolveRegisterLayout({
@@ -569,7 +644,8 @@ function DataTable({
             const isGroupStart = res?.role === 'start' || !res;
             const groupFits = res?.fits ?? true;
             const groupSpan = res?.span ?? 1;
-            const format = res?.format ?? tab.displayFormat;
+            // ⭐ 位区：一行 = 一个寄存器 = 16 个位地址 ⇒ 固定按 LED 组呈现（Q20 四区同构）
+            const format: DataDisplayFormat = isBit ? 'led' : (res?.format ?? tab.displayFormat);
             // 写入：仅分组起点可编辑（含 32/64 位宽类型）；被占用的后续地址不可编辑。
             // 编辑（暂存草稿）不依赖连接状态，仅"写入"提交才要求已连接。
             const canEdit = isGroupStart && isWriteFc;
@@ -601,12 +677,18 @@ function DataTable({
                     : "odd:bg-surface/40 even:bg-transparent hover:bg-surface-container/50"
                 }`}
               >
-                {/* 地址 */}
+                {/* 地址（寄存器编号；位区旁附只读的位范围，Q20） */}
                 <td className="w-18 px-3 py-1.5 font-mono text-data font-semibold">
                   {isDrafted && (
                     <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400 align-middle" />
                   )}
                   {item.address}
+                  {isBit && (
+                    <span className="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground/50">
+                      {t("bitLabel")} {item.address * BITS_PER_REGISTER}~
+                      {item.address * BITS_PER_REGISTER + BITS_PER_REGISTER - 1}
+                    </span>
+                  )}
                 </td>
                 {/* 原始 HEX */}
                 <td className="w-28 px-3 py-1.5 font-mono text-muted-foreground">
@@ -765,7 +847,7 @@ export function usePolling() {
           conn.slaveId,
           parseFunctionCode(tab.functionCode),
           tab.startAddress,
-          tab.quantity,
+          tab.registerCount,
         );
       }, Math.max(tab.pollInterval, 200));
     },
@@ -940,6 +1022,7 @@ function TabBar({
 /* ========== 配置条 ========== */
 function ConfigBar({
   tab,
+  area,
   connName,
   connSlaveId,
   isConnected,
@@ -951,6 +1034,8 @@ function ConfigBar({
   onWrite,
 }: {
   tab: RegisterTab;
+  /** 该标签看的寄存器区域（决定是否给出只读的位范围提示） */
+  area: RegisterArea;
   connName: string;
   connSlaveId: number;
   isConnected: boolean;
@@ -967,6 +1052,10 @@ function ConfigBar({
     tab.functionCode === '06' ||
     tab.functionCode === '15' ||
     tab.functionCode === '16';
+  const isBit = isBitArea(area);
+  /** 位区的只读位范围（Q20：主显示是寄存器编号，位范围挂在旁边作参考） */
+  const bitStart = tab.startAddress * BITS_PER_REGISTER;
+  const bitEnd = (tab.startAddress + Math.max(1, tab.registerCount)) * BITS_PER_REGISTER - 1;
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border/30 bg-surface px-3 py-2">
@@ -1001,7 +1090,7 @@ function ConfigBar({
 
       <span className="h-4 w-px bg-border/30" />
 
-      {/* 起始地址 */}
+      {/* 起始地址（寄存器编号；位区旁附只读起始位） */}
       <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         {t("startAddress")}
         <Input
@@ -1014,23 +1103,33 @@ function ConfigBar({
           }
           className="h-6 w-20 border-border/40 bg-background px-2 text-xs"
         />
+        {isBit && (
+          <span className="font-mono text-[10px] text-muted-foreground/50">
+            {t("bitLabel")} {bitStart}
+          </span>
+        )}
       </label>
 
       <span className="h-4 w-px bg-border/30" />
 
-      {/* 寄存器数量 */}
+      {/* 寄存器数量（四区同一标签、同一单位；位区旁附只读位范围） */}
       <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         {t("registerCount")}
         <Input
           type="number"
           min={1}
           max={125}
-          value={tab.quantity}
+          value={tab.registerCount}
           onChange={(e) =>
-            onUpdate(tab.id, { quantity: Number(e.target.value) || 1 })
+            onUpdate(tab.id, { registerCount: Number(e.target.value) || 1 })
           }
           className="h-6 w-16 border-border/40 bg-background px-2 text-xs"
         />
+        {isBit && (
+          <span className="font-mono text-[10px] text-muted-foreground/50">
+            {t("bitLabel")} {bitStart} ~ {bitEnd}
+          </span>
+        )}
       </label>
 
       {/* 显示格式（标签级默认，可被表格逐行 override） */}

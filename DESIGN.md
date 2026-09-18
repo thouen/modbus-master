@@ -101,7 +101,16 @@ flowchart LR
 ### 状态模型
 
 - 服务端 [`connectionConfigs`](src/ws-handlers/modbus.ts:19) 为进程内存态：**进程重启即丢失**。
-- 前端持久化 `connections` + `tabs` + 激活项；`connectionStatus` / `registerData` / `logs`（500 条环形缓冲）均为运行时状态。
+  服务端**不存寄存器数组** —— 值的缓存全在前端。
+- 前端持久化 `connections` + `tabs` + 激活项；`connectionStatus` / `registerImages` / `logs`（500 条环形缓冲）均为运行时状态。
+- ⭐ **设备镜像（R3）**：[`registerImages`](src/hooks/use-app-state.tsx:1) 是
+  **`Record<connectionId, ConnectionRegisterImage>`** —— 每个连接 4 条 `Uint16Array`
+  （位区按位打包，1 字 = 16 个位地址），初始长度 = 该连接声明的 `areaTotalRegisters`，
+  **收到超出长度的响应时自动扩容**（见 [`connection-image.ts`](src/lib/connection-image.ts:1)）。
+  - 归属是**连接**不是标签 ⇒ 同一个物理寄存器在所有引用该连接的标签里值一致。
+  - 标签只按 `startAddress` 去镜像里取值，自己不再存数据。
+  - **手动编辑是草稿，不进镜像**；镜像只被"主站读回 / 写入确认 /（R2）生成器"改写。
+  - 改 `slaveId` 或改声明容量 ⇒ 该连接的镜像**重建**；删连接 ⇒ **释放**。
 - 轮询由 [`usePolling()`](src/components/register-tab-manager.tsx:537) 统一调度：连接为 `connected` 才启动，广播连接禁止轮询。
 
 ### 已知限制
@@ -109,6 +118,8 @@ flowchart LR
 - 服务端目前**只把回执发给发起请求的那条 socket**（多 WebSocket 连接时，其它标签页收不到状态与日志）。对齐 slave 的广播模型是既定整改项。
 - 页面关闭后设备连接不会被回收（[`ws.on('close')`](src/ws-handlers/modbus.ts:72) 有意保留），刷新会留下僵尸连接与串口句柄。
 - 报文原文未采集：[`ModbusResponse.rawTx/rawRx`](src/lib/modbus-types.ts:159) 恒为空串。
+- 镜像按连接常驻内存（默认 ≈ 8 KB / 连接），**连接多且声明容量大时占用上升**；
+  但目前没有"空闲释放"策略 —— 与上面那条"连接不回收"是同一个待整改方向。
 
 ### 主题现状（2026-09-18 对齐后）
 

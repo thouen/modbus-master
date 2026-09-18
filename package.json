@@ -10,8 +10,9 @@
     "lint:build": "eslint . --quiet",
     "lint:style": "stylelint \"src/**/*.css\"",
     "start": "bash ./scripts/start.sh",
+    "test": "pnpm exec tsx --test \"src/**/*.test.ts\"",
     "ts-check": "tsc -p tsconfig.json",
-    "validate": "pnpm dlx concurrently --group --names lint-tsc,lint-build,lint-style \"pnpm ts-check\" \"pnpm lint:build\" \"pnpm lint:style\""
+    "validate": "pnpm dlx concurrently --group --names ts-check,lint-build,lint-style,test \"pnpm run ts-check\" \"pnpm run lint:build\" \"pnpm run lint:style\" \"pnpm run test\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",

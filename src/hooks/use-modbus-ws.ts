@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { createWsConnection, type WsMessage } from '@/lib/ws-client';
 import { useAppState } from './use-app-state';
 import type { ConnectionConfig, ModbusConnectionStatus, LogEntry } from '@/lib/modbus-types';
+import { fcToArea, isBitArea, packBitsToWords } from '@/lib/modbus-types';
 
 export function useModbusWs() {
   const { dispatch } = useAppState();
@@ -23,16 +24,52 @@ export function useModbusWs() {
         break;
       }
       case 'data': {
-        const { tabId, startAddress, registers } = payload as {
+        // ⭐ 服务端回传的是**寄存器单位**的落点 + 协议原始响应。
+        const { connectionId, functionCode, startAddress, registers } = payload as {
+          connectionId: string;
           tabId: string;
+          functionCode: number;
+          /** 寄存器序号 */
           startAddress: number;
+          registerCount: number;
+          /** 字区：每寄存器一个值；位区：每位一个 0/1 */
           registers: number[];
         };
-        const data = registers.map((value, i) => ({
-          address: startAddress + i,
-          rawValue: value,
-        }));
-        dispatch({ type: 'SET_REGISTER_DATA', payload: { tabId, data } });
+        const area = fcToArea(functionCode);
+        if (!area) break;
+        // 位区响应是"每位一个 0/1"，先打包成寄存器字 —— 镜像只认寄存器单位
+        const words = isBitArea(area) ? packBitsToWords(registers) : registers;
+        dispatch({
+          type: 'APPLY_REGISTER_DATA',
+          payload: {
+            connectionId,
+            area,
+            startRegister: startAddress,
+            values: words,
+            source: 'master',
+            now: Date.now(),
+          },
+        });
+        break;
+      }
+      case 'write_ack': {
+        // 写入成功确认：把用户确认过的值落到镜像（镜像的三个写方之一）
+        const { connectionId, functionCode, startAddress, values } = payload as {
+          connectionId: string;
+          tabId: string;
+          functionCode: number;
+          /** 寄存器序号 */
+          startAddress: number;
+          /** 寄存器单位的值（位区为打包字） */
+          values: number[];
+          broadcast?: boolean;
+        };
+        const area = fcToArea(functionCode);
+        if (!area) break;
+        dispatch({
+          type: 'APPLY_WRITE_ACK',
+          payload: { connectionId, area, startRegister: startAddress, values, now: Date.now() },
+        });
         break;
       }
       case 'log': {
@@ -114,14 +151,18 @@ export function useModbusWs() {
     });
   }, []);
 
-  // 读取寄存器
+  /**
+   * 读取寄存器。
+   * ⭐ `startAddress` 是**寄存器序号**、`registerCount` 是**寄存器个数** ——
+   * 位区的 ×16 换算由服务端统一做（唯一一处），前端不碰协议地址。
+   */
   const readRegisters = useCallback((
     connectionId: string,
     tabId: string,
     slaveId: number,
     functionCode: number,
     startAddress: number,
-    quantity: number,
+    registerCount: number,
   ) => {
     wsRef.current?.send({
       type: 'read',
@@ -131,12 +172,16 @@ export function useModbusWs() {
         slaveId,
         functionCode,
         startAddress,
-        quantity,
+        registerCount,
       },
     });
   }, []);
 
-  // 写入寄存器
+  /**
+   * 写入寄存器。
+   * ⭐ `startAddress` 是寄存器序号；`values` 是**寄存器单位**（位区为按位打包的字），
+   * 位区展开成"每位一个 0/1"同样由服务端负责。
+   */
   const writeRegisters = useCallback((
     connectionId: string,
     tabId: string,

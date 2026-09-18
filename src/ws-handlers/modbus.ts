@@ -7,7 +7,13 @@ import {
   toErrorMessage,
 } from '../lib/modbus-client';
 import type { ConnectionConfig, ModbusConnectionStatus } from '../lib/modbus-types';
-import { isBroadcastSlave } from '../lib/modbus-types';
+import {
+  isBroadcastSlave,
+  fcToArea,
+  isBitArea,
+  registerSpanToAddressSpan,
+  expandPackedBitWords,
+} from '../lib/modbus-types';
 
 interface WsMessage {
   type: string;
@@ -129,14 +135,17 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
     }
 
     // ── 读取寄存器 ──
+    // ⭐ 入参一律是**寄存器单位**（Q19/Q20）；位区的 ×16 换算只在这里做一次。
     case 'read': {
-      const { connectionId, tabId, slaveId, functionCode, startAddress, quantity } = payload as {
+      const { connectionId, tabId, slaveId, functionCode, startAddress, registerCount } = payload as {
         connectionId: string;
         tabId: string;
         slaveId: number;
         functionCode: number;
+        /** 寄存器序号（不是位地址） */
         startAddress: number;
-        quantity: number;
+        /** 覆盖几个寄存器 */
+        registerCount: number;
       };
 
       const conn = connectionConfigs.get(connectionId);
@@ -159,14 +168,23 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         return;
       }
 
+      const area = fcToArea(functionCode);
+      if (!area) {
+        sendError(ws, connectionId, tabId, `Unsupported read FC: ${functionCode}`);
+        return;
+      }
+
+      const span = registerSpanToAddressSpan(area, startAddress, registerCount);
       const name = fcName(functionCode);
-      const result = await readRegisters(connectionId, slaveId, functionCode, startAddress, quantity);
+      // 日志主显示用寄存器编号，位区附只读的位范围（Q20）
+      const bitHint = isBitArea(area) ? ` [bit ${span.start}~${span.start + span.count - 1}]` : '';
+      const result = await readRegisters(connectionId, slaveId, functionCode, span.start, span.count);
 
       sendLog(ws, {
         connectionId,
         tabId,
         direction: 'tx',
-        message: `${name} Read Addr:${startAddress} Qty:${quantity}`,
+        message: `${name} Read Reg:${startAddress} Count:${registerCount}${bitHint}`,
       });
 
       if (result.success && result.data) {
@@ -174,14 +192,18 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
           connectionId,
           tabId,
           direction: 'rx',
-          message: `${name} Response ${result.data.length} regs (${result.timing ?? 0}ms)`,
+          message: `${name} Response ${result.data.length} ${isBitArea(area) ? 'bits' : 'regs'} (${result.timing ?? 0}ms)`,
         });
         ws.send(JSON.stringify({
           type: 'data',
           payload: {
             connectionId,
             tabId,
+            functionCode,
+            // 寄存器单位的落点，前端据此写设备镜像
             startAddress,
+            registerCount,
+            // 协议原始响应：字区 = 每寄存器一个值；位区 = 每个位一个 0/1
             registers: result.data,
             timing: result.timing,
           },
@@ -200,13 +222,17 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
     }
 
     // ── 写入操作（支持广播 slave=0）──
+    // ⭐ 入参同样是**寄存器单位**：位区 `values` 是**按位打包的寄存器字**，
+    // 由这里展开成协议要的「每位一个 0/1」。
     case 'write': {
       const { connectionId, tabId, slaveId, functionCode, startAddress, values } = payload as {
         connectionId: string;
         tabId: string;
         slaveId: number;
         functionCode: number;
+        /** 寄存器序号（不是位地址） */
         startAddress: number;
+        /** 寄存器单位的值；位区为打包字 */
         values: number[];
       };
 
@@ -216,16 +242,26 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         return;
       }
 
+      const area = fcToArea(functionCode);
+      if (!area) {
+        sendError(ws, connectionId, tabId, `Unsupported write FC: ${functionCode}`);
+        return;
+      }
+
+      const span = registerSpanToAddressSpan(area, startAddress, values.length);
+      // 位区：打包字 → 每位一个 0/1（协议口径）
+      const onlineValues = isBitArea(area) ? expandPackedBitWords(values, span.count) : values;
+
       const name = fcName(functionCode);
       const broadcast = isBroadcastSlave(slaveId);
-      const result = await writeRegisters(connectionId, slaveId, functionCode, startAddress, values);
+      const result = await writeRegisters(connectionId, slaveId, functionCode, span.start, onlineValues);
 
-      const qtyInfo = Array.isArray(values) ? ` Qty:${values.length}` : '';
+      const bitHint = isBitArea(area) ? ` [bit ${span.start}~${span.start + span.count - 1}]` : '';
       sendLog(ws, {
         connectionId,
         tabId,
         direction: 'tx',
-        message: `${name} Write Addr:${startAddress}${qtyInfo}${broadcast ? ' [BROADCAST]' : ''}`,
+        message: `${name} Write Reg:${startAddress} Count:${values.length}${bitHint}${broadcast ? ' [BROADCAST]' : ''}`,
       });
 
       if (result.success) {
@@ -239,7 +275,15 @@ async function handleMessage(ws: WebSocket, msg: WsMessage) {
         });
         ws.send(JSON.stringify({
           type: 'write_ack',
-          payload: { connectionId, tabId, functionCode, address: startAddress, broadcast },
+          payload: {
+            connectionId,
+            tabId,
+            functionCode,
+            startAddress,
+            // 回显寄存器单位的值，前端据此把确认过的值落到镜像
+            values,
+            broadcast,
+          },
         }));
       } else {
         sendError(ws, connectionId, tabId, result.error || 'Write failed');

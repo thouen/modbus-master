@@ -3,6 +3,7 @@ import type {
   ByteOrder64,
   DataDisplayFormat,
   RegisterData,
+  RegisterTab,
 } from './modbus-types';
 
 /**
@@ -272,6 +273,28 @@ export function getBitsPerValue(format: DataDisplayFormat): number {
 const WIDE_FORMATS: ReadonlySet<DataDisplayFormat> = new Set<DataDisplayFormat>([
   'long', 'ulong', 'float', 'double',
 ]);
+
+/**
+ * 标签窗口的**身份键**（R3）。
+ *
+ * 窗口 = 「看到的是哪一块寄存器」，由四样东西共同决定：
+ *
+ *    标签 id + 功能码 + 起始地址 + 寄存器数量
+ *
+ * ⚠️ **不要退化成"只用标签 id"**：同一个标签可以切换功能码 / 改范围去看
+ * 另一块寄存器 —— 只认 id 的话，草稿会跨窗口串值（这正是 slave 侧
+ * 「R1 后续修复：跨区串值」踩过的坑，主站侧一模一样）。
+ *
+ * ⚠️ 功能码参与身份而不只是"区域"：FC03 与 FC06 虽然都是保持寄存器，
+ * 但一个是读视图、一个是写视图，窗口语义不同（数量上限、单帧限制都不同）。
+ *
+ * 用途：**写入草稿按窗口分桶**。草稿是"用户还没提交的编辑"，属于那个窗口 ——
+ * 所以切走再切回来要还在，同时别的窗口不能看到它。
+ * （注意：读取缓存/镜像的规则**相反** —— 窗口一变就该丢弃，见 ROADMAP §3.2）
+ */
+export function registerWindowKey(tab: RegisterTab): string {
+  return `${tab.id}|${tab.functionCode}|${tab.startAddress}|${tab.registerCount}`;
+}
 
 /** 该功能码是否为"寄存器（word, 16-bit）"类型；线圈/离散输入为 bit 类型 */
 export function isWordFunctionCode(functionCode: string | number): boolean {

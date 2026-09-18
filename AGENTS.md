@@ -32,11 +32,27 @@ src/
 │   └── modbus.ts               # WebSocket 服务端处理器（ModBus 操作）
 └── lib/
     ├── i18n.ts                 # 中英文翻译字典
-    ├── modbus-types.ts         # ModBus 协议类型定义
+    ├── modbus-types.ts         # ModBus 协议类型定义（含 RegisterArea / ConnectionRegisterImage）
+    ├── connection-image.ts     # ⭐ R3：连接设备镜像内核（分配 / 自动扩容 / 打包读写）
     ├── modbus-client.ts        # modbus-serial 协议层封装
-    ├── modbus-utils.ts         # 工具函数（数据格式化/转换）
+    ├── modbus-utils.ts         # 工具函数（数据格式化/转换、registerWindowKey）
     └── utils.ts                # 通用工具（cn）
 ```
+
+> ⭐ **R3 后的数据流**（值不再挂在标签上）：
+> ```
+> 设备 ──协议──> modbus-client ──data(寄存器单位)──> use-modbus-ws
+>                                                      │
+>                                     packBitsToWords（仅位区）
+>                                                      ▼
+>                       registerImages[connectionId]（每连接 4 条 Uint16Array，可扩容）
+>                                                      │
+>                                          readRegisterRows（一行 = 一寄存器）
+>                                                      ▼
+>                                    DataTable（标签只是**视图**）
+> ```
+> 写方向反过来：草稿（按**窗口身份**分桶）→ 镜像现值回填未编辑行 → `write` → 服务端
+> `expandPackedBitWords`（仅位区）→ 设备。
 
 ## 核心功能模块
 
@@ -45,17 +61,22 @@ src/
 - 支持 ASCII/RTU 两种模式
 - 卡片式连接列表，LED 状态指示，hover 显示操作按钮
 - 支持广播从站（Slave ID = 0），广播连接仅写操作
+- ⭐ R3：新增「设备镜像」分节 —— 4 个区的总寄存器数量（默认 **1000**，下限 1），
+  即镜像数组的初始长度；位区附只读位范围 `位 0 ~ N×16−1`
 - 底部导入/导出 JSON 配置按钮
 - 导入支持覆盖/合并两种策略
 
 ### 2. 标签页管理 (`register-tab-manager.tsx`)
 - 标签栏：双击重命名，自动生成名称（FCxx @地址）
-- 每个标签独立配置：起始地址、数量、功能码、轮询间隔、显示格式、字节序
+- 每个标签独立配置：**起始地址、寄存器数量（`registerCount`，寄存器单位）**、功能码、轮询间隔、显示格式、字节序
 - 功能码类型：FunctionCode = '01'|'02'|'03'|'04'|'05'|'06'|'15'|'16'（字符串类型）
-- 数据表格：地址/原始HEX/原始DEC/格式化值/类型，逐行格式切换
-- 写入支持：表格行内编辑 + 写入弹窗双模式
-- 广播写入需确认弹窗
-- 删除连接自动删除关联标签
+- ⭐ 数据表格**四区同构，一行 = 一个寄存器**；位区一行 = 16 个位地址（LED 组），地址列旁附只读 `位 A~B`
+- 数据来源是**该连接的设备镜像**（不是标签自己的缓存）⇒ 同一个物理寄存器在所有标签里值一致
+- 写入草稿按**窗口身份**分桶（`registerWindowKey` = `id|功能码|起始地址|寄存器数量`）
+  ⇒ 切走再切回还在、不同窗口互不串值
+- 写入支持：表格行内编辑 + 写入弹窗双模式；广播写入需确认弹窗
+- 越界**不阻止**提交（要保留"主站正确收到并处理 `0x02`"的测试能力）
+- 删除连接自动删除关联标签（并**释放该连接的镜像**）
 
 ### 3. 日志系统 (`log-viewer.tsx`)
 - 全局日志数组（500条环形缓冲）
@@ -65,6 +86,10 @@ src/
 ### 4. 配置持久化 (`use-app-state.tsx`)
 - localStorage 自动保存/恢复（连接、标签、激活状态）
 - 手动 JSON 导入/导出（connections + tabs）
+- ⚠️ **设备镜像（`registerImages`）不持久化** —— 它是运行时状态，
+  恢复配置后按各连接声明的容量**重建**（`HYDRATE` 里做）。
+- ⚠️ 迁移**不猜旧字段语义**：旧 `bitCount` 可能是"位数"（差 16 倍），
+  一律丢弃回默认值，比搬一个错值安全。
 
 ### 5. 国际化 (`use-i18n.tsx` + `i18n.ts`)
 - 中文/英文双语支持
@@ -83,8 +108,14 @@ pnpm run dev        # 开发模式
 pnpm run build      # 生产构建
 pnpm run start      # 生产启动
 pnpm ts-check       # TypeScript 检查
-pnpm lint           # ESLint 检查
+pnpm run lint:build # ESLint（--quiet，只报 error）
+pnpm run lint:style # stylelint
+pnpm run test       # 单元测试（node:test + tsx）
+pnpm run validate   # 上面四项一起跑
 ```
+
+> ⚠️ `pnpm run build` 会先跑 `pnpm install`；若本机 pnpm store 路径损坏会直接失败
+> （与环境有关，与代码无关）。可改用 `pnpm exec next build` 跳过安装来验证编译。
 
 ## 设计规范
 参考 `DESIGN.md`：工业暗色主题，SCADA 监控终端风格。
