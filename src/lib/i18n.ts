@@ -2,7 +2,7 @@ export const translations = {
   en: {
     // App
     appTitle: 'ModBus Master',
-    appSubtitle: 'Multi-Protocol Communication Tool',
+    appSubtitle: 'Multi-Protocol Master Simulator',
 
     // Navigation
     connections_management: 'Connections',
@@ -110,8 +110,8 @@ export const translations = {
     noLogs: 'No logs yet',
 
     // Config Import/Export
-    importConfig: 'Import',
-    exportConfig: 'Export',
+    importConfig: 'Import Config',
+    exportConfig: 'Export Config',
     importStrategy: 'Import Strategy',
     importOverwrite: 'Overwrite',
     importMerge: 'Merge',
@@ -185,9 +185,9 @@ export const translations = {
     exportLogs: 'Export Logs',
     filterByConnection: 'Filter by Connection',
     empty: 'No tabs available',
-    rawHex: 'Raw Hex',
-    rawDec: 'Raw Dec',
-    formattedValue: 'Value',
+    rawHex: 'Raw HEX',
+    rawDec: 'Raw DEC',
+    formattedValue: 'Display Value',
     dataType: 'Type',
     bitHint: 'Each value occupies {bits} bits',
     writeTitle: 'Write Registers',
@@ -201,7 +201,7 @@ export const translations = {
   zh: {
     // App
     appTitle: 'ModBus 主站',
-    appSubtitle: '多协议通信工具',
+    appSubtitle: '多协议主站模拟器',
 
     // Navigation
     connections_management: '连接管理',
@@ -273,7 +273,7 @@ export const translations = {
     formatBinary: '二进制 (16位)',
     formatLong: '长整型 (32位)',
     formatULong: '无符号长整型 (32位)',
-    formatFloat: '浮点型 (32位)',
+    formatFloat: '浮点 (32位)',
     formatDouble: '双精度 (64位)',
 
     // Byte Orders
@@ -309,8 +309,8 @@ export const translations = {
     noLogs: '暂无日志',
 
     // Config Import/Export
-    importConfig: '导入',
-    exportConfig: '导出',
+    importConfig: '导入配置',
+    exportConfig: '导出配置',
     importStrategy: '导入策略',
     importOverwrite: '覆盖',
     importMerge: '合并',
@@ -384,9 +384,9 @@ export const translations = {
     exportLogs: '导出日志',
     filterByConnection: '按连接筛选',
     empty: '暂无标签',
-    rawHex: '原始十六进制',
-    rawDec: '原始十进制',
-    formattedValue: '数值',
+    rawHex: '原始 HEX',
+    rawDec: '原始 DEC',
+    formattedValue: '显示值',
     dataType: '类型',
     bitHint: '每个值占 {bits} 位',
     writeTitle: '写入寄存器',

@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'ModBus Master',
-  description: 'Multi-Protocol ModBus Communication Tool',
+  description: 'Multi-Protocol ModBus Master Simulator',
 };
 
 export default function RootLayout({
