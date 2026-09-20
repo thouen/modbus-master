@@ -105,4 +105,36 @@ describe('连接生命周期：对端掉线检测', () => {
       await disconnectAllClients();
     }
   });
+
+  /**
+   * ⭐ 回归守卫（2026-09-20 修的真实故障）：
+   * `client.close()` 返回的 Promise 依赖底层端口的 close 回调，而该回调在
+   * `openFlag === false`（= 对端已经掉线）时**永远不会被调用** ⇒ 裸 `await client.close()`
+   * 会永久挂起，`disconnect` 指令就卡死 ⇒ **从站不在线时点「断开」没反应、也重连不上**。
+   */
+  it('对端已掉线时 disconnect 仍必须返回（否则「断开」按钮没反应）', async () => {
+    const dummy = await startDummySlave();
+    try {
+      await connectClient('t-dead', makeConn(dummy.port), { onLost: () => undefined });
+      // 让对端先掉线：此时底层端口的 openFlag 已被置 false
+      await dummy.kill();
+      await sleep(200);
+
+      const started = Date.now();
+      let settled = 'pending';
+      await Promise.race([
+        disconnectClient('t-dead').then(
+          () => { settled = 'resolved'; },
+          () => { settled = 'rejected'; },
+        ),
+        sleep(3000).then(() => { settled = '超时未返回'; }),
+      ]);
+      const elapsed = Date.now() - started;
+      assert.notEqual(settled, '超时未返回', '对端掉线后 disconnect 必须返回，不能永久挂起');
+      assert.ok(elapsed < 2000, `disconnect 应在兜底超时内返回，实际耗时 ${elapsed}ms`);
+    } finally {
+      await dummy.kill();
+      await disconnectAllClients();
+    }
+  });
 });

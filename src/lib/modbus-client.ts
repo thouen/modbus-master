@@ -144,6 +144,27 @@ export async function connectClient(
   }
 }
 
+/**
+ * 关掉底层端口的**最长等待时长**（毫秒）。
+ *
+ * ⚠️ **这个超时是必需的，不是保险起见**。`modbus-serial` 的 `client.close()` 被
+ * [`apis/promise.js:88`](node_modules/modbus-serial/apis/promise.js) 用 `_convert()` 包成了 Promise，
+ * 它的 resolve 依赖底层 TCP 端口的 close 回调；而
+ * [`ports/tcpport.js:145`](node_modules/modbus-serial/ports/tcpport.js) 的写法是
+ * `this._client.on("close", function () { if (self.openFlag) { … handleCallback(…) } })`
+ * —— **对端已经掉线时 `openFlag` 早已被同一个文件的 `error` 分支置为 `false`，
+ * 那个回调永远不会被调用** ⇒ `await client.close()` 会**永久挂起**。
+ *
+ * 后果（真实故障）：`disconnect` 指令卡在 `await disconnectClient()` 上，
+ * 「广播 `disconnected` + 清理连接表」的代码永远走不到 ⇒
+ * **从站不在线时点「断开」没有任何反应；由于 `connectClient()` 开头也要先断开旧连接，
+ * 连"重连"也会一起卡死**。
+ *
+ * 超时后我们**不重试也不等待**：直接认为端口已弃用（反正连接状态已由对端掉线检报告知），
+ * 把连接从表里摘掉即可 —— 这是一条 TCP 连接，进程内没有别的持有者。
+ */
+const CLOSE_TIMEOUT = 500;
+
 /** 断开连接 */
 export async function disconnectClient(connectionId: string): Promise<void> {
   // ⭐ 先摘掉对端监测，否则这次**主动**关闭会被当成"对端掉线"回调出去
@@ -151,13 +172,24 @@ export async function disconnectClient(connectionId: string): Promise<void> {
   lostHooks.delete(connectionId);
 
   const client = clients.get(connectionId);
-  if (client) {
-    try {
-      await client.close();
-    } catch {
-      /* ignore */
-    }
-    clients.delete(connectionId);
+  if (!client) return;
+  // ⭐ 先从表里摘掉：无论 `close()` 是否如期返回，这条连接都不该再被复用/重连命中
+  clients.delete(connectionId);
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      client.close(),
+      new Promise<void>((resolve) => {
+        // ⚠️ **不要 unref()**：那会让事件循环提前"空掉"，进程可能在 disconnect 完成前就退出；
+        // 正确做法是正常 ref，并在 `close()` 抢先返回时 clearTimeout（见 finally）。
+        timer = setTimeout(resolve, CLOSE_TIMEOUT);
+      }),
+    ]);
+  } catch {
+    /* ignore */
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
