@@ -70,9 +70,17 @@ export function ConnectionPanel() {
   const [deleteTarget, setDeleteTarget] = useState<ConnectionConfig | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * 连接 / 断开。
+   *
+   * ⭐ `connecting` 也允许断开：TCP 连一个不可达的主机时 `connectTCP` 会挂在
+   * OS 默认超时（可能一两分钟）里，status 一直是 `connecting`。若只在 `connected`
+   * 时才给「断开」按钮，用户在这段时间里**无法取消**这次连接尝试 ——
+   * 「从站不在线也要能直接断开」要的就是这个。
+   */
   const handleConnect = (conn: ConnectionConfig) => {
     const status = state.connectionStatus[conn.id];
-    if (status === 'connected') {
+    if (status === 'connected' || status === 'connecting') {
       disconnectDevice(conn.id);
     } else {
       connectDevice(conn.id, conn);
@@ -215,7 +223,8 @@ export function ConnectionPanel() {
                     32:{conn.byteOrder32} · 64:{conn.byteOrder64} · {tabCount} {t('tabs')}
                   </span>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {status === 'connected' ? (
+                    {/* ⭐ `connecting` 也显示「断开」：见 handleConnect 的说明 */}
+                    {status === 'connected' || status === 'connecting' ? (
                       <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] text-red-400" onClick={e => { e.stopPropagation(); handleConnect(conn); }}>
                         <Unplug className="w-3 h-3 mr-0.5" />
                       </Button>
@@ -325,7 +334,9 @@ function DeleteConfirmDialog({ target, onClose }: { target: ConnectionConfig | n
           <AlertDialogAction
             className="text-xs h-8 bg-red-500/90 hover:bg-red-500 text-white"
             onClick={() => {
-              if (state.connectionStatus[target.id] === 'connected') {
+              // 连接中（connecting）也要先断开，否则服务端会留下一条没人认领的挂起连接
+              const s = state.connectionStatus[target.id];
+              if (s === 'connected' || s === 'connecting') {
                 disconnectDevice(target.id);
               }
               dispatch({ type: 'DELETE_CONNECTION', payload: target.id });
@@ -407,7 +418,9 @@ function ConnectionDialog({
 
     if (editing) {
       // 编辑已连接设备：先断开，避免旧连接继续占用端口；用户保存后手动重连
-      if (state.connectionStatus[editing.id] === 'connected') {
+      // （connecting 也算"占用中"：挂起的连接尝试同样要取消）
+      const s = state.connectionStatus[editing.id];
+      if (s === 'connected' || s === 'connecting') {
         disconnectDevice(editing.id);
       }
       dispatch({ type: 'UPDATE_CONNECTION', payload: config });

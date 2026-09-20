@@ -144,12 +144,17 @@ export function useModbusWs() {
   }, [dispatch]);
 
   // 断开设备
+  // ⭐ **乐观更新**：立刻把本地状态置为 `disconnected`，不等服务端回包。
+  // 理由：如果服务端此前没有这条连接的记录（服务端重启过、或这次连接尝试还挂在
+  // `connecting` 中），它本来就不会回状态，界面会一直卡在旧状态。服务端随后的
+  // `status` 广播仍会再校正一次，所以乐观置位是安全的。
   const disconnectDevice = useCallback((connectionId: string) => {
     wsRef.current?.send({
       type: 'disconnect',
       payload: { connectionId },
     });
-  }, []);
+    dispatch({ type: 'SET_CONNECTION_STATUS', payload: { id: connectionId, status: 'disconnected' } });
+  }, [dispatch]);
 
   /**
    * 读取寄存器。
