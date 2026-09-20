@@ -123,20 +123,53 @@ export function ConnectionPanel() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* ⭐ 固定高度 h-10（40px）：与标签栏、slave 侧的标题栏**四者同高** */}
+      {/* ⭐ 固定高度 h-10（40px）：与标签栏、slave 侧的标题栏**四者同高**。
+          ⭐ 导入/导出移到与「+」同一行（对齐 slave 的「从站管理」头部），不再占独立底栏。 */}
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
         <h2 className="text-xs font-semibold text-foreground/90">{t('connections_management')}</h2>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => {
-            setEditingConn(null);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="w-3.5 h-3.5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setEditingConn(null);
+              setDialogOpen(true);
+            }}
+            title={t('newConnection')}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => fileInputRef.current?.click()}
+            title={t('importConfig')}
+          >
+            <Upload className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={handleExport}
+            title={t('exportConfig')}
+          >
+            <Download className="w-3.5 h-3.5" />
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) handleImportFile(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
       </div>
 
       <ScrollArea className="flex-1 min-h-0">
@@ -205,26 +238,7 @@ export function ConnectionPanel() {
         </div>
       </ScrollArea>
 
-      {/* Footer: import/export */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-t border-border shrink-0">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json"
-          className="hidden"
-          onChange={e => {
-            const f = e.target.files?.[0];
-            if (f) handleImportFile(f);
-            e.target.value = '';
-          }}
-        />
-        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground" onClick={() => fileInputRef.current?.click()}>
-          <Upload className="w-3 h-3 mr-1" />{t('importConfig')}
-        </Button>
-        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground" onClick={handleExport}>
-          <Download className="w-3 h-3 mr-1" />{t('exportConfig')}
-        </Button>
-      </div>
+      {/* 导入/导出已上移到标题栏（见上），原来的独立底栏已删除 */}
 
       <ConnectionDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editingConn} />
       <ImportDialog

@@ -140,7 +140,7 @@ export function LogViewer() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Toolbar */}
+      {/* Toolbar —— ⭐ 连接筛选与「自动滚动」同处一行（对齐 slave 的日志头），不再占独立第二行 */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="text-xs font-semibold text-foreground/90">{t('logTitle')}</h3>
@@ -151,6 +151,24 @@ export function LogViewer() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Select
+            value={selectedConnectionId ?? '__all__'}
+            onValueChange={v => setSelectedConnectionId(v === '__all__' ? null : v)}
+          >
+            <SelectTrigger className="h-6 w-[200px] text-[11px] bg-background/50 border-border/50">
+              <SelectValue placeholder={t('filterByConnection')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">
+                {t('allConnections')} ({state.logs.length})
+              </SelectItem>
+              {state.connections.map(c => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name} ({connectionLogCount(c.id)})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-muted-foreground/60">{t('autoScroll')}</span>
             <Switch
@@ -166,28 +184,6 @@ export function LogViewer() {
             {t('exportLogs')}
           </Button>
         </div>
-      </div>
-
-      {/* Connection selector */}
-      <div className="px-3 py-1 border-b border-border/30 bg-surface/50">
-        <Select
-          value={selectedConnectionId ?? '__all__'}
-          onValueChange={v => setSelectedConnectionId(v === '__all__' ? null : v)}
-        >
-          <SelectTrigger className="h-6 text-[11px] bg-background/50 border-border/50 w-[200px]">
-            <SelectValue placeholder={t('filterByConnection')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">
-              {t('allConnections')} ({state.logs.length})
-            </SelectItem>
-            {state.connections.map(c => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name} ({connectionLogCount(c.id)})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Log entries */}
