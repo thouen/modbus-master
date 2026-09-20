@@ -193,7 +193,7 @@ export function formatRegisterValue(
   const reg = registers[startIndex];
 
   switch (format) {
-    case 'led': {
+    case 'bits': {
       // Show each bit as on/off
       const bits: string[] = [];
       for (let i = 15; i >= 0; i--) {
@@ -247,11 +247,11 @@ export function formatRegisterValue(
 
 /**
  * Get bits per value for a given display format
- * led: 1 bit, 16-bit formats: 16 bits, 32-bit formats: 32 bits, 64-bit: 64 bits
+ * bits: 恒占 1 个寄存器（位视图），16-bit formats: 16 bits, 32-bit formats: 32 bits, 64-bit: 64 bits
  */
 export function getBitsPerValue(format: DataDisplayFormat): number {
   switch (format) {
-    case 'led':
+    case 'bits':
       return 1;
     case 'binary':
     case 'short':

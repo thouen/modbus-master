@@ -82,7 +82,7 @@ const FC_OPTIONS: { value: FunctionCode; labelKey: string }[] = [
 
 /** 显示格式选项 */
 const FORMAT_OPTIONS: { value: DataDisplayFormat; labelKey: string }[] = [
-  { value: "led", labelKey: "formatLed" },
+  { value: "bits", labelKey: "formatBits" },
   { value: "short", labelKey: "formatShort" },
   { value: "ushort", labelKey: "formatUShort" },
   { value: "hex", labelKey: "formatHex" },
@@ -644,8 +644,8 @@ function DataTable({
             const isGroupStart = res?.role === 'start' || !res;
             const groupFits = res?.fits ?? true;
             const groupSpan = res?.span ?? 1;
-            // ⭐ 位区：一行 = 一个寄存器 = 16 个位地址 ⇒ 固定按 LED 组呈现（Q20 四区同构）
-            const format: DataDisplayFormat = isBit ? 'led' : (res?.format ?? tab.displayFormat);
+            // ⭐ 位区：一行 = 一个寄存器 = 16 个位地址 ⇒ 固定按位组呈现（Q20 四区同构）
+            const format: DataDisplayFormat = isBit ? 'bits' : (res?.format ?? tab.displayFormat);
             // 写入：仅分组起点可编辑（含 32/64 位宽类型）；被占用的后续地址不可编辑。
             // 编辑（暂存草稿）不依赖连接状态，仅"写入"提交才要求已连接。
             const canEdit = isGroupStart && isWriteFc;
@@ -751,7 +751,7 @@ function DataTable({
                           : "bg-foreground/5 " +
                             (format === "float" || format === "double"
                               ? "text-primary"
-                              : format === "led"
+                              : format === "bits"
                                 ? "text-success"
                                 : "text-amber-500")
                       } ${res?.overridden ? "ring-1 ring-primary/40" : ""}`}
@@ -766,9 +766,9 @@ function DataTable({
                     </Badge>
                   )}
                 </td>
-                {/* 格式化值（行内编辑，32/64 位只读展示；led 渲染为位开关） */}
+                {/* 格式化值（行内编辑，32/64 位只读展示；bits 渲染为位开关） */}
                 <td className="w-48 px-3 py-1.5">
-                  {format === "led" ? (
+                  {format === "bits" ? (
                     <LedBits
                       value={draftValue ?? item.rawValue}
                       editable={canEdit}
@@ -896,7 +896,7 @@ function formatDraftValue(value: number, format: DataDisplayFormat): string {
       const s = value & 0xffff;
       return String(s <= 0x7fff ? s : s - 0x10000);
     }
-    case 'led':
+    case 'bits':
       return Array.from({ length: 16 }, (_, i) =>
         (value & (1 << (15 - i))) ? '1' : '0',
       ).join('');
@@ -907,7 +907,7 @@ function formatDraftValue(value: number, format: DataDisplayFormat): string {
 
 /** Map display format to i18n key */
 const FORMAT_KEY_MAP: Record<DataDisplayFormat, string> = {
-  led: 'formatLed',
+  bits: 'formatBits',
   short: 'formatShort',
   ushort: 'formatUShort',
   hex: 'formatHex',

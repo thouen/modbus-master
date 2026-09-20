@@ -67,7 +67,7 @@ export const translations = {
     renameTab: 'Rename Tab',
 
     // Data Display Formats
-    formatLed: 'Bits (16-bit)',
+    formatBits: 'Bits (16-bit)',
     formatShort: 'Short (16-bit)',
     formatUShort: 'UShort (16-bit)',
     formatHex: 'Hexadecimal (16-bit)',
@@ -266,7 +266,7 @@ export const translations = {
     renameTab: '重命名标签',
 
     // Data Display Formats
-    formatLed: 'Bits（位）',
+    formatBits: 'Bits（位）',
     formatShort: '短整型 (16位)',
     formatUShort: '无符号短整型 (16位)',
     formatHex: '十六进制 (16位)',

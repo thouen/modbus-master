@@ -100,6 +100,9 @@ const initialState: AppState = {
  * 所以**不猜** —— 直接丢弃、回落到默认值（比搬一个错值更安全，见 ROADMAP §3.7）。
  */
 export function migrateTab(tab: Partial<RegisterTab> & { bitCount?: number }): RegisterTab {
+  // ⚠️ 旧版本把 16 位位视图的类型名写作 `'led'`，现统一更名为 `'bits'`（类型名 + i18n key 同步）。
+  // 旧持久化配置里存的就是 `'led'`，必须在此改写 —— 否则会带一个**已废止的联合成员**进入运行时。
+  const legacyFormat: string | undefined = tab.displayFormat;
   return {
     id: tab.id ?? generateId(),
     name: tab.name ?? '',
@@ -108,7 +111,7 @@ export function migrateTab(tab: Partial<RegisterTab> & { bitCount?: number }): R
     registerCount: tab.registerCount ?? 10,
     functionCode: (tab.functionCode ?? '03') as FunctionCode,
     pollInterval: tab.pollInterval ?? 1000,
-    displayFormat: tab.displayFormat ?? 'hex',
+    displayFormat: (legacyFormat === 'led' ? 'bits' : tab.displayFormat) ?? 'hex',
     byteOrder32: tab.byteOrder32 ?? 'ABCD',
     byteOrder64: tab.byteOrder64 ?? 'ABCDEFGH',
     isPolling: tab.isPolling ?? false,

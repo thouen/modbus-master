@@ -356,6 +356,20 @@ describe('字段迁移：不猜旧字段语义', () => {
     assert.equal(migrated.registerCount, 10);
   });
 
+  it('migrateTab：把旧持久化里的 led 改写为 bits（类型更名）', () => {
+    // 旧版本把 16 位位视图类型名写作 'led'；更名后必须迁移，否则会带废止的联合成员进运行时
+    const legacy = {
+      ...makeTab(),
+      displayFormat: 'led',
+    } as unknown as Partial<RegisterTab> & { bitCount?: number };
+    assert.equal(migrateTab(legacy).displayFormat, 'bits');
+  });
+
+  it('migrateTab：缺省 displayFormat 回落 hex', () => {
+    const legacy: Partial<RegisterTab> = {};
+    assert.equal(migrateTab(legacy).displayFormat, 'hex');
+  });
+
   it('migrateConnection：补齐 4 个区域总量为默认 1000', () => {
     const legacy = makeConn();
     delete (legacy as Partial<ConnectionConfig>).coilCount;
