@@ -1043,14 +1043,16 @@ function TabBar({
   const connNameOf = (connectionId: string) =>
     connections.find((c) => c.id === connectionId)?.name ?? '—';
   return (
-    <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border/30 bg-surface px-1.5 pt-1">
+    // ⭐ 固定高度 h-10（40px），与「连接管理」标题栏同高 —— 四个标题/标签栏一律 40px。
+    // 不靠内容撑高：标签自身字号/内边距一变，高度就会跟着漂。
+    <div className="flex h-10 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border/30 bg-surface px-1.5">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         const isEditing = tab.id === editingTabId;
         return (
           <div
             key={tab.id}
-            className={`group relative flex shrink-0 cursor-pointer items-center gap-1 rounded-t-md px-3 py-2 text-xs transition-colors ${
+            className={`group relative flex h-full shrink-0 cursor-pointer items-center gap-1 rounded-t-md px-3 text-xs transition-colors ${
               isActive
                 ? "border-b-2 border-primary bg-surface-container text-foreground"
                 : "border-b-2 border-transparent text-muted-foreground hover:bg-surface-container/60 hover:text-foreground"

@@ -123,7 +123,8 @@ export function ConnectionPanel() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
+      {/* ⭐ 固定高度 h-10（40px）：与标签栏、slave 侧的标题栏**四者同高** */}
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
         <h2 className="text-xs font-semibold text-foreground/90">{t('connections_management')}</h2>
         <Button
           size="sm"
