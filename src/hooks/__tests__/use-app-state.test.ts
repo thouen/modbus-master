@@ -4,6 +4,7 @@ import {
   appReducer,
   migrateConnection,
   migrateTab,
+  parsePersistedState,
   type AppState,
 } from '@/hooks/use-app-state';
 import type { ConnectionConfig, RegisterTab } from '@/lib/modbus-types';
@@ -51,6 +52,7 @@ function emptyState(): AppState {
     activeTabId: null,
     activeConnectionId: null,
     registerImages: {},
+    rowNotes: {},
     logs: [],
   };
 }
@@ -397,5 +399,159 @@ describe('字段迁移：不猜旧字段语义', () => {
 
   it('migrateConnection：已声明的容量不被覆盖', () => {
     assert.equal(migrateConnection(makeConn({ coilCount: 64 })).coilCount, 64);
+  });
+});
+
+// ── 行备注（R4） ─────────────────────────────────────────────────
+
+describe('行备注（R4）', () => {
+  it('SET_ROW_NOTE：给某设备的某个寄存器写入备注（key = connectionId:area）', () => {
+    let state = stateWithConnection();
+    state = appReducer(state, {
+      type: 'SET_ROW_NOTE',
+      payload: { ownerId: 'conn-1', area: 'holdingRegisters', address: 5, note: '进水温度' },
+    });
+    assert.equal(state.rowNotes['conn-1:holdingRegisters'][5], '进水温度');
+  });
+
+  it('存的是去掉首尾空白后的文本', () => {
+    let state = stateWithConnection();
+    state = appReducer(state, {
+      type: 'SET_ROW_NOTE',
+      payload: { ownerId: 'conn-1', area: 'coils', address: 0, note: '  hi  ' },
+    });
+    assert.equal(state.rowNotes['conn-1:coils'][0], 'hi');
+  });
+
+  it('同一设备的不同区域互不影响（area 是 key 的一部分）', () => {
+    let state = stateWithConnection();
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'coils', address: 0, note: '位区' } });
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'holdingRegisters', address: 0, note: '字区' } });
+    assert.equal(state.rowNotes['conn-1:coils'][0], '位区');
+    assert.equal(state.rowNotes['conn-1:holdingRegisters'][0], '字区');
+  });
+
+  it('备注归属设备：不同设备的同地址互不串', () => {
+    let state = appReducer(emptyState(), { type: 'ADD_CONNECTION', payload: makeConn({ id: 'conn-1' }) });
+    state = appReducer(state, { type: 'ADD_CONNECTION', payload: makeConn({ id: 'conn-2' }) });
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'coils', address: 3, note: 'A' } });
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-2', area: 'coils', address: 3, note: 'B' } });
+    assert.equal(state.rowNotes['conn-1:coils'][3], 'A');
+    assert.equal(state.rowNotes['conn-2:coils'][3], 'B');
+  });
+
+  it('note 去空白后为空串 ⇒ 删除该条，且空桶整个键被移除', () => {
+    let state = stateWithConnection();
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'coils', address: 0, note: 'x' } });
+    assert.equal(state.rowNotes['conn-1:coils'][0], 'x');
+    const cleared = appReducer(state, {
+      type: 'SET_ROW_NOTE',
+      payload: { ownerId: 'conn-1', area: 'coils', address: 0, note: '   ' },
+    });
+    assert.equal('conn-1:coils' in cleared.rowNotes, false);
+  });
+
+  it('DELETE_ROW_NOTE：删单条；该条不存在时返回原 state（引用相等）', () => {
+    let state = stateWithConnection();
+    const miss = appReducer(state, {
+      type: 'DELETE_ROW_NOTE',
+      payload: { ownerId: 'conn-1', area: 'coils', address: 9 },
+    });
+    assert.equal(miss, state);
+
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'coils', address: 9, note: 'n' } });
+    const next = appReducer(state, {
+      type: 'DELETE_ROW_NOTE',
+      payload: { ownerId: 'conn-1', area: 'coils', address: 9 },
+    });
+    assert.equal('conn-1:coils' in next.rowNotes, false);
+  });
+
+  it('写同样的值 ⇒ 返回原 state（不触发多余的重渲染 / 持久化）', () => {
+    let state = stateWithConnection();
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'coils', address: 0, note: 'hi' } });
+    const again = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'coils', address: 0, note: 'hi' } });
+    assert.equal(again, state);
+  });
+
+  it('DELETE_CONNECTION：级联清理该连接的全部备注，其它连接保留', () => {
+    let state = appReducer(emptyState(), { type: 'ADD_CONNECTION', payload: makeConn({ id: 'conn-1' }) });
+    state = appReducer(state, { type: 'ADD_CONNECTION', payload: makeConn({ id: 'conn-2' }) });
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'holdingRegisters', address: 1, note: 'A' } });
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-2', area: 'holdingRegisters', address: 1, note: 'B' } });
+
+    const next = appReducer(state, { type: 'DELETE_CONNECTION', payload: 'conn-1' });
+    assert.equal('conn-1:holdingRegisters' in next.rowNotes, false);
+    assert.equal(next.rowNotes['conn-2:holdingRegisters'][1], 'B');
+  });
+
+  it('级联清理按 `${id}:` 前缀匹配，不会误删 id 以它为前缀的其它连接（conn-1 vs conn-11）', () => {
+    let state = appReducer(emptyState(), { type: 'ADD_CONNECTION', payload: makeConn({ id: 'conn-1' }) });
+    state = appReducer(state, { type: 'ADD_CONNECTION', payload: makeConn({ id: 'conn-11' }) });
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-11', area: 'coils', address: 2, note: 'X' } });
+
+    const next = appReducer(state, { type: 'DELETE_CONNECTION', payload: 'conn-1' });
+    assert.equal(next.rowNotes['conn-11:coils'][2], 'X');
+  });
+
+  it('IMPORT_CONFIG overwrite：备注整块替换（旧备注被丢弃）', () => {
+    let state = stateWithConnection();
+    state = appReducer(state, { type: 'SET_ROW_NOTE', payload: { ownerId: 'conn-1', area: 'holdingRegisters', address: 1, note: '旧的' } });
+
+    const next = appReducer(state, {
+      type: 'IMPORT_CONFIG',
+      payload: {
+        connections: [makeConn({ id: 'conn-2' })],
+        tabs: [makeTab({ connectionId: 'conn-2' })],
+        rowNotes: { 'conn-2:coils': { 3: '新的' } },
+        strategy: 'overwrite',
+      },
+    });
+    assert.deepEqual(next.rowNotes, { 'conn-2:coils': { 3: '新的' } });
+  });
+
+  it('IMPORT_CONFIG merge：连接 id 被重新分配时，备注的 key 跟着重映射（不静默丢失）', () => {
+    const state = stateWithConnection(); // 已存在 conn-1
+    const next = appReducer(state, {
+      type: 'IMPORT_CONFIG',
+      payload: {
+        // 导入的连接 id 也是 conn-1 ⇒ 命中冲突，会被分配一个新 id
+        connections: [makeConn()],
+        tabs: [makeTab()],
+        rowNotes: { 'conn-1:holdingRegisters': { 7: '水位' } },
+        strategy: 'merge',
+      },
+    });
+
+    assert.equal('conn-1:holdingRegisters' in next.rowNotes, false);
+    const keys = Object.keys(next.rowNotes).filter((k) => k.endsWith(':holdingRegisters'));
+    assert.equal(keys.length, 1);
+    assert.equal(next.rowNotes[keys[0]][7], '水位');
+    // key 里的 owner 必须等于新分配的那台连接 id
+    const imported = next.connections.find((c) => c.id !== 'conn-1');
+    assert.notEqual(imported, undefined);
+    assert.equal(keys[0], `${imported?.id}:holdingRegisters`);
+  });
+
+  it('持久化往返：从 localStorage 原文解析回来时备注不丢', () => {
+    const persisted = JSON.stringify({
+      connections: [makeConn()],
+      tabs: [makeTab()],
+      activeTabId: 'tab-1',
+      activeConnectionId: 'conn-1',
+      rowNotes: { 'conn-1:holdingRegisters': { 0: '水温', 12: '流量' } },
+    });
+    const parsed = parsePersistedState(persisted);
+    assert.deepEqual(parsed.rowNotes, { 'conn-1:holdingRegisters': { 0: '水温', 12: '流量' } });
+  });
+
+  it('持久化原文里没有 rowNotes（旧配置）⇒ 回落为空对象，不炸', () => {
+    const parsed = parsePersistedState(JSON.stringify({ connections: [], tabs: [] }));
+    assert.deepEqual(parsed.rowNotes, {});
+  });
+
+  it('持久化原文损坏 / 为空 ⇒ 回到 initialState', () => {
+    assert.deepEqual(parsePersistedState('{not json').rowNotes, {});
+    assert.deepEqual(parsePersistedState(null).rowNotes, {});
   });
 });

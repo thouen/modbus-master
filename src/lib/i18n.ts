@@ -202,6 +202,10 @@ export const translations = {
       '32/64-bit types only · 16-bit registers are fixed big-endian (ModBus spec)',
     read: 'Read',
     autoPoll: 'Auto Poll',
+
+    // Row Notes (R4)
+    rowNote: 'Note',
+    rowNotePlaceholder: 'Add a note…',
   },
   zh: {
     // App
@@ -404,6 +408,10 @@ export const translations = {
     byteOrderScopeHint: '仅作用于 32/64 位类型 · 16 位寄存器固定为大端（ModBus 规范）',
     read: '读取',
     autoPoll: '自动轮询',
+
+    // Row Notes (R4)
+    rowNote: '备注',
+    rowNotePlaceholder: '添加备注…',
   },
 } as const;
 

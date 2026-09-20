@@ -46,6 +46,7 @@ import { readRegisterRows } from "@/lib/connection-image";
 import {
   fcToArea,
   isBitArea,
+  rowNotesKey,
   BITS_PER_REGISTER,
   type RegisterArea,
   type ConnectionRegisterImage,
@@ -58,6 +59,7 @@ import type {
   ByteOrder64,
   FunctionCode,
   ConnectionConfig,
+  RowNotes,
 } from "@/lib/modbus-types";
 
 /** 广播从站地址（Slave ID = 0） */
@@ -166,6 +168,10 @@ export function RegisterTabManager() {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [cellValue, setCellValue] = useState("");
   const [editingFormatRow, setEditingFormatRow] = useState<string | null>(null);
+  // 行备注（R4）行内编辑状态 —— 与「格式化值」用**独立**的编辑态：
+  // 两者是不同的单元格，共用一个 key 会让"点备注"被值单元格误认成"我正在被编辑"。
+  const [editingNoteCell, setEditingNoteCell] = useState<string | null>(null);
+  const [noteValue, setNoteValue] = useState("");
 
   /**
    * 写入草稿：**窗口身份 → (寄存器序号 → 待写入值)**。
@@ -191,6 +197,34 @@ export function RegisterTabManager() {
       (activeTab ? writeDrafts[registerWindowKey(activeTab)] : undefined) ??
       new Map<number, number>(),
     [activeTab, writeDrafts],
+  );
+
+  /**
+   * 当前窗口的**行备注桶**（R4）：`寄存器序号 → 备注文本`。
+   *
+   * ⭐ 归属是**连接**（= 那台设备），key = `connectionId:area` ⇒ 同一个连接的不同标签
+   * 看到的是同一份备注（"这个寄存器是进水温度"属于设备，不属于某个窗口）。
+   *
+   * ⚠️ 与 `writeDraft` 同理，必须包进 `useMemo`（原因见上一个注释）。
+   */
+  const rowNotesForTab: Record<number, string> = useMemo(() => {
+    if (!activeTab || !activeArea) return {};
+    return state.rowNotes[rowNotesKey(activeTab.connectionId, activeArea)] ?? {};
+  }, [state.rowNotes, activeTab, activeArea]);
+
+  /** 提交一条行备注（R4）：去空白后为空串 ⇒ 删除该条 */
+  const commitRowNote = useCallback(
+    (address: number, raw: string) => {
+      if (!activeTab || !activeArea) return;
+      const ownerId = activeTab.connectionId;
+      if (raw.trim() === "") {
+        dispatch({ type: "DELETE_ROW_NOTE", payload: { ownerId, area: activeArea, address } });
+      } else {
+        dispatch({ type: "SET_ROW_NOTE", payload: { ownerId, area: activeArea, address, note: raw } });
+      }
+      setEditingNoteCell(null);
+    },
+    [activeTab, activeArea, dispatch],
   );
 
   // 标签选择
@@ -468,6 +502,12 @@ export function RegisterTabManager() {
           }
           editingFormatRow={editingFormatRow}
           setEditingFormatRow={setEditingFormatRow}
+          rowNotes={rowNotesForTab}
+          editingNoteCell={editingNoteCell}
+          setEditingNoteCell={setEditingNoteCell}
+          noteValue={noteValue}
+          setNoteValue={setNoteValue}
+          onCommitRowNote={commitRowNote}
         />
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground/60">
@@ -569,6 +609,12 @@ function DataTable({
   onCommitCellEdit,
   editingFormatRow,
   setEditingFormatRow,
+  rowNotes,
+  editingNoteCell,
+  setEditingNoteCell,
+  noteValue,
+  setNoteValue,
+  onCommitRowNote,
 }: {
   tab: RegisterTab;
   /** 该标签看的寄存器区域（决定是否按"16 位打包"呈现） */
@@ -589,6 +635,14 @@ function DataTable({
   onCommitCellEdit: (address: number, raw: string, format?: DataDisplayFormat, span?: number) => void;
   editingFormatRow: string | null;
   setEditingFormatRow: (address: string | null) => void;
+  /** 当前窗口的行备注桶（R4）：`寄存器序号 → 文本`；归属**连接**（设备），不是标签 */
+  rowNotes: Record<number, string>;
+  editingNoteCell: string | null;
+  setEditingNoteCell: (key: string | null) => void;
+  noteValue: string;
+  setNoteValue: (v: string) => void;
+  /** 提交一条备注；去空白后为空串即删除该条 */
+  onCommitRowNote: (address: number, raw: string) => void;
 }) {
   const { t } = useI18n();
   const isWriteFc =
@@ -623,6 +677,10 @@ function DataTable({
           <tr className="border-b border-border/30 bg-surface-container/90 backdrop-blur">
             <th className="px-3 py-2 text-left font-medium text-muted-foreground">
               {t("address")}
+            </th>
+            {/* 行备注（R4）：归属连接（设备），同一连接的每个标签看到同一份备注 */}
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+              {t("rowNote")}
             </th>
             <th className="px-3 py-2 text-left font-medium text-muted-foreground">
               {t("rawHex")}
@@ -690,6 +748,38 @@ function DataTable({
                     <span className="ml-1.5 rounded bg-foreground/10 px-1 py-0.5 font-mono text-[10px] font-normal text-muted-foreground">
                       {t("bitLabel")} {item.address * BITS_PER_REGISTER} ~{" "}
                       {item.address * BITS_PER_REGISTER + BITS_PER_REGISTER - 1}
+                    </span>
+                  )}
+                </td>
+                {/* 行备注（R4）：点击行内编辑，空值显示 —。
+                    ⚠️ 与"能不能写寄存器"无关 —— 只读标签（FC01/02/04）也能写备注，
+                       因为备注是**本地资料**，不经过 ModBus 协议。 */}
+                <td className="w-56 px-3 py-1.5">
+                  {editingNoteCell === cellKey ? (
+                    <input
+                      autoFocus
+                      value={noteValue}
+                      placeholder={t("rowNotePlaceholder")}
+                      onChange={(e) => setNoteValue(e.target.value)}
+                      onBlur={() => onCommitRowNote(item.address, noteValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") onCommitRowNote(item.address, noteValue);
+                        if (e.key === "Escape") setEditingNoteCell(null);
+                      }}
+                      className="w-52 rounded border border-primary/40 bg-background px-1.5 py-0.5 text-xs text-foreground outline-none"
+                    />
+                  ) : (
+                    <span
+                      className={`block max-w-52 cursor-pointer truncate rounded px-1.5 py-0.5 text-xs hover:bg-primary/10 ${
+                        rowNotes[item.address] ? "text-foreground/90" : "text-muted-foreground/40"
+                      }`}
+                      title={rowNotes[item.address] || undefined}
+                      onClick={() => {
+                        setEditingNoteCell(cellKey);
+                        setNoteValue(rowNotes[item.address] ?? "");
+                      }}
+                    >
+                      {rowNotes[item.address] || "—"}
                     </span>
                   )}
                 </td>

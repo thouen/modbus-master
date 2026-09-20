@@ -8,9 +8,10 @@ import type {
   RegisterTab,
   LogEntry,
   FunctionCode,
+  RowNotes,
   ValueSource,
 } from '@/lib/modbus-types';
-import { withAreaTotals } from '@/lib/modbus-types';
+import { rowNotesKey, withAreaTotals } from '@/lib/modbus-types';
 import { applyRegistersToImage, cloneImage, createConnectionImage } from '@/lib/connection-image';
 import { generateId } from '@/lib/modbus-utils';
 
@@ -34,6 +35,16 @@ export interface AppState {
    * ⚠️ 这是运行时状态，**不持久化**（重启进程即清空）。
    */
   registerImages: Record<string, ConnectionRegisterImage>;
+  /**
+   * **行备注**（R4）：`key = connectionId:area` -> `寄存器序号 -> 备注文本`。
+   *
+   * ⭐ 归属是**连接**（= 那台设备），不是标签：同一台设备的同一个点，
+   * 在引用它的所有标签窗口里看到的都是**同一条**备注。
+   *
+   * ⚠️ 与 `registerImages` 同为"按设备索引"，但**这份要持久化** ——
+   * 备注是用户手录的资料，重启后必须还在（镜像是运行时数据，所以不持久化）。
+   */
+  rowNotes: RowNotes;
   logs: LogEntry[]; // 全局日志（按 connectionId 筛选展示）
 }
 
@@ -77,9 +88,33 @@ export type Action =
       };
     }
   | { type: 'RESET_CONNECTION_IMAGE'; payload: string }
+  | {
+      /**
+       * 写一条**行备注**（R4）。
+       *
+       * ⚠️ `ownerId` 是**设备**（= `connectionId`）；`address` 是**寄存器序号**（Q20）。
+       * `note` 去掉首尾空白后为空串 ⇒ 等价于删除该条备注（见 reducer）。
+       */
+      type: 'SET_ROW_NOTE';
+      payload: { ownerId: string; area: RegisterArea; address: number; note: string };
+    }
+  | {
+      /** 删除一条**行备注**（R4） */
+      type: 'DELETE_ROW_NOTE';
+      payload: { ownerId: string; area: RegisterArea; address: number };
+    }
   | { type: 'ADD_LOG'; payload: LogEntry }
   | { type: 'CLEAR_LOGS'; payload?: string } // connectionId，缺省清全部
-  | { type: 'IMPORT_CONFIG'; payload: { connections: ConnectionConfig[]; tabs: RegisterTab[]; strategy: 'overwrite' | 'merge' } }
+  | {
+      type: 'IMPORT_CONFIG';
+      payload: {
+        connections: ConnectionConfig[];
+        tabs: RegisterTab[];
+        /** R4 行备注：导出时一并带上，导入时随策略替换 / 合并 */
+        rowNotes?: RowNotes;
+        strategy: 'overwrite' | 'merge';
+      };
+    }
   | { type: 'RESET_ACTIVE' }
   | { type: 'HYDRATE'; payload: AppState };
 
@@ -90,6 +125,7 @@ const initialState: AppState = {
   activeTabId: null,
   activeConnectionId: null,
   registerImages: {},
+  rowNotes: {},
   logs: [],
 };
 
@@ -125,12 +161,16 @@ export function migrateConnection(conn: ConnectionConfig): ConnectionConfig {
   return withAreaTotals(conn);
 }
 
-/** 从 localStorage 恢复持久化配置 */
-function loadPersistedState(): AppState {
-  if (typeof window === 'undefined') return initialState;
+/**
+ * **纯函数**：把 localStorage 里的原始字符串解析成 `AppState`。
+ *
+ * 抽成纯函数是为了**可单测**：持久化往返是"静默丢数据"的高发点 ——
+ * 少读一个字段在运行时完全无感（`undefined` 默默地变成默认值），只有重启后
+ * 才发现用户录的资料没了。所以这一层必须有测试盯着。
+ */
+export function parsePersistedState(raw: string | null): AppState {
+  if (!raw) return initialState;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return initialState;
     const parsed = JSON.parse(raw) as Partial<AppState>;
     const connections = (parsed.connections ?? []).map(migrateConnection);
     const tabs = (parsed.tabs ?? []).map(migrateTab);
@@ -140,6 +180,8 @@ function loadPersistedState(): AppState {
       tabs,
       activeTabId: parsed.activeTabId ?? null,
       activeConnectionId: parsed.activeConnectionId ?? (connections.length > 0 ? connections[0].id : null),
+      // 行备注（R4）是用户手录的资料，必须随配置一起恢复
+      rowNotes: parsed.rowNotes ?? {},
       // 运行时状态不持久化
       connectionStatus: Object.fromEntries(connections.map(c => [c.id, 'disconnected' as const])),
       registerImages: {},
@@ -148,6 +190,12 @@ function loadPersistedState(): AppState {
   } catch {
     return initialState;
   }
+}
+
+/** 从 localStorage 恢复持久化配置 */
+function loadPersistedState(): AppState {
+  if (typeof window === 'undefined') return initialState;
+  return parsePersistedState(localStorage.getItem(STORAGE_KEY));
 }
 
 /** 创建默认标签页（自动命名） */
@@ -238,6 +286,11 @@ export function appReducer(state: AppState, action: Action): AppState {
       const remainingTabs = state.tabs.filter(t => t.connectionId !== action.payload);
       // 释放该连接的设备镜像（R3：连接删除时释放）
       const { [action.payload]: _releasedImage, ...registerImages } = state.registerImages;
+      // 级联清理该连接的全部行备注（R4）：备注的归属是"设备"，
+      // 设备都没了，`connectionId:area` 这些键就再没有主人 —— 留着只是垃圾。
+      const rowNotes = Object.fromEntries(
+        Object.entries(state.rowNotes).filter(([k]) => !k.startsWith(`${action.payload}:`)),
+      );
       return {
         ...state,
         connections: state.connections.filter(c => c.id !== action.payload),
@@ -252,6 +305,7 @@ export function appReducer(state: AppState, action: Action): AppState {
           ? (state.connections.find(c => c.id !== action.payload)?.id ?? null)
           : state.activeConnectionId,
         registerImages,
+        rowNotes,
         logs: state.logs.filter(l => l.connectionId !== action.payload),
       };
     }
@@ -348,6 +402,44 @@ export function appReducer(state: AppState, action: Action): AppState {
         registerImages: { ...state.registerImages, [action.payload]: createConnectionImage(action.payload, conn) },
       };
     }
+    case 'SET_ROW_NOTE': {
+      const { ownerId, area, address, note } = action.payload;
+      const key = rowNotesKey(ownerId, area);
+      const trimmed = note.trim();
+      const bucket = state.rowNotes[key];
+      const existing = bucket?.[address];
+
+      // 去空白后为空串 ⇒ 等价于清除该条备注（不留一条"看着有、其实是空白"的备注）
+      if (trimmed === '') {
+        if (!bucket || existing === undefined) return state;
+        const rest = { ...bucket };
+        delete rest[address];
+        const rowNotes = { ...state.rowNotes };
+        if (Object.keys(rest).length === 0) delete rowNotes[key]; // 空桶不留在状态里
+        else rowNotes[key] = rest;
+        return { ...state, rowNotes };
+      }
+
+      // 无变化就直接返回原 state：避免无谓的重渲染与一次 localStorage 写入
+      if (existing === trimmed) return state;
+
+      return {
+        ...state,
+        rowNotes: { ...state.rowNotes, [key]: { ...(bucket ?? {}), [address]: trimmed } },
+      };
+    }
+    case 'DELETE_ROW_NOTE': {
+      const { ownerId, area, address } = action.payload;
+      const key = rowNotesKey(ownerId, area);
+      const bucket = state.rowNotes[key];
+      if (!bucket || bucket[address] === undefined) return state;
+      const rest = { ...bucket };
+      delete rest[address];
+      const rowNotes = { ...state.rowNotes };
+      if (Object.keys(rest).length === 0) delete rowNotes[key];
+      else rowNotes[key] = rest;
+      return { ...state, rowNotes };
+    }
     case 'ADD_LOG': {
       // 全局环形缓冲，保留最近 500 条
       const nextLogs = [...state.logs, action.payload];
@@ -362,12 +454,15 @@ export function appReducer(state: AppState, action: Action): AppState {
         logs: action.payload ? state.logs.filter(l => l.connectionId !== action.payload) : [],
       };
     case 'IMPORT_CONFIG': {
-      const { connections: importedConns, tabs: importedTabs, strategy } = action.payload;
+      const { connections: importedConns, tabs: importedTabs, rowNotes: importedNotes, strategy } = action.payload;
       let connections: ConnectionConfig[];
       let tabs: RegisterTab[];
+      let rowNotes: RowNotes;
       if (strategy === 'overwrite') {
         connections = importedConns.map(migrateConnection);
         tabs = importedTabs.map(migrateTab);
+        // 覆盖：备注整块替换（导出里没有备注字段 ⇒ 视为空）
+        rowNotes = importedNotes ?? {};
       } else {
         // 合并：追加新连接和标签页（简单追加，避免 ID 冲突）
         const connIds = new Set(state.connections.map(c => c.id));
@@ -392,11 +487,22 @@ export function appReducer(state: AppState, action: Action): AppState {
           })),
         ];
         connections = mergedConns;
+        // ⚠️ 行备注的 key 里嵌着 connectionId ⇒ 连接被重新分配 id 时键也得跟着改，
+        // 否则导入的备注会挂在"已不存在的连接"上，界面上永远看不到（静默丢失）。
+        const remappedNotes: RowNotes = {};
+        for (const [key, bucket] of Object.entries(importedNotes ?? {})) {
+          const sep = key.indexOf(':');
+          const oldOwner = sep >= 0 ? key.slice(0, sep) : key;
+          const area = sep >= 0 ? key.slice(sep + 1) : '';
+          remappedNotes[`${idMap[oldOwner] ?? oldOwner}:${area}`] = bucket;
+        }
+        rowNotes = { ...state.rowNotes, ...remappedNotes };
       }
       return {
         ...state,
         connections,
         tabs,
+        rowNotes,
         connectionStatus: Object.fromEntries(connections.map(c => [c.id, 'disconnected' as const])),
         activeTabId: tabs.length > 0 ? tabs[0].id : null,
         activeConnectionId: connections.length > 0 ? connections[0].id : null,
@@ -450,13 +556,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tabs: state.tabs,
           activeTabId: state.activeTabId,
           activeConnectionId: state.activeConnectionId,
+          rowNotes: state.rowNotes,
         }));
       } catch {
         /* storage 不可用时静默忽略 */
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [state.connections, state.tabs, state.activeTabId, state.activeConnectionId]);
+  }, [state.connections, state.tabs, state.activeTabId, state.activeConnectionId, state.rowNotes]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

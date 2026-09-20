@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAppState } from '@/hooks/use-app-state';
 import { useModbusWs } from '@/hooks/use-modbus-ws';
-import { isBroadcastSlave, DEFAULT_AREA_TOTAL_REGISTERS, BITS_PER_REGISTER, type ConnectionConfig, type Protocol, type Mode, type ByteOrder32, type ByteOrder64 } from '@/lib/modbus-types';
+import { isBroadcastSlave, DEFAULT_AREA_TOTAL_REGISTERS, BITS_PER_REGISTER, type ConnectionConfig, type Protocol, type Mode, type ByteOrder32, type ByteOrder64, type RowNotes } from '@/lib/modbus-types';
 import { generateId } from '@/lib/modbus-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,7 +66,7 @@ export function ConnectionPanel() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConn, setEditingConn] = useState<ConnectionConfig | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [pendingImport, setPendingImport] = useState<{ connections: ConnectionConfig[]; tabs: RegisterTabType[] } | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ connections: ConnectionConfig[]; tabs: RegisterTabType[]; rowNotes: RowNotes } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ConnectionConfig | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -90,7 +90,8 @@ export function ConnectionPanel() {
 
   const handleExport = () => {
     if (state.connections.length === 0) return;
-    const data = { connections: state.connections, tabs: state.tabs };
+    // R4：行备注一并导出，否则"导出 → 再导入"会静默丢掉用户手录的备注
+    const data = { connections: state.connections, tabs: state.tabs, rowNotes: state.rowNotes };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -106,7 +107,11 @@ export function ConnectionPanel() {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (Array.isArray(parsed.connections)) {
-          setPendingImport({ connections: parsed.connections, tabs: parsed.tabs ?? [] });
+          setPendingImport({
+            connections: parsed.connections,
+            tabs: parsed.tabs ?? [],
+            rowNotes: parsed.rowNotes ?? {},
+          });
           setImportOpen(true);
         }
       } catch {
@@ -240,14 +245,17 @@ function ImportDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  pending: { connections: ConnectionConfig[]; tabs: RegisterTabType[] } | null;
+  pending: { connections: ConnectionConfig[]; tabs: RegisterTabType[]; rowNotes: RowNotes } | null;
 }) {
   const { t } = useI18n();
   const { dispatch } = useAppState();
 
   const apply = (strategy: 'overwrite' | 'merge') => {
     if (!pending) return;
-    dispatch({ type: 'IMPORT_CONFIG', payload: { connections: pending.connections, tabs: pending.tabs, strategy } });
+    dispatch({
+      type: 'IMPORT_CONFIG',
+      payload: { connections: pending.connections, tabs: pending.tabs, rowNotes: pending.rowNotes, strategy },
+    });
     onOpenChange(false);
   };
 
