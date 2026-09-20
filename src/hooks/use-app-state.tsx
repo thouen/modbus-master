@@ -98,6 +98,10 @@ const initialState: AppState = {
  *
  * ⚠️ 旧字段 `bitCount` 的语义**可能是"位数"而不是"寄存器数"**（差 16 倍），
  * 所以**不猜** —— 直接丢弃、回落到默认值（比搬一个错值更安全，见 ROADMAP §3.7）。
+ *
+ * ⚠️ 旧版本标签上还带 `byteOrder32` / `byteOrder64`。字节序已改归连接（见 `ConnectionConfig`），
+ * 这两个字段随本函数**显式构造返回值而自然丢弃** —— 与已废弃的 `writeMode` 同一先例。
+ * **绝不要把它们上推回连接**：那会用旧标签里的值覆盖连接上的新值。
  */
 export function migrateTab(tab: Partial<RegisterTab> & { bitCount?: number }): RegisterTab {
   // ⚠️ 旧版本把 16 位位视图的类型名写作 `'led'`，现统一更名为 `'bits'`（类型名 + i18n key 同步）。
@@ -112,8 +116,6 @@ export function migrateTab(tab: Partial<RegisterTab> & { bitCount?: number }): R
     functionCode: (tab.functionCode ?? '03') as FunctionCode,
     pollInterval: tab.pollInterval ?? 1000,
     displayFormat: (legacyFormat === 'led' ? 'bits' : tab.displayFormat) ?? 'hex',
-    byteOrder32: tab.byteOrder32 ?? 'ABCD',
-    byteOrder64: tab.byteOrder64 ?? 'ABCDEFGH',
     isPolling: tab.isPolling ?? false,
   };
 }
@@ -149,7 +151,7 @@ function loadPersistedState(): AppState {
 }
 
 /** 创建默认标签页（自动命名） */
-function createDefaultTab(connectionId: string, conn: ConnectionConfig, index: number): RegisterTab {
+function createDefaultTab(connectionId: string, index: number): RegisterTab {
   return {
     id: generateId(),
     name: `Tab ${index}`,
@@ -159,8 +161,6 @@ function createDefaultTab(connectionId: string, conn: ConnectionConfig, index: n
     functionCode: '03' as FunctionCode,
     pollInterval: 1000,
     displayFormat: 'hex',
-    byteOrder32: conn.byteOrder32,
-    byteOrder64: conn.byteOrder64,
     isPolling: false,
   };
 }
@@ -196,7 +196,7 @@ export function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'ADD_CONNECTION': {
       const conn = migrateConnection(action.payload);
-      const defaultTab = createDefaultTab(conn.id, conn, 1);
+      const defaultTab = createDefaultTab(conn.id, 1);
       return {
         ...state,
         connections: [...state.connections, conn],

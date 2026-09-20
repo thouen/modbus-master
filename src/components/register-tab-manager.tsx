@@ -93,22 +93,6 @@ const FORMAT_OPTIONS: { value: DataDisplayFormat; labelKey: string }[] = [
   { value: "double", labelKey: "formatDouble" },
 ];
 
-/** 32 位字节序 */
-const BYTE_ORDER_32: { value: ByteOrder32; label: string }[] = [
-  { value: "ABCD", label: "ABCD" },
-  { value: "BADC", label: "BADC" },
-  { value: "CDAB", label: "CDAB" },
-  { value: "DCBA", label: "DCBA" },
-];
-
-/** 64 位字节序 */
-const BYTE_ORDER_64: { value: ByteOrder64; label: string }[] = [
-  { value: "ABCDEFGH", label: "ABCDEFGH" },
-  { value: "HGFEDCBA", label: "HGFEDCBA" },
-  { value: "BADCFEHG", label: "BADCFEHG" },
-  { value: "GHEFCDAB", label: "GHEFCDAB" },
-];
-
 /** 功能码字符串（十进制 '01'~'16'）转数字 */
 function parseFunctionCode(fc: FunctionCode): number {
   return parseInt(fc, 10);
@@ -137,6 +121,14 @@ export function RegisterTabManager() {
     ? connectionStatus[activeConn.id] === "connected"
     : false;
   const isBroadcast = activeConn?.slaveId === BROADCAST_SLAVE_ID;
+
+  /**
+   * ⭐ 当前生效的 32/64 位字节序。
+   * 字节序是**设备属性** ⇒ 归**连接**；标签只是视图，所以这里一律**读连接的值**，
+   * 标签侧只做只读显示、不持有（见 `RegisterTab` 的注释）。
+   */
+  const byteOrder32: ByteOrder32 = activeConn?.byteOrder32 ?? 'ABCD';
+  const byteOrder64: ByteOrder64 = activeConn?.byteOrder64 ?? 'ABCDEFGH';
 
   /** 当前标签看的是哪个寄存器区域 */
   const activeArea = activeTab ? tabArea(activeTab) : null;
@@ -222,8 +214,6 @@ export function RegisterTabManager() {
       registerCount: 10,
       pollInterval: 1000,
       isPolling: false,
-      byteOrder32: "ABCD",
-      byteOrder64: "ABCDEFGH",
       displayFormat: "ushort",
     };
     const namedTab = { ...newTab, name: generateTabName(newTab.functionCode, newTab.startAddress) };
@@ -315,6 +305,9 @@ export function RegisterTabManager() {
       const fmt = format ?? tab.displayFormat;
       // 草稿按**窗口身份**分桶存：切走再切回来还在，别的窗口看不到（R3）
       const key = registerWindowKey(tab);
+      // ⭐ 字节序按**标签所绑定的连接**取（不是"当前选中的"）—— 与 `performWrite` 同一口径：
+      // 字节序是设备属性，谁的值就按谁的设备解释，哪怕这个标签此刻不是活动标签。
+      const conn = connections.find((c) => c.id === tab.connectionId);
       const writeInto = (entries: [number, number][]) => {
         setWriteDrafts((prev) => {
           const next = new Map(prev[key] ?? []);
@@ -328,8 +321,8 @@ export function RegisterTabManager() {
         const regs = encodeValueToRegisters(
           parseDisplayValue(raw, fmt),
           fmt,
-          tab.byteOrder32,
-          tab.byteOrder64,
+          conn?.byteOrder32 ?? 'ABCD',
+          conn?.byteOrder64 ?? 'ABCDEFGH',
         );
         if (regs.length !== span) return;
         writeInto(regs.map((value, i) => [address + i, value] as [number, number]));
@@ -340,7 +333,7 @@ export function RegisterTabManager() {
       }
       setEditingCell(null);
     },
-    [],
+    [connections],
   );
 
   // 整段批量提交：startAddress 起 registerCount 个值（草稿覆盖 + 未编辑行回填**镜像现值**）
@@ -443,6 +436,8 @@ export function RegisterTabManager() {
           area={activeArea}
           connName={activeConn.name}
           connSlaveId={activeConn.slaveId}
+          byteOrder32={byteOrder32}
+          byteOrder64={byteOrder64}
           isConnected={isConnected}
           isBroadcast={isBroadcast}
           hasDraft={writeDraft.size > 0}
@@ -459,6 +454,8 @@ export function RegisterTabManager() {
           tab={activeTab}
           area={activeArea}
           rows={activeRows}
+          byteOrder32={byteOrder32}
+          byteOrder64={byteOrder64}
           writeDraft={writeDraft}
           onUpdate={updateTab}
           onRead={() => handleRead(activeTab)}
@@ -560,6 +557,8 @@ function DataTable({
   tab,
   area,
   rows,
+  byteOrder32,
+  byteOrder64,
   writeDraft,
   onUpdate,
   onRead,
@@ -576,6 +575,10 @@ function DataTable({
   area: RegisterArea;
   /** 当前窗口的行：**一行 = 一个寄存器**（四区同构，Q20） */
   rows: RegisterData[];
+  /** ⭐ 32 位字节序 —— 来自**该标签所绑定的连接**（设备属性），标签自己不持有 */
+  byteOrder32: ByteOrder32;
+  /** ⭐ 64 位字节序 —— 同上 */
+  byteOrder64: ByteOrder64;
   writeDraft: Map<number, number>;
   onUpdate: (tabId: string, updates: Partial<RegisterTab>) => void;
   onRead: () => void;
@@ -654,7 +657,7 @@ function DataTable({
             // 起点且空间足够才计算格式化值；占用行 / 越界组显示 —
             const displayValue =
               isGroupStart && groupFits
-                ? formatRegisterValue(rows, index, format, tab.byteOrder32, tab.byteOrder64)
+                ? formatRegisterValue(rows, index, format, byteOrder32, byteOrder64)
                 : "—";
             // 宽类型整组草稿展示：整组地址均已编辑时按草稿重算格式化值
             let groupDisplay = displayValue;
@@ -663,7 +666,7 @@ function DataTable({
               const drafted = addrs.map((a) => writeDraft.get(a));
               if (drafted.every((v) => v !== undefined)) {
                 const eff: RegisterData[] = addrs.map((a, k) => ({ address: a, rawValue: drafted[k]! }));
-                groupDisplay = formatRegisterValue(eff, 0, format, tab.byteOrder32, tab.byteOrder64);
+                groupDisplay = formatRegisterValue(eff, 0, format, byteOrder32, byteOrder64);
               }
             }
             // 起点行可选格式：非寄存器（线圈）禁用 32/64 位；空间不足禁用跨寄存器类型
@@ -798,7 +801,7 @@ function DataTable({
                       onClick={() => {
                         if (!canEdit) return;
                         setEditingCell(cellKey);
-                        setCellValue(formatRegisterValue(rows, index, format, tab.byteOrder32, tab.byteOrder64));
+                        setCellValue(formatRegisterValue(rows, index, format, byteOrder32, byteOrder64));
                       }}
                     >
                       {groupSpan > 1
@@ -1025,6 +1028,8 @@ function ConfigBar({
   area,
   connName,
   connSlaveId,
+  byteOrder32,
+  byteOrder64,
   isConnected,
   isBroadcast,
   hasDraft,
@@ -1038,6 +1043,10 @@ function ConfigBar({
   area: RegisterArea;
   connName: string;
   connSlaveId: number;
+  /** ⭐ 32 位字节序 —— **只读展示**，值来自所绑定连接（设备属性） */
+  byteOrder32: ByteOrder32;
+  /** ⭐ 64 位字节序 —— **只读展示**，值来自所绑定连接 */
+  byteOrder64: ByteOrder64;
   isConnected: boolean;
   isBroadcast: boolean;
   hasDraft: boolean;
@@ -1158,54 +1167,34 @@ function ConfigBar({
         </Select>
       </label>
 
-      {/* 32 位字节序 */}
+      {/* 32 位字节序 —— ⭐ **只读**：字节序是所绑定**连接**的设备属性，标签只是视图 */}
       {(tab.displayFormat === "long" ||
         tab.displayFormat === "ulong" ||
         tab.displayFormat === "float") && (
-        <label className="hidden items-center gap-1.5 text-[11px] text-muted-foreground lg:flex">
+        <span
+          className="hidden items-center gap-1.5 text-[11px] text-muted-foreground lg:flex"
+          title={t("byteOrderFollowsHint")}
+        >
           {t("byteOrder32")}
-          <Select
-            value={tab.byteOrder32}
-            onValueChange={(v) =>
-              onUpdate(tab.id, { byteOrder32: v as ByteOrder32 })
-            }
-          >
-            <SelectTrigger className="h-6 w-20 border-border/40 bg-background px-2 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {BYTE_ORDER_32.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
+          <span className="rounded border border-border/40 bg-foreground/5 px-2 py-0.5 font-mono text-xs text-foreground/70">
+            {byteOrder32}
+          </span>
+          <span className="text-[10px] text-muted-foreground/60">{t("byteOrderFollows")}</span>
+        </span>
       )}
 
-      {/* 64 位字节序 */}
+      {/* 64 位字节序 —— ⭐ 同上，只读 */}
       {tab.displayFormat === "double" && (
-        <label className="hidden items-center gap-1.5 text-[11px] text-muted-foreground lg:flex">
+        <span
+          className="hidden items-center gap-1.5 text-[11px] text-muted-foreground lg:flex"
+          title={t("byteOrderFollowsHint")}
+        >
           {t("byteOrder64")}
-          <Select
-            value={tab.byteOrder64}
-            onValueChange={(v) =>
-              onUpdate(tab.id, { byteOrder64: v as ByteOrder64 })
-            }
-          >
-            <SelectTrigger className="h-6 w-24 border-border/40 bg-background px-2 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {BYTE_ORDER_64.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
+          <span className="rounded border border-border/40 bg-foreground/5 px-2 py-0.5 font-mono text-xs text-foreground/70">
+            {byteOrder64}
+          </span>
+          <span className="text-[10px] text-muted-foreground/60">{t("byteOrderFollows")}</span>
+        </span>
       )}
 
       <span className="h-4 w-px bg-border/30" />

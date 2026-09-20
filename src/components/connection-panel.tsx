@@ -499,7 +499,7 @@ function ConnectionDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">32-bit</label>
+              <label className="text-xs text-muted-foreground">{t('byteOrder32')}</label>
               <Select value={byteOrder32} onValueChange={v => setByteOrder32(v as ByteOrder32)}>
                 <SelectTrigger className="h-8 text-xs bg-background border-border">
                   <SelectValue />
@@ -512,7 +512,7 @@ function ConnectionDialog({
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">64-bit</label>
+              <label className="text-xs text-muted-foreground">{t('byteOrder64')}</label>
               <Select value={byteOrder64} onValueChange={v => setByteOrder64(v as ByteOrder64)}>
                 <SelectTrigger className="h-8 text-xs bg-background border-border">
                   <SelectValue />
@@ -525,6 +525,10 @@ function ConnectionDialog({
               </Select>
             </div>
           </div>
+          {/* 作用范围：16 位固定大端，不受这两种字节序影响（ModBus 规范） */}
+          <p className="text-[11px] leading-relaxed text-muted-foreground/70">
+            {t('byteOrderScopeHint')}
+          </p>
 
           {/* 设备镜像：4 个区的总寄存器数量（= 镜像数组的初始长度） */}
           <div className="border-t border-border pt-3">

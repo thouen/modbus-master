@@ -195,6 +195,11 @@ export const translations = {
     confirmBroadcast: 'Confirm Broadcast',
     byteOrder32: '32-bit Byte Order',
     byteOrder64: '64-bit Byte Order',
+    byteOrderFollows: 'Follows connection',
+    byteOrderFollowsHint:
+      'Byte order is a property of the bound connection. Edit it in the connection panel.',
+    byteOrderScopeHint:
+      '32/64-bit types only · 16-bit registers are fixed big-endian (ModBus spec)',
     read: 'Read',
     autoPoll: 'Auto Poll',
   },
@@ -394,6 +399,9 @@ export const translations = {
     confirmBroadcast: '确认广播',
     byteOrder32: '32位字节序',
     byteOrder64: '64位字节序',
+    byteOrderFollows: '跟随连接',
+    byteOrderFollowsHint: '字节序是所绑定连接的属性，请在连接面板中修改。',
+    byteOrderScopeHint: '仅作用于 32/64 位类型 · 16 位寄存器固定为大端（ModBus 规范）',
     read: '读取',
     autoPoll: '自动轮询',
   },

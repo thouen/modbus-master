@@ -38,8 +38,6 @@ function makeTab(overrides: Partial<RegisterTab> = {}): RegisterTab {
     functionCode: '03',
     pollInterval: 1000,
     displayFormat: 'hex',
-    byteOrder32: 'ABCD',
-    byteOrder64: 'ABCDEFGH',
     isPolling: false,
     ...overrides,
   };
@@ -368,6 +366,19 @@ describe('字段迁移：不猜旧字段语义', () => {
   it('migrateTab：缺省 displayFormat 回落 hex', () => {
     const legacy: Partial<RegisterTab> = {};
     assert.equal(migrateTab(legacy).displayFormat, 'hex');
+  });
+
+  it('migrateTab：丢弃旧标签上的字节序字段（字节序已改归连接）', () => {
+    // 旧版本标签自带 byteOrder32/64。改绑到连接后必须**丢弃** ——
+    // 且绝不能把它们上推回连接（那会用旧标签的值覆盖连接上的新值）。
+    const legacy = {
+      ...makeTab(),
+      byteOrder32: 'DCBA',
+      byteOrder64: 'HGFEDCBA',
+    } as unknown as Partial<RegisterTab> & { bitCount?: number };
+    const migrated = migrateTab(legacy);
+    assert.equal('byteOrder32' in migrated, false);
+    assert.equal('byteOrder64' in migrated, false);
   });
 
   it('migrateConnection：补齐 4 个区域总量为默认 1000', () => {

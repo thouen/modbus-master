@@ -13,8 +13,6 @@ function makeTab(overrides: Partial<RegisterTab> = {}): RegisterTab {
     functionCode: '03',
     pollInterval: 1000,
     displayFormat: 'hex',
-    byteOrder32: 'ABCD',
-    byteOrder64: 'ABCDEFGH',
     isPolling: false,
     ...overrides,
   };
@@ -67,12 +65,9 @@ describe('registerWindowKey（窗口身份）', () => {
     );
   });
 
-  it('仅换字节序 → 键不变', () => {
-    assert.equal(
-      registerWindowKey(makeTab({ byteOrder32: 'ABCD' })),
-      registerWindowKey(makeTab({ byteOrder32: 'DCBA' })),
-    );
-  });
+  // ⚠️ 这里原有「仅换字节序 → 键不变」的用例，已删除：字节序改归**连接**（`ConnectionConfig`）后
+  // 标签上**根本没有**这个字段 ⇒ 该不变量已由**类型系统**保证，不再需要用例。
+  // （窗口身份的四个要素由下一条用例逐一断言。）
 
   it('窗口键里包含 id / 功能码 / 起始地址 / 数量四个要素', () => {
     const key = registerWindowKey(makeTab({ id: 'x', functionCode: '04', startAddress: 7, registerCount: 3 }));
