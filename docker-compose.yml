@@ -50,6 +50,12 @@ services:
       HOSTNAME: 0.0.0.0        # 不覆盖会被 Docker 塞成容器 ID
     ports:
       - "5000:5000"            # 管理界面 + /ws/modbus
+    # ⚠️ 主站**不需要**发布任何 ModBus 端口：它是客户端，主动连出去
+    #    （连从站走容器网络的服务名 modbus-slave，或连外部真设备的 IP:port）。
+    # 要用串口（Serial/RTU/ASCII）：把宿主串口设备映射进容器。**仅 Linux 宿主可行**；
+    # Windows 的 Docker Desktop（WSL2）传不进 COM 口，串口请改走裸机部署。
+    # devices:
+    #   - "/dev/ttyUSB0:/dev/ttyUSB0"
     networks:
       - modbus-net
     restart: unless-stopped

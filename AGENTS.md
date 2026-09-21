@@ -136,5 +136,10 @@ docker compose down
 > 展示时主站界面里的 host 要填 **`modbus-slave`** —— 容器里的 `127.0.0.1` 指向主站自己，连不到从站。
 > 完整说明与实测记录见本仓库 `docker-compose.yml` 顶部注释。
 
+> ⚠️ **容器能做串口**（别被"容器不能串口"误导）：容器只是默认不带宿主串口设备。
+> **Linux 宿主**加 `devices: ["/dev/ttyUSB0:/dev/ttyUSB0"]` 即可用（master 走 `connectRTUBuffered` /
+> `connectAsciiSerial`）；**Windows 宿主**（Docker Desktop 走 WSL2）**传不进 COM 口** ⇒ 串口请改走裸机部署。
+> 另外：主站是**客户端**，**不需要**发布任何 ModBus 端口（它主动连出去）。
+
 ## 设计规范
 参考 `DESIGN.md`：工业暗色主题，SCADA 监控终端风格。
