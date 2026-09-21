@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────
+# Docker 构建上下文忽略清单（modbus-master）
+# ⚠️ 目的有二：
+#   ① 别把宿主机的 Windows 版 node_modules / 构建产物拷进 Linux 镜像（会直接跑不起来）
+#   ② 缩小上下文，加快构建
+# ─────────────────────────────────────────────────────────────
+
+# ── 依赖与构建产物：镜像内会重新生成 ──
+node_modules
+.next
+dist
+out
+build
+*.tsbuildinfo
+
+# ── 版本控制与本地工具元数据 ──
+.git
+.gitignore
+.workbuddy
+.cozeproj
+.reasonix
+.codegraph
+.coze-logs
+
+# ── Docker 自身文件（改这些不必让镜像层缓存失效）──
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
+
+# ── 本地环境变量与日志 ──
+.env
+.env.*
+*.log
+output.log
+logs
+
+# ── 编辑器 / 系统垃圾 ──
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# ⚠️ 以下**故意不排除**，动了会导致构建或运行失败：
+#   .npmrc              —— 指定了 registry.npmmirror.com，是构建提速的关键
+#   src/                —— next build 与 tsup 都要读
+#   next.config.ts      —— 构建期需要，运行期 Next 也会读
+#   public/             —— 静态资源，运行期要 serve
+#   scripts/            —— 保留，便于在容器内用同一套脚本排查
+#   assets/             —— 未排除：无法确认无引用，宁可多拷也不冒构建失败的风险

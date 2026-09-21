@@ -122,5 +122,19 @@ pnpm run validate   # 上面四项一起跑
 > ⚠️ `pnpm run build` 会先跑 `pnpm install`；若本机 pnpm store 路径损坏会直接失败
 > （与环境有关，与代码无关）。可改用 `pnpm exec next build` 跳过安装来验证编译。
 
+## Docker 容器部署
+
+```bash
+docker network create modbus-net 2>/dev/null || true   # 与 modbus-slave 仓库共用，只需建一次
+docker compose up -d --build                           # 起本仓库（主站）→ http://localhost:5000
+docker compose down
+```
+
+> 本仓库的 `docker-compose.yml` 与 [`modbus-slave`](https://github.com/thouen/modbus-slave) 仓库的那份**刻意分开**
+> （两个仓库 = 两个独立 compose 项目），靠一张**外部共享网络 `modbus-net`** 互通（两边都写 `external: true`）。
+> ⚠️ **必须先起从站、后起主站**，且**不能跨仓库写 `depends_on`**（compose 校验阶段直接报错）。
+> 展示时主站界面里的 host 要填 **`modbus-slave`** —— 容器里的 `127.0.0.1` 指向主站自己，连不到从站。
+> 完整说明与实测记录见本仓库 `docker-compose.yml` 顶部注释。
+
 ## 设计规范
 参考 `DESIGN.md`：工业暗色主题，SCADA 监控终端风格。

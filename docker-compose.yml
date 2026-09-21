@@ -1,0 +1,60 @@
+# ═══════════════════════════════════════════════════════════════════════
+# ModBus Master —— 本仓库自带的 docker compose（与 modbus-slave 仓库分开）
+#
+#   首次启动：
+#     docker network create modbus-net 2>/dev/null || true
+#     docker compose up -d --build
+#   查看：  docker compose ps
+#   日志：  docker compose logs -f
+#   停止：  docker compose down
+#
+#   ⚠️ 两个仓库 = 两个**独立的 compose 项目**，靠一张**外部共享网络**互通。
+#      网络名固定为 modbus-net，两侧都声明 external: true。含义是：
+#        · 谁都不"拥有"这张网 ⇒ 任何一侧 down 都不会把它删掉；
+#        · 代价是必须先手工建一次（就是上面那行；已存在时无副作用）。
+#
+#   ── 展示流程（⚠️ 第 4 步的 host 填什么都别填 127.0.0.1）──────────────
+#     1. 先把从站跑起来： cd modbus-slave && docker compose up -d --build
+#     2. 再起主站（本仓库）： docker compose up -d --build
+#     3. 打开从站界面 http://localhost:5001
+#        新建从站：TCP，host 0.0.0.0，port 1502，单元号 1 → 启动
+#     4. 打开主站界面 http://localhost:5000
+#        新建连接：TCP，host **modbus-slave**，port **1502**，slaveId 1 → 连接
+#     5. 读 FC03，应能读到从站推送/注入的寄存器值
+#
+#   ⚠️ 为什么 host 要写 modbus-slave 而不是 127.0.0.1？
+#      发 ModBus 请求的是**主站容器**，不是你的浏览器。
+#      容器里的 127.0.0.1 指向主站容器自己，根本连不到从站。
+#      两个容器挂在同一张 modbus-net 上，用**服务名**就能互相解析。
+#
+#   ⚠️ 这里**没有 depends_on**。depends_on 只认同一个 compose 文件里的服务，
+#      跨仓库引用会直接报错（实测：compose 校验阶段就失败）。启动顺序请自己保证。
+# ═══════════════════════════════════════════════════════════════════════
+
+name: modbus-master
+
+services:
+  # 纯管理界面：它自己不对外提供 ModBus 服务，只作为客户端主动连出去
+  modbus-master:
+    build:
+      context: .
+      # 想换 Node 版本：加 args: { NODE_VERSION: "22" }
+    image: modbus-master:local
+    container_name: modbus-master
+    init: true                 # 让 PID 1 能正确转发信号、回收僵尸进程
+    environment:
+      # ⚠️ 这三个变量在 Dockerfile 里已设。这里再写一遍是**故意的**：
+      #    compose 是"怎么跑"的最终事实来源，看这一个文件就够。
+      COZE_PROJECT_ENV: PROD   # 不设 = dev 模式，不报错但极慢
+      DEPLOY_RUN_PORT: "5000"
+      HOSTNAME: 0.0.0.0        # 不覆盖会被 Docker 塞成容器 ID
+    ports:
+      - "5000:5000"            # 管理界面 + /ws/modbus
+    networks:
+      - modbus-net
+    restart: unless-stopped
+
+networks:
+  modbus-net:
+    name: modbus-net
+    external: true
