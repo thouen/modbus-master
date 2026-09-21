@@ -1,0 +1,65 @@
+; ═══════════════════════════════════════════════════════════════════
+; ModBus Master（主站）—— supervisor 配置示例
+;
+; 用法：
+;   sudo cp modbus-master.conf.example /etc/supervisor/conf.d/modbus-master.conf
+;   （RHEL/CentOS 系换成 /etc/supervisord.d/modbus-master.conf）
+;   按需修改下面的 directory / user
+;   sudo supervisorctl reread && sudo supervisorctl update
+;   sudo supervisorctl status modbus-master
+;
+; 前提：先把产物构建出来 —— supervisor 只负责"跑"，不负责"构建"：
+;   pnpm install --frozen-lockfile && pnpm run build
+;   产出 dist/server.js 与 .next/，详见 DEPLOY.md §2.1
+;
+; ⚠️ supervisor **不支持行内注释** —— 本文件所有注释都独占一行，
+;    千万不要在指令后面追加 `; 说明`，那会被当成配置值的一部分。
+; ═══════════════════════════════════════════════════════════════════
+
+[program:modbus-master]
+command=/bin/bash ./scripts/start.sh
+directory=/opt/modbus-simulator/modbus-master
+user=modbus
+
+; ⚠️ 下面这行是必需的，不是可选。五个变量各有各的用处：
+;   COZE_PROJECT_ENV=PROD  —— 唯一的生产开关，不给会跑成 dev 模式（不报错，但慢几十倍）
+;   DEPLOY_RUN_PORT=5000   —— 监听端口（server.ts 读的就是它，不是 PORT）
+;   HOSTNAME=0.0.0.0       —— 不给时 server.ts 会退回 localhost
+;   NODE_ENV=production    —— 让 Next 与依赖走生产分支
+;   NODE_OPTIONS=...       —— 小内存机器上避免 V8 堆过小
+environment=COZE_PROJECT_ENV="PROD",DEPLOY_RUN_PORT="5000",HOSTNAME="0.0.0.0",NODE_ENV="production",NODE_OPTIONS="--max-old-space-size=2048"
+
+autostart=true
+autorestart=unexpected
+startsecs=5
+startretries=3
+
+; ⚠️ start.sh 是 bash，node 是它的子进程。必须连整个进程组一起杀，
+;    否则 stop 之后会留下孤儿 node 继续占着 5000 端口，下次起不来。
+stopasgroup=true
+killasgroup=true
+stopsignal=TERM
+stopwaitsecs=10
+
+stdout_logfile=/var/log/supervisor/modbus-master.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+stderr_logfile=/var/log/supervisor/modbus-master.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
+
+; ── 端口 / 权限 ─────────────────────────────────────────────────
+; 主站是 ModBus **客户端**：它自己不监听任何 ModBus 端口，只主动往外连
+; （连从站走 TCP，或直接开串口）。所以它**不需要**任何特权端口授权 ——
+; 这一点和从站不同（从站要用 502 得额外授权，见 modbus-slave.conf.example）。
+;
+; ── 串口（可选） ───────────────────────────────────────────────
+; 要用 Serial / RTU / ASCII：让 user 属于 dialout 组，然后重启本程序
+;   sudo usermod -aG dialout modbus
+;   sudo supervisorctl restart modbus-master
+;
+; ── 想一条命令同时管主站+从站 ─────────────────────────────────
+; 在同一个 supervisord 里再放一份从站配置，然后新建第三个文件加一个组：
+;   [group:modbus]
+;   programs=modbus-master,modbus-slave
+; 之后即可 `sudo supervisorctl restart modbus:*` 一起重启。

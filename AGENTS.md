@@ -141,5 +141,20 @@ docker compose down
 > `connectAsciiSerial`）；**Windows 宿主**（Docker Desktop 走 WSL2）**传不进 COM 口** ⇒ 串口请改走裸机部署。
 > 另外：主站是**客户端**，**不需要**发布任何 ModBus 端口（它主动连出去）。
 
+## 进程管理器（systemd / supervisor）
+
+仓库根目录带一份 **`modbus-master.conf.example`**（supervisor 配置示例）。用法：
+
+```bash
+sudo cp modbus-master.conf.example /etc/supervisor/conf.d/modbus-master.conf
+sudo supervisorctl reread && sudo supervisorctl update
+```
+
+> ⚠️ supervisor 只管"跑"，**构建仍要自己做**（`pnpm install --frozen-lockfile && pnpm run build`）。
+> ⚠️ 示例里的 `directory` / `user` 要按实际路径改；注释**必须独占一行**（supervisor 不支持行内注释）。
+> ⚠️ 主站是 ModBus **客户端**，不自监听 ModBus 端口 ⇒ **不需要**任何特权端口授权；
+> 要用串口则把该 `user` 加进 `dialout` 组。
+> systemd unit、502 特权端口、串口权限的完整说明见父目录 `DEPLOY.md §3–§4`。
+
 ## 设计规范
 参考 `DESIGN.md`：工业暗色主题，SCADA 监控终端风格。
