@@ -111,7 +111,7 @@ export async function connectClient(
   const client = new ModbusRTU();
   try {
     if (config.protocol === 'tcp') {
-      const host = config.tcpConfig?.host || '127.0.0.1';
+      const host = config.tcpConfig?.host || 'modbus-slave';
       const port = config.tcpConfig?.port || 502;
       await client.connectTCP(host, { port });
     } else if (config.protocol === 'serial') {
