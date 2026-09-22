@@ -65,6 +65,16 @@ export function ConnectionPanel() {
   const { connectDevice, disconnectDevice } = useModbusWs();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConn, setEditingConn] = useState<ConnectionConfig | null>(null);
+  /**
+   * 弹窗「打开次数」计数器 —— 专供 `ConnectionDialog` 的 `key` 用。
+   *
+   * `ConnectionDialog` 是**常驻挂载**的（不像 slave 那样条件挂载），而它的字段是
+   * per-field `useState(editing?.xxx ?? 默认值)` —— 初值**只在挂载时取一次**。
+   * 不加 key 的话，第二次打开会留着上一次的表单内容（编辑 A 再编辑 B 尤其明显）。
+   * 每次打开时 +1 ⇒ key 变化 ⇒ 整棵子树重挂载 ⇒ 初值重新取。
+   * ⚠️ 不能在关闭时换 key：那会让 Radix 的 `animate-out` 来不及播（弹窗会瞬间消失）。
+   */
+  const [dialogSeq, setDialogSeq] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<{ connections: ConnectionConfig[]; tabs: RegisterTabType[]; rowNotes: RowNotes } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ConnectionConfig | null>(null);
@@ -89,6 +99,7 @@ export function ConnectionPanel() {
 
   const handleEdit = (conn: ConnectionConfig) => {
     setEditingConn(conn);
+    setDialogSeq(s => s + 1);
     setDialogOpen(true);
   };
 
@@ -142,6 +153,7 @@ export function ConnectionPanel() {
             className="h-6 w-6 text-muted-foreground hover:text-foreground"
             onClick={() => {
               setEditingConn(null);
+              setDialogSeq(s => s + 1);
               setDialogOpen(true);
             }}
             title={t('newConnection')}
@@ -249,7 +261,12 @@ export function ConnectionPanel() {
 
       {/* 导入/导出已上移到标题栏（见上），原来的独立底栏已删除 */}
 
-      <ConnectionDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editingConn} />
+      <ConnectionDialog
+        key={dialogSeq}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editing={editingConn}
+      />
       <ImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
