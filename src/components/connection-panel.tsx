@@ -533,43 +533,10 @@ function ConnectionDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{t('byteOrder32')}</label>
-              <Select value={byteOrder32} onValueChange={v => setByteOrder32(v as ByteOrder32)}>
-                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {['ABCD', 'DCBA', 'BADC', 'CDAB'].map(o => (
-                    <SelectItem key={o} value={o}>{o}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{t('byteOrder64')}</label>
-              <Select value={byteOrder64} onValueChange={v => setByteOrder64(v as ByteOrder64)}>
-                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {['ABCDEFGH', 'HGFEDCBA', 'BADCFEHG', 'GHEFCDAB'].map(o => (
-                    <SelectItem key={o} value={o}>{o}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {/* 作用范围：16 位固定大端，不受这两种字节序影响（ModBus 规范） */}
-          <p className="text-[11px] leading-relaxed text-muted-foreground/70">
-            {t('byteOrderScopeHint')}
-          </p>
-
           {/* 设备镜像：4 个区的总寄存器数量（= 镜像数组的初始长度） */}
           <div className="border-t border-border pt-3">
             <div className="mb-2 text-xs font-medium text-foreground">
-              {t('deviceImage')}
+              {t('memoryConfiguration')}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -607,6 +574,9 @@ function ConnectionDialog({
                   value={holdingRegisterCount}
                   onChange={e => setHoldingRegisterCount(Math.max(1, parseInt(e.target.value) || 1))}
                 />
+                <span className="block text-[9px] text-muted-foreground/60">
+                  {t('bitLabel')} {bitRange(holdingRegisterCount)}
+                </span>
               </div>
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">{t('inputRegisterCount')}</label>
@@ -617,12 +587,45 @@ function ConnectionDialog({
                   value={inputRegisterCount}
                   onChange={e => setInputRegisterCount(Math.max(1, parseInt(e.target.value) || 1))}
                 />
+                <span className="block text-[9px] text-muted-foreground/60">
+                  {t('bitLabel')} {bitRange(inputRegisterCount)}
+                </span>
               </div>
             </div>
-            <p className="mt-2 text-[9px] leading-relaxed text-muted-foreground/60">
-              {t('deviceImageHint')}
-            </p>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">{t('byteOrder32')}</label>
+              <Select value={byteOrder32} onValueChange={v => setByteOrder32(v as ByteOrder32)}>
+                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['ABCD', 'DCBA', 'BADC', 'CDAB'].map(o => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">{t('byteOrder64')}</label>
+              <Select value={byteOrder64} onValueChange={v => setByteOrder64(v as ByteOrder64)}>
+                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['ABCDEFGH', 'HGFEDCBA', 'BADCFEHG', 'GHEFCDAB'].map(o => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {/* 作用范围：16 位固定大端，不受这两种字节序影响（ModBus 规范） */}
+          <p className="text-[11px] leading-relaxed text-muted-foreground/70">
+            {t('byteOrderScopeHint')}
+          </p>
 
           {slaveId === 0 && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[10px] text-amber-400">
