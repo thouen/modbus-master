@@ -200,7 +200,7 @@ export function ConnectionPanel() {
                 className={`group rounded-md border p-2 cursor-pointer transition-all ${
                   isActive
                     ? 'border-primary/60 bg-primary/[0.06] ring-1 ring-primary/30'
-                    : 'border-border/60 hover:border-border bg-[#0d1117] hover:bg-[#111722]'
+                    : 'border-border/60 hover:border-border bg-surface-list hover:bg-surface-list-hover'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -285,7 +285,7 @@ function ImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#141922] border-border text-foreground sm:max-w-sm">
+      <DialogContent className="border-border text-foreground sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="text-sm">{t('importStrategy')}</DialogTitle>
         </DialogHeader>
@@ -320,7 +320,7 @@ function DeleteConfirmDialog({ target, onClose }: { target: ConnectionConfig | n
 
   return (
     <AlertDialog open={!!target} onOpenChange={v => !v && onClose()}>
-      <AlertDialogContent className="bg-[#141922] border-border text-foreground sm:max-w-sm">
+      <AlertDialogContent className="border-border text-foreground sm:max-w-sm">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-sm">{t('deleteConnection')}</AlertDialogTitle>
           <AlertDialogDescription className="text-xs text-muted-foreground">
@@ -432,7 +432,7 @@ function ConnectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#141922] border-border text-foreground sm:max-w-md">
+      <DialogContent className="border-border text-foreground sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-sm">
             {editing ? t('editConnection') : t('newConnection')}

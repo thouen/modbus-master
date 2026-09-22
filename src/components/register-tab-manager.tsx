@@ -517,7 +517,7 @@ export function RegisterTabManager() {
 
       {/* 广播写入确认 */}
       <AlertDialog open={broadcastConfirmOpen} onOpenChange={setBroadcastConfirmOpen}>
-        <AlertDialogContent className="border-amber-500/40 bg-surface-container">
+        <AlertDialogContent className="border-amber-500/40">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-amber-500">
               <Radio className="h-4 w-4" />

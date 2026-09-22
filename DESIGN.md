@@ -40,6 +40,15 @@
 → `--surface-container`(=card) `#131C2E` → `--surface-container-high` `#1A2438`
 → `--surface-container-highest` `#222E44`
 
+**列表项（连接 / 从站实例卡片）专用**：非选中 `--surface-list` `#0d1117`，悬停 `--surface-list-hover` `#111722`。
+⚠️ 这一对**刻意比 `--surface-container` 更暗** —— 选中态的底色是 `bg-primary/[0.06]`（≈`#10192B` 叠在页面底上），
+若非选中底色比它还亮，选中看起来就成了"变暗"，高亮反而消失。**两端必须共用同一对 token**（2026-09-22 抽成 token）。
+
+**弹窗底色**：一律用**默认 `bg-background`**（`#0B1120`），业务层**不覆盖** `bg-*`。
+⚠️ **不是** `--popover` / `--card`（`#131C2E`），尽管语义上像浮层。
+两端 `ui/dialog.tsx` / `ui/alert-dialog.tsx` 已逐字一致；2026-09-22 清掉了 master 原有的 `#141922` 覆盖（3 处）
+与广播确认弹窗的 `bg-surface-container` —— 至此**两端硬编码色清零**。
+
 **侧栏**：`--sidebar` 跟随 `--surface` `#0E1628`，其余与主体同源。
 
 **图表序列（`--chart-1..5`）**：`#3B82F6` / `#22C55E` / `#F59E0B` / `#06B6D4` / `#8B5CF6`
