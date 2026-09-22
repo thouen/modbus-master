@@ -17,15 +17,17 @@
 #     1. 先把从站跑起来： cd modbus-slave && docker compose up -d --build
 #     2. 再起主站（本仓库）： docker compose up -d --build
 #     3. 打开从站界面 http://localhost:5001
-#        新建从站：TCP，host 0.0.0.0，port 1502，单元号 1 → 启动
+#        新建从站：TCP，host 0.0.0.0，port 502，单元号 1 → 启动
 #     4. 打开主站界面 http://localhost:5000
-#        新建连接：TCP，host **modbus-slave**，port **1502**，slaveId 1 → 连接
+#        新建连接：TCP，host **modbus-slave**，port **502**，slaveId 1 → 连接
 #     5. 读 FC03，应能读到从站推送/注入的寄存器值
 #
 #   ⚠️ 为什么 host 要写 modbus-slave 而不是 127.0.0.1？
 #      发 ModBus 请求的是**主站容器**，不是你的浏览器。
 #      容器里的 127.0.0.1 指向主站容器自己，根本连不到从站。
 #      两个容器挂在同一张 modbus-net 上，用**服务名**就能互相解析。
+#      ⇒ 这也是从裸机迁移过来时最容易漏改的一项：裸机上填的 127.0.0.1
+#        在容器里指向的是自己，必须改成服务名（见 DEPLOY.md §9.8）。
 #
 #   ⚠️ 这里**没有 depends_on**。depends_on 只认同一个 compose 文件里的服务，
 #      跨仓库引用会直接报错（实测：compose 校验阶段就失败）。启动顺序请自己保证。
@@ -59,6 +61,11 @@ services:
     networks:
       - modbus-net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"        # 不设上限会一直涨，长期跑必炸磁盘
+        max-file: "3"
 
 networks:
   modbus-net:
