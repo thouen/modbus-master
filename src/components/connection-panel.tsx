@@ -492,7 +492,7 @@ function ConnectionDialog({
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{t('slave')}</label>
+              <label className="text-xs text-muted-foreground">{t('slaveId')}</label>
               <Input
                 type="number"
                 min={0}
