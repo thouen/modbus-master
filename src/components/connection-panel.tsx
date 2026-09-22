@@ -368,7 +368,7 @@ function ConnectionDialog({
   const [protocol, setProtocol] = useState<Protocol>(editing?.protocol ?? 'tcp');
   const [mode, setMode] = useState<Mode>(editing?.mode ?? 'rtu');
   const [slaveId, setSlaveId] = useState(editing?.slaveId ?? 1);
-  const [host, setHost] = useState(editing?.tcpConfig?.host ?? '127.0.0.1');
+  const [host, setHost] = useState(editing?.tcpConfig?.host ?? 'modbus-slave');
   const [port, setPort] = useState(editing?.tcpConfig?.port ?? 502);
   const [serialPort, setSerialPort] = useState(editing?.serialConfig?.port ?? '/dev/ttyUSB0');
   const [baudRate, setBaudRate] = useState(editing?.serialConfig?.baudRate ?? 9600);
