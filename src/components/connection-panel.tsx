@@ -432,7 +432,7 @@ function ConnectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border text-foreground sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-sm">
             {editing ? t('editConnection') : t('newConnection')}
@@ -453,7 +453,7 @@ function ConnectionDialog({
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">{t('protocol')}</label>
               <Select value={protocol} onValueChange={v => setProtocol(v as Protocol)}>
-                <SelectTrigger className="h-8 text-xs bg-background border-border">
+                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -465,7 +465,7 @@ function ConnectionDialog({
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">{t('mode')}</label>
               <Select value={mode} onValueChange={v => setMode(v as Mode)}>
-                <SelectTrigger className="h-8 text-xs bg-background border-border">
+                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -520,7 +520,7 @@ function ConnectionDialog({
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">{t('baudRate')}</label>
                 <Select value={String(baudRate)} onValueChange={v => setBaudRate(Number(v))}>
-                  <SelectTrigger className="h-8 text-xs bg-background border-border">
+                  <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -537,7 +537,7 @@ function ConnectionDialog({
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">{t('byteOrder32')}</label>
               <Select value={byteOrder32} onValueChange={v => setByteOrder32(v as ByteOrder32)}>
-                <SelectTrigger className="h-8 text-xs bg-background border-border">
+                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -550,7 +550,7 @@ function ConnectionDialog({
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">{t('byteOrder64')}</label>
               <Select value={byteOrder64} onValueChange={v => setByteOrder64(v as ByteOrder64)}>
-                <SelectTrigger className="h-8 text-xs bg-background border-border">
+                <SelectTrigger className="h-8 w-full text-xs bg-background border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

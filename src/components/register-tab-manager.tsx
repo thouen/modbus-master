@@ -1260,9 +1260,7 @@ function ConfigBar({
       </label>
 
       {/* 32 位字节序 —— ⭐ **只读**：字节序是所绑定**连接**的设备属性，标签只是视图 */}
-      {(tab.displayFormat === "long" ||
-        tab.displayFormat === "ulong" ||
-        tab.displayFormat === "float") && (
+      {
         <span
           className="hidden items-center gap-1.5 text-[11px] text-muted-foreground lg:flex"
           title={t("byteOrderFollowsHint")}
@@ -1271,12 +1269,11 @@ function ConfigBar({
           <span className="rounded border border-border/40 bg-foreground/5 px-2 py-0.5 font-mono text-xs text-foreground/70">
             {byteOrder32}
           </span>
-          <span className="text-[10px] text-muted-foreground/60">{t("byteOrderFollows")}</span>
         </span>
-      )}
+      }
 
       {/* 64 位字节序 —— ⭐ 同上，只读 */}
-      {tab.displayFormat === "double" && (
+      {
         <span
           className="hidden items-center gap-1.5 text-[11px] text-muted-foreground lg:flex"
           title={t("byteOrderFollowsHint")}
@@ -1285,9 +1282,8 @@ function ConfigBar({
           <span className="rounded border border-border/40 bg-foreground/5 px-2 py-0.5 font-mono text-xs text-foreground/70">
             {byteOrder64}
           </span>
-          <span className="text-[10px] text-muted-foreground/60">{t("byteOrderFollows")}</span>
         </span>
-      )}
+      }
 
       <span className="h-4 w-px bg-border/30" />
 
